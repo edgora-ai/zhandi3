@@ -1,0 +1,8 @@
+# Godot 编辑器/导入缓存
+.godot/
+# 本地运行时（见 AGENTS.md 边界约定，不进版本库）
+tools/Godot.app/
+tools/godot_app/
+tools/godot.zip
+# macOS
+.DS_Store

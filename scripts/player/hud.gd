@@ -1,0 +1,343 @@
+class_name HUD
+extends CanvasLayer
+## 玩家 HUD：准星、血条/护甲、弹药、毒圈状态、击杀播报、占点提示、结算画面
+
+var _ui: Control
+var _crosshair_lines := []
+var _crosshair_dot: ColorRect
+var _hp_bar: ColorRect
+var _armor_bar: ColorRect
+var _hp_label: Label
+var _ammo_label: Label
+var _weapon_label: Label
+var _zone_label: Label
+var _alive_label: Label
+var _kills_label: Label
+var _feed_box: VBoxContainer
+var _interact_label: Label
+var _capture_bar: ColorRect
+var _capture_wrap: Control
+var _capture_label: Label
+var _vignette: TextureRect
+var _end_panel: Control
+var _pause_panel: Control
+var _spread_px := 8.0
+
+
+func _ready() -> void:
+	layer = 10
+	_ui = Control.new()
+	_ui.name = "UI"
+	_ui.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 默认字体不含中文字形，且字形回退链对部分字符失效 —— 直接整体换成内置 Noto Sans SC
+	var font_path := "res://assets/fonts/NotoSansCJKsc-Regular.otf"
+	if FileAccess.file_exists(font_path):
+		var font := FontFile.new()
+		font.data = FileAccess.get_file_as_bytes(font_path)
+		var theme := Theme.new()
+		theme.default_font = font
+		_ui.theme = theme
+	add_child(_ui)
+	_build_crosshair()
+	_build_bars()
+	_build_top()
+	_build_feed()
+	_build_vignette()
+	_ignore_mouse(_ui)
+
+
+# HUD 全部控件不接收鼠标事件：捕获模式下光标钉在屏幕中心，
+# 任何 mouse_filter=STOP 的可见控件（如准星）都会吞掉转向/开火输入
+func _ignore_mouse(node: Node) -> void:
+	if node is Control:
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in node.get_children():
+		_ignore_mouse(child)
+
+
+func _mk_label(parent: Control, text: String, size: int, color: Color = Color.WHITE) -> Label:
+	var l := Label.new()
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	l.add_theme_constant_override("shadow_size", 3)
+	l.add_theme_constant_override("shadow_offset_x", 1)
+	l.add_theme_constant_override("shadow_offset_y", 2)
+	parent.add_child(l)
+	return l
+
+
+func _mk_rect(parent: Control, pos: Vector2, size: Vector2, color: Color) -> ColorRect:
+	var r := ColorRect.new()
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.color = color
+	r.position = pos
+	r.size = size
+	parent.add_child(r)
+	return r
+
+
+# ---------- 准星 ----------
+
+func _build_crosshair() -> void:
+	var c := Control.new()
+	c.name = "Crosshair"
+	c.set_anchors_preset(Control.PRESET_CENTER)
+	_ui.add_child(c)
+	for i in range(4):
+		var line := ColorRect.new()
+		line.color = Color(1, 1, 1, 0.9)
+		line.size = Vector2(2, 10) if i < 2 else Vector2(10, 2)
+		c.add_child(line)
+		_crosshair_lines.append(line)
+	_crosshair_dot = ColorRect.new()
+	_crosshair_dot.color = Color(1, 1, 1, 0.9)
+	_crosshair_dot.size = Vector2(3, 3)
+	c.add_child(_crosshair_dot)
+	_layout_crosshair()
+
+
+func _layout_crosshair() -> void:
+	var gap := _spread_px
+	# 0上 1下 2左 3右
+	_crosshair_lines[0].position = Vector2(-1, -gap - 10)
+	_crosshair_lines[1].position = Vector2(-1, gap)
+	_crosshair_lines[2].position = Vector2(-gap - 10, -1)
+	_crosshair_lines[3].position = Vector2(gap, -1)
+	_crosshair_dot.position = Vector2(-1.5, -1.5)
+
+
+func set_spread(px: float) -> void:
+	_spread_px = lerpf(_spread_px, px, 0.25)
+	_layout_crosshair()
+
+
+func set_crosshair_visible(v: bool) -> void:
+	for l in _crosshair_lines:
+		l.visible = v
+	_crosshair_dot.visible = v
+
+
+# ---------- 血条 / 弹药 ----------
+
+func _build_bars() -> void:
+	var wrap := Control.new()
+	wrap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	wrap.position = Vector2(24, -70)
+	_ui.add_child(wrap)
+	_mk_rect(wrap, Vector2.ZERO, Vector2(260, 14), Color(0, 0, 0, 0.45))
+	_hp_bar = _mk_rect(wrap, Vector2(2, 2), Vector2(256, 10), Color(0.35, 0.85, 0.35))
+	_mk_rect(wrap, Vector2(0, -10), Vector2(260, 7), Color(0, 0, 0, 0.45))
+	_armor_bar = _mk_rect(wrap, Vector2(2, -8), Vector2(0, 3), Color(0.35, 0.6, 1.0))
+	_hp_label = _mk_label(wrap, "100", 20)
+	_hp_label.position = Vector2(268, -8)
+
+	var aw := Control.new()
+	aw.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	aw.position = Vector2(-280, -80)
+	_ui.add_child(aw)
+	_weapon_label = _mk_label(aw, "徒手", 18, Color(0.9, 0.9, 0.8))
+	_weapon_label.position = Vector2(0, 0)
+	_ammo_label = _mk_label(aw, "--", 34)
+	_ammo_label.position = Vector2(60, 16)
+
+
+func set_health(hp: float, armor: float) -> void:
+	_hp_bar.size.x = 256.0 * clampf(hp / 100.0, 0.0, 1.0)
+	_armor_bar.size.x = 256.0 * clampf(armor / 100.0, 0.0, 1.0)
+	_hp_bar.color = Color(0.35, 0.85, 0.35) if hp > 35 else Color(0.9, 0.3, 0.2)
+	_hp_label.text = str(int(ceil(hp)))
+
+
+func set_ammo(mag: int, reserve: int) -> void:
+	_ammo_label.text = "%d / %d" % [mag, reserve]
+
+
+func set_weapon_name(n: String) -> void:
+	_weapon_label.text = n
+
+
+func set_ammo_text(t: String) -> void:
+	_ammo_label.text = t
+
+
+# ---------- 顶部信息 ----------
+
+func _build_top() -> void:
+	var wrap := Control.new()
+	wrap.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	wrap.position = Vector2(-200, 14)
+	_ui.add_child(wrap)
+	_zone_label = _mk_label(wrap, "", 20, Color(0.75, 0.95, 1.0))
+	_zone_label.position = Vector2(0, 0)
+	_zone_label.size.x = 400
+	_zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	var rw := Control.new()
+	rw.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	rw.position = Vector2(-220, 14)
+	_ui.add_child(rw)
+	_alive_label = _mk_label(rw, "存活 24", 20)
+	_kills_label = _mk_label(rw, "击杀 0", 20, Color(1.0, 0.85, 0.4))
+	_kills_label.position = Vector2(0, 26)
+
+	_capture_wrap = Control.new()
+	_capture_wrap.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_capture_wrap.position = Vector2(-130, 52)
+	_ui.add_child(_capture_wrap)
+	_capture_label = _mk_label(_capture_wrap, "占领中...", 16, Color(1.0, 0.95, 0.6))
+	_capture_label.position = Vector2(0, 0)
+	_capture_label.size.x = 260
+	_capture_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mk_rect(_capture_wrap, Vector2(0, 24), Vector2(260, 8), Color(0, 0, 0, 0.45))
+	_capture_bar = _mk_rect(_capture_wrap, Vector2(2, 26), Vector2(0, 4), Color(1.0, 0.85, 0.3))
+	_capture_wrap.visible = false
+
+
+func set_zone_text(t: String) -> void:
+	_zone_label.text = t
+
+
+func set_alive(n: int) -> void:
+	_alive_label.text = "存活 %d" % n
+
+
+func set_kills(n: int) -> void:
+	_kills_label.text = "击杀 %d" % n
+
+
+func set_capture(text: String, frac: float) -> void:
+	if frac < 0.0:
+		_capture_wrap.visible = false
+		return
+	_capture_wrap.visible = true
+	_capture_label.text = text
+	_capture_bar.size.x = 256.0 * clampf(frac, 0.0, 1.0)
+
+
+# ---------- 击杀播报 ----------
+
+func _build_feed() -> void:
+	_feed_box = VBoxContainer.new()
+	_feed_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_feed_box.position = Vector2(-420, 70)
+	_feed_box.custom_minimum_size.x = 400
+	_feed_box.alignment = BoxContainer.ALIGNMENT_END
+	_ui.add_child(_feed_box)
+
+
+func add_feed(text: String) -> void:
+	var l := _mk_label(_feed_box, text, 15, Color(0.95, 0.95, 0.9))
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	l.size_flags_horizontal = Control.SIZE_SHRINK_END
+	var tw := l.create_tween()
+	tw.tween_interval(4.5)
+	tw.tween_property(l, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(l.queue_free)
+	while _feed_box.get_child_count() > 5:
+		_feed_box.get_child(0).queue_free()
+
+
+# ---------- 交互提示 / 受击 ----------
+
+func set_interact(text: String) -> void:
+	if _interact_label == null:
+		_interact_label = Label.new()
+		_interact_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_interact_label.add_theme_font_size_override("font_size", 18)
+		_interact_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.8))
+		_interact_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		_interact_label.add_theme_constant_override("shadow_size", 3)
+		_interact_label.set_anchors_preset(Control.PRESET_CENTER)
+		_interact_label.position = Vector2(-120, 90)
+		_interact_label.size.x = 240
+		_interact_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_ui.add_child(_interact_label)
+	_interact_label.text = text
+	_interact_label.visible = text != ""
+
+
+func _build_vignette() -> void:
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.7, 0.05, 0.05, 0.55))
+	grad.set_color(1, Color(0.7, 0.05, 0.05, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 512
+	tex.height = 288
+	_vignette = TextureRect.new()
+	_vignette.texture = tex
+	_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_vignette.modulate.a = 0.0
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui.add_child(_vignette)
+
+
+func flash_damage() -> void:
+	_vignette.modulate.a = 1.0
+	var tw := _vignette.create_tween()
+	tw.tween_property(_vignette, "modulate:a", 0.0, 0.6)
+
+
+func set_danger(on: bool) -> void:
+	if on and _vignette.modulate.a < 0.25:
+		_vignette.modulate.a = 0.25
+
+
+# ---------- 结算 ----------
+
+func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
+	if _end_panel:
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_end_panel = Control.new()
+	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ui.add_child(_end_panel)
+	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.55))
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.position = Vector2(-250, -110)
+	box.custom_minimum_size.x = 500
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_end_panel.add_child(box)
+	var title := _mk_label(box, "大吉大利，今晚吃鸡！" if victory else "阵 亡", 52, Color(1.0, 0.85, 0.3) if victory else Color(0.95, 0.4, 0.3))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var sub := _mk_label(box, "排名 #%d / %d      击杀 %d" % [rank, total, kills], 24)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var hint := _mk_label(box, "按 R 重新开始", 20, Color(0.8, 0.9, 1.0))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ignore_mouse(_end_panel)
+
+
+# ---------- 暂停（窗口失焦） ----------
+
+func show_pause() -> void:
+	if _pause_panel:
+		return
+	_pause_panel = Control.new()
+	_pause_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ui.add_child(_pause_panel)
+	_mk_rect(_pause_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.5))
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.position = Vector2(-250, -60)
+	box.custom_minimum_size.x = 500
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_pause_panel.add_child(box)
+	var title := _mk_label(box, "已 暂 停", 44, Color(1.0, 0.95, 0.7))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var sub := _mk_label(box, "窗口失去焦点，点击游戏窗口继续", 20, Color(0.8, 0.9, 1.0))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ignore_mouse(_pause_panel)
+
+
+func hide_pause() -> void:
+	if _pause_panel:
+		_pause_panel.queue_free()
+		_pause_panel = null

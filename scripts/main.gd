@@ -107,6 +107,10 @@ func _ready() -> void:
 		_focus_recovery_test_frame = 0
 	if args.has("--seasontest"):
 		_season_test_frame = 0
+	if args.has("--feedtest"):
+		for i in range(12):
+			hud.add_feed("播报上限回归 %02d" % i)
+		print("[feedtest] items=%d expected=%d" % [hud.feed_item_count(), HUD.MAX_FEED_ITEMS])
 	if args.has("--endtest"):
 		hud.show_end(false, 12, 3, 24)
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):

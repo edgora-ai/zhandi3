@@ -100,6 +100,40 @@ tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --n
 
 经验：任何会暂停自身执行环境的模块，都必须提供在该环境之外运行的恢复路径。
 
+### 3.5 相同症状的第二个根因：延迟删除导致无限循环
+
+四季改动后再次出现“画面停止、声音仍在播放”，但这次活动监视器显示 Godot 占用约 88GB 内存。现场证据与失焦暂停完全不同：
+
+- 固定种子战局在第 6 条季节/占点/击杀播报附近停止心跳，主线程接近 100% CPU。
+- macOS `sample` 显示进程 physical footprint 已达 42.4GB，主线程持续进入 `malloc`；终止测试时记录到 67.4GB 峰值 footprint。
+- 引擎内 `Performance.MEMORY_STATIC` 仍显示约 180MB，说明只看 Godot 静态内存监控会漏掉这类主线程分配风暴。
+
+根因是 HUD 用下面的逻辑限制播报数量：
+
+```gdscript
+while container.get_child_count() > 5:
+    container.get_child(0).queue_free()
+```
+
+`queue_free()` 只把节点标记为帧末删除，当前循环里的 `get_child_count()` 不会下降。因此第 6 条播报加入后条件永久为真，同一个节点被反复排队删除，CPU 和内存会在单帧内失控。
+
+正确做法是先让容器状态立即收敛，再延迟释放：
+
+```gdscript
+while container.get_child_count() > MAX_ITEMS:
+    var oldest := container.get_child(0)
+    container.remove_child(oldest)
+    oldest.queue_free()
+```
+
+专用回归测试会一次加入 12 条播报，并确认最终只保留 5 条：
+
+```bash
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 30 -- --noworld --feedtest
+```
+
+期望日志：`[feedtest] items=5 expected=5`。经验：不要在同一循环中依赖任何延迟执行 API 改变循环条件；`queue_free()`、`call_deferred()` 和 `set_deferred()` 都应按这个原则审查。
+
 ## 4. 程序化渲染与碰撞
 
 ### 4.1 Godot 4 API 和 shader 易错点
@@ -205,6 +239,9 @@ tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --m
 
 # 四季配置消费者联动检查
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --seasontest
+
+# HUD 播报数量上限（覆盖 queue_free 延迟删除陷阱）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 30 -- --noworld --feedtest
 ```
 
 视觉改动不能只看编译通过；运行时问题不能只看单张截图。

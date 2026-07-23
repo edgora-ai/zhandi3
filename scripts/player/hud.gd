@@ -2,6 +2,8 @@ class_name HUD
 extends CanvasLayer
 ## 玩家 HUD：准星、血条/护甲、弹药、毒圈状态、击杀播报、占点提示、结算画面
 
+const MAX_FEED_ITEMS := 5
+
 var _ui: Control
 var _crosshair_lines := []
 var _crosshair_dot: ColorRect
@@ -237,8 +239,15 @@ func add_feed(text: String) -> void:
 	tw.tween_interval(4.5)
 	tw.tween_property(l, "modulate:a", 0.0, 0.8)
 	tw.tween_callback(l.queue_free)
-	while _feed_box.get_child_count() > 5:
-		_feed_box.get_child(0).queue_free()
+	while _feed_box.get_child_count() > MAX_FEED_ITEMS:
+		var oldest := _feed_box.get_child(0)
+		# queue_free() 到帧末才移除节点；先脱离容器才能让当前循环收敛。
+		_feed_box.remove_child(oldest)
+		oldest.queue_free()
+
+
+func feed_item_count() -> int:
+	return _feed_box.get_child_count()
 
 
 # ---------- 交互提示 / 受击 ----------

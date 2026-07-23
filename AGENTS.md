@@ -11,6 +11,7 @@ Godot 4.7.1 + GDScript 的单机 3D FPS（战地玩法 × 吃鸡框架 × 旷野
 - Godot 4 注意：描边用 `grow`（不是 grow_enabled）；shader 里实例矩阵是 `MODEL_MATRIX`（不是 INSTANCE_TRANSFORM）；**前向面是顺时针绕序**（自建网格三角形绕反会导致 trimesh 碰撞单向失效——踩过坑，terrain 已开 `backface_collision`）
 - 中文文本一律走 HUD 的主题字体（assets/fonts/NotoSansCJKsc-Regular.otf），不要依赖系统字体或字形回退链
 - GDScript 对 Variant 不能用 `:=` 推断（字典取值、get_nodes_in_group 返回值等），写显式类型
+- `queue_free()` 到帧末才真正移除节点；循环裁剪子节点时先 `remove_child()` 或使用有界迭代，不能等它改变当前帧的 `get_child_count()`
 
 ## 验证（改完必跑）
 

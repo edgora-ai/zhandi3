@@ -31,6 +31,8 @@ var _m_wood_d: StandardMaterial3D
 var _m_glass: StandardMaterial3D
 var _m_sand: StandardMaterial3D
 var _m_metal: StandardMaterial3D
+var _m_snow: StandardMaterial3D
+var _snow_caps: Array[MeshInstance3D] = []
 
 var _terrain: Terrain
 
@@ -49,6 +51,7 @@ func generate(terrain: Terrain) -> void:
 	_m_glass = Toon.make_material(GLASS, false)
 	_m_sand = Toon.make_material(SAND, true, 0.01)
 	_m_metal = Toon.make_material(METAL, true, 0.01)
+	_m_snow = Toon.make_material(Color(0.88, 0.94, 0.98), true, 0.008)
 
 	for i in range(VILLAGE_COUNT):
 		var c := _find_village_spot()
@@ -194,6 +197,16 @@ func _gable_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Ma
 	mi.material_override = mat
 	mi.position.y = y
 	parent.add_child(mi)
+	# 同一轮廓的薄雪盖，冬季直接显隐，避免运行时重建建筑网格。
+	var snow := MeshInstance3D.new()
+	snow.mesh = mesh
+	snow.material_override = _m_snow
+	snow.position.y = y + 0.045
+	snow.scale = Vector3(1.012, 1.012, 1.012)
+	snow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	snow.visible = false
+	parent.add_child(snow)
+	_snow_caps.append(snow)
 
 
 # 带门洞的前墙：两段侧墙 + 门楣 + 木门框
@@ -216,6 +229,24 @@ func _window(parent: Node3D, pos: Vector3, rot_y: float = 0.0) -> void:
 	_part(Vector3(0.7, 0.7, 0.06), _m_glass, pos, parent, rot_y)
 	_part(Vector3(0.82, 0.08, 0.1), _m_wood_d, pos + Vector3(0, 0.4, 0), parent, rot_y)
 	_part(Vector3(0.82, 0.08, 0.1), _m_wood_d, pos - Vector3(0, 0.4, 0), parent, rot_y)
+	var side := Vector3(cos(rot_y), 0, -sin(rot_y)) * 0.4
+	_part(Vector3(0.08, 0.82, 0.1), _m_wood_d, pos - side, parent, rot_y)
+	_part(Vector3(0.08, 0.82, 0.1), _m_wood_d, pos + side, parent, rot_y)
+	# 十字窗棂让远处窗口也有清晰轮廓。
+	_part(Vector3(0.06, 0.72, 0.11), _m_wood_d, pos, parent, rot_y)
+	_part(Vector3(0.72, 0.06, 0.11), _m_wood_d, pos, parent, rot_y)
+
+
+func _house_timber_frame(parent: Node3D, w: float, d: float, h: float) -> void:
+	# 墙面之外再叠一层木构骨架，形成墙、梁、柱三层体块。
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_part(Vector3(0.16, h + 0.14, 0.16), _m_wood_d, Vector3(sx * w * 0.5, h * 0.5, sz * d * 0.5), parent)
+	for y in [0.18, h - 0.12]:
+		_part(Vector3(w + 0.18, 0.15, 0.16), _m_wood_d, Vector3(0, y, d * 0.5), parent)
+		_part(Vector3(w + 0.18, 0.15, 0.16), _m_wood_d, Vector3(0, y, -d * 0.5), parent)
+		_part(Vector3(0.16, 0.15, d + 0.18), _m_wood_d, Vector3(-w * 0.5, y, 0), parent)
+		_part(Vector3(0.16, 0.15, d + 0.18), _m_wood_d, Vector3(w * 0.5, y, 0), parent)
 
 
 # ---------- 房型 ----------
@@ -233,7 +264,8 @@ func _make_house(p: Vector3, rot: float, two_story: bool) -> void:
 	var wall_mat: StandardMaterial3D = [_m_wall, _m_wood_wall, _m_brick][_rng.randi_range(0, 2)]
 	var roof_mat: StandardMaterial3D = _m_roof_r if _rng.randf() < 0.6 else _m_roof_b
 
-	# 地板 + 四面墙（前面带门洞）
+	# 石质基座 + 地板 + 四面墙（前面带门洞）
+	_part(Vector3(w + 0.35, 0.38, d + 0.35), _m_brick, Vector3(0, -0.05, 0), g)
 	_part(Vector3(w, 0.2, d), _m_wood_d, Vector3(0, 0.1, 0), g)
 	_part(Vector3(w, h, 0.18), wall_mat, Vector3(0, h * 0.5, d * 0.5), g)
 	_col(body, Vector3(w, h, 0.18), Vector3(0, h * 0.5, d * 0.5))
@@ -242,6 +274,7 @@ func _make_house(p: Vector3, rot: float, two_story: bool) -> void:
 	_part(Vector3(0.18, h, d), wall_mat, Vector3(w * 0.5, h * 0.5, 0), g)
 	_col(body, Vector3(0.18, h, d), Vector3(w * 0.5, h * 0.5, 0))
 	_front_wall(g, body, w, h, -d * 0.5, wall_mat)
+	_house_timber_frame(g, w, d, h)
 
 	if two_story:
 		# 中层楼板 + 二层窗户
@@ -253,7 +286,12 @@ func _make_house(p: Vector3, rot: float, two_story: bool) -> void:
 		_window(g, Vector3(-w * 0.5 - 0.06, 1.5, 0.6), PI * 0.5)
 		_window(g, Vector3(w * 0.5 + 0.06, 1.5, -0.6), PI * 0.5)
 
-	_gable_roof(g, w + 0.7, 1.5 if two_story else 1.3, d + 0.9, h, roof_mat)
+	var roof_h := 1.5 if two_story else 1.3
+	_gable_roof(g, w + 0.7, roof_h, d + 0.9, h, roof_mat)
+	# 深色屋脊与檐口，把单块屋顶拆成可读的层次。
+	_part(Vector3(0.18, 0.18, d + 1.05), _m_wood_d, Vector3(0, h + roof_h + 0.04, 0), g)
+	_part(Vector3(w + 0.85, 0.14, 0.18), _m_wood_d, Vector3(0, h + 0.02, d * 0.5 + 0.46), g)
+	_part(Vector3(w + 0.85, 0.14, 0.18), _m_wood_d, Vector3(0, h + 0.02, -d * 0.5 - 0.46), g)
 	# 烟囱
 	if _rng.randf() < 0.5:
 		_part(Vector3(0.4, 1.2, 0.4), _m_brick, Vector3(w * 0.25, h + 0.9, d * 0.15), g)
@@ -282,6 +320,12 @@ func _make_warehouse(p: Vector3, rot: float) -> void:
 	# 宽大库门洞
 	_front_wall(g, body, w, h, -d * 0.5, _m_metal, 3.0, 2.9)
 	_gable_roof(g, w + 0.7, 1.6, d + 0.9, h, _m_roof_d)
+	# 仓库立向压条，弱化大块平墙的塑料盒感。
+	for x in range(-3, 4):
+		_part(Vector3(0.055, h - 0.2, 0.08), _m_wood_d, Vector3(float(x) * 1.15, h * 0.5, d * 0.5 + 0.08), g)
+	for z in range(-2, 3):
+		_part(Vector3(0.08, h - 0.2, 0.055), _m_wood_d, Vector3(-w * 0.5 - 0.08, h * 0.5, float(z) * 1.25), g)
+		_part(Vector3(0.08, h - 0.2, 0.055), _m_wood_d, Vector3(w * 0.5 + 0.08, h * 0.5, float(z) * 1.25), g)
 	# 库内物资箱
 	_make_crate(Vector3(-w * 0.28, 0.45, d * 0.15), 0.3, g)
 	_make_crate(Vector3(-w * 0.28, 1.3, d * 0.15), 0.8, g, 0.8)
@@ -447,9 +491,32 @@ func _make_dock() -> void:
 		if i % 2 == 0:
 			for sx in [-0.95, 0.95]:
 				_part(Vector3(0.16, 2.4, 0.16), _m_wood_d, Vector3(sx, -1.1, i * 1.85 + 0.9), g)
+				_part(Vector3(0.18, 1.75, 0.18), _m_wood_d, Vector3(sx, 0.82, i * 1.85 + 0.9), g)
 	_part(Vector3(2.3, 0.1, 0.4), _m_wood_d, Vector3(0, 0.02, 15.6), g)
+	# 两侧下垂绳索：分段盒体模拟绳桥轮廓，保持纯程序化且开销固定。
+	for sx in [-0.98, 0.98]:
+		_rope_line(g, sx, 0.9, 14.8, 1.58, 0.34)
 	# 小船泊在桥尾
 	_make_boat(g.position + Vector3(cos(yaw) * 3.2, -0.35, sin(yaw) * 3.2 + 12.0), yaw + 0.25)
+
+
+func _rope_line(parent: Node3D, x: float, z0: float, z1: float, height: float, sag: float) -> void:
+	var segments := 18
+	for i in range(segments):
+		var t0 := float(i) / segments
+		var t1 := float(i + 1) / segments
+		var a := Vector3(x, height - sin(t0 * PI) * sag, lerpf(z0, z1, t0))
+		var b := Vector3(x, height - sin(t1 * PI) * sag, lerpf(z0, z1, t1))
+		var delta := b - a
+		var part := _part(Vector3(0.055, 0.055, delta.length() + 0.025), _m_wood_d, (a + b) * 0.5, parent)
+		part.rotation.x = -atan2(delta.y, delta.z)
+
+
+func set_season(season_name: String) -> void:
+	var winter := season_name == "winter"
+	for cap in _snow_caps:
+		if is_instance_valid(cap):
+			cap.visible = winter
 
 
 func _make_boat(p: Vector3, rot: float) -> void:

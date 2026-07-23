@@ -8,6 +8,7 @@ const INSTANCE_LOCK := "user://zhandi3_game.pid"
 var terrain: Terrain
 var props: Props
 var buildings: Buildings
+var seasons: SeasonSystem
 var player: Player
 var hud: HUD
 var zone: Zone
@@ -33,6 +34,7 @@ var _focus_pause_owned := false
 var _focus_recovery_timer: Timer
 var _focus_recovery_test_frame := -1
 var _focus_recovery_test_pending := false
+var _season_test_frame := -1
 
 
 func _ready() -> void:
@@ -78,6 +80,17 @@ func _ready() -> void:
 	else:
 		rng.randomize()
 	_spawn_player(rng)
+	seasons = SeasonSystem.new()
+	seasons.name = "SeasonSystem"
+	add_child(seasons)
+	seasons.season_changed.connect(func(_season_name: String, display_name: String) -> void:
+		hud.add_feed("季节切换：%s" % display_name)
+	)
+	var initial_season := "spring"
+	var season_i := args.find("--season")
+	if season_i >= 0 and season_i + 1 < args.size():
+		initial_season = args[season_i + 1]
+	seasons.setup(terrain, props, buildings, player, initial_season)
 	if not args.has("--noworld"):
 		_spawn_bots(rng)
 		_spawn_capture_points(rng)
@@ -92,6 +105,8 @@ func _ready() -> void:
 	_smoketest = args.has("--smoketest")
 	if args.has("--focusrecoverytest"):
 		_focus_recovery_test_frame = 0
+	if args.has("--seasontest"):
+		_season_test_frame = 0
 	if args.has("--endtest"):
 		hud.show_end(false, 12, 3, 24)
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
@@ -373,6 +388,13 @@ func _poll_focus_recovery() -> void:
 
 
 func _process(delta: float) -> void:
+	if _season_test_frame >= 0:
+		_season_test_frame += 1
+		if _season_test_frame in [20, 40, 60]:
+			seasons.cycle_season()
+		elif _season_test_frame == 80:
+			print("[seasontest] done at ", seasons.current_season)
+			_season_test_frame = -1
 	if _focus_recovery_test_frame >= 0:
 		_focus_recovery_test_frame += 1
 		if _focus_recovery_test_frame == 20:

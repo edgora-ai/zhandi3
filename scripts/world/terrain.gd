@@ -20,6 +20,8 @@ const SAND := Color(0.82, 0.76, 0.55)
 var noise := FastNoiseLite.new()
 var patch_noise := FastNoiseLite.new()
 var mesh_instance: MeshInstance3D
+var _ground_material: ShaderMaterial
+var _water_material: ShaderMaterial
 
 
 func _init() -> void:
@@ -91,13 +93,9 @@ func _build() -> void:
 
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-	mat.specular_mode = BaseMaterial3D.SPECULAR_TOON
-	mat.roughness = 1.0
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mesh_instance.material_override = mat
+	_ground_material = ShaderMaterial.new()
+	_ground_material.shader = load("res://assets/shaders/ground.gdshader")
+	mesh_instance.material_override = _ground_material
 	add_child(mesh_instance)
 
 	var body := StaticBody3D.new()
@@ -137,13 +135,25 @@ func _build_water() -> void:
 	water.name = "Water"
 	water.mesh = plane
 	water.position.y = WATER_LEVEL
-	var sm := ShaderMaterial.new()
-	sm.shader = load("res://assets/shaders/water.gdshader")
-	sm.set_shader_parameter("u_height_map", _bake_heightmap())
-	sm.set_shader_parameter("u_water_level", WATER_LEVEL)
-	sm.set_shader_parameter("u_ground_half", HALF)
-	water.material_override = sm
+	_water_material = ShaderMaterial.new()
+	_water_material.shader = load("res://assets/shaders/water.gdshader")
+	_water_material.set_shader_parameter("u_height_map", _bake_heightmap())
+	_water_material.set_shader_parameter("u_water_level", WATER_LEVEL)
+	_water_material.set_shader_parameter("u_ground_half", HALF)
+	water.material_override = _water_material
 	add_child(water)
+
+
+func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, water_shallow: Color, water_deep: Color, rain_amount: float, ice_amount: float) -> void:
+	if _ground_material:
+		_ground_material.set_shader_parameter("season_tint", ground_tint)
+		_ground_material.set_shader_parameter("snow_amount", snow_amount)
+		_ground_material.set_shader_parameter("wetness", wetness)
+	if _water_material:
+		_water_material.set_shader_parameter("color_shallow", water_shallow)
+		_water_material.set_shader_parameter("color_deep", water_deep)
+		_water_material.set_shader_parameter("rain_amount", rain_amount)
+		_water_material.set_shader_parameter("ice_amount", ice_amount)
 
 
 # 水面 shader 用：把解析高度烘成单通道纹理（R = 高度，米）

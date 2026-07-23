@@ -8,7 +8,10 @@ uniform float u_ground_half = 250.0;
 uniform vec4 color_shallow : source_color = vec4(0.35, 0.76, 0.76, 1.0);
 uniform vec4 color_deep : source_color = vec4(0.05, 0.30, 0.52, 1.0);
 uniform vec4 color_foam : source_color = vec4(0.95, 0.99, 1.0, 1.0);
+uniform vec4 color_ice : source_color = vec4(0.76, 0.90, 0.98, 1.0);
 uniform float wave_speed = 1.0;
+uniform float rain_amount : hint_range(0.0, 1.0) = 0.0;
+uniform float ice_amount : hint_range(0.0, 1.0) = 0.0;
 
 varying vec3 v_world;
 
@@ -33,7 +36,8 @@ void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float t = TIME * wave_speed;
 	// 两组低频行波叠加的涌浪
-	VERTEX.y += sin(wp.x * 0.30 + t * 1.4) * 0.11 + sin(wp.z * 0.24 - t * 1.0 + wp.x * 0.12) * 0.09;
+	float open_water = 1.0 - ice_amount * 0.92;
+	VERTEX.y += (sin(wp.x * 0.30 + t * 1.4) * 0.11 + sin(wp.z * 0.24 - t * 1.0 + wp.x * 0.12) * 0.09) * open_water;
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
@@ -67,6 +71,28 @@ void fragment() {
 	foam = clamp(foam, 0.0, 1.0);
 	col = mix(col, color_foam.rgb, foam);
 	alpha = max(alpha, foam * 0.95);
+
+	// 雨季水片：世界空间格子生成随机扩散的小圆环，不依赖外部雨滴贴图。
+	vec2 rain_uv = v_world.xz * 0.72;
+	vec2 rain_cell = floor(rain_uv);
+	vec2 rain_local = fract(rain_uv) - 0.5;
+	float rain_rand = vhash(rain_cell);
+	vec2 rain_center = vec2(vhash(rain_cell + 17.0), vhash(rain_cell + 41.0)) - 0.5;
+	float rain_phase = fract(t * 0.85 + rain_rand);
+	float rain_dist = length(rain_local - rain_center * 0.55);
+	float rain_ring = smoothstep(0.035, 0.0, abs(rain_dist - rain_phase * 0.42));
+	rain_ring *= smoothstep(1.0, 0.45, rain_phase) * step(0.52, rain_rand) * rain_amount;
+	col = mix(col, color_foam.rgb, rain_ring * 0.85);
+	alpha = max(alpha, rain_ring * 0.92);
+
+	// 冬季水片：低频冰层 + 细裂纹，仍保留少量深水颜色。
+	float ice_noise = vnoise(v_world.xz * 0.075 + vec2(9.2, 3.7));
+	float ice_cells = abs(fract(ice_noise * 5.0 + vnoise(v_world.xz * 0.19)) - 0.5);
+	float ice_crack = smoothstep(0.055, 0.012, ice_cells);
+	float ice_mask = ice_amount * smoothstep(0.08, 0.65, d + ice_noise * 0.35);
+	vec3 ice_col = color_ice.rgb * (0.88 + ice_noise * 0.16) - ice_crack * 0.18;
+	col = mix(col, ice_col, ice_mask * 0.88);
+	alpha = max(alpha, ice_mask * 0.97);
 
 	ALBEDO = col;
 	ALPHA = alpha;

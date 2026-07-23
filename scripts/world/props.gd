@@ -14,6 +14,8 @@ const ROCK_COLOR := Color(0.52, 0.55, 0.58)
 var _rng := RandomNumberGenerator.new()
 var _canopy_shader_mat: ShaderMaterial
 var _pine_shader_mat: ShaderMaterial
+var _grass_shader_mat: ShaderMaterial
+var _flower_instance: MultiMeshInstance3D
 var _card_mesh: ArrayMesh
 var _card_dirs: Array[Vector3] = []
 var _broadleaf_transforms: Array[Transform3D] = []
@@ -323,9 +325,9 @@ func _make_rock() -> Node3D:
 
 func _scatter_grass(terrain: Terrain) -> void:
 	var tuft := _make_blade_mesh()
-	var shader_mat := ShaderMaterial.new()
-	shader_mat.shader = load("res://assets/shaders/grass.gdshader")
-	shader_mat.set_shader_parameter("u_blade", TexGen.grass_blades())
+	_grass_shader_mat = ShaderMaterial.new()
+	_grass_shader_mat.shader = load("res://assets/shaders/grass.gdshader")
+	_grass_shader_mat.set_shader_parameter("u_blade", TexGen.grass_blades())
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
@@ -352,7 +354,7 @@ func _scatter_grass(terrain: Terrain) -> void:
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "Grass"
 	mmi.multimesh = mm
-	mmi.material_override = shader_mat
+	mmi.material_override = _grass_shader_mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
 
@@ -387,12 +389,29 @@ func _scatter_flowers(terrain: Terrain) -> void:
 		mm.set_instance_color(placed, petals[_rng.randi_range(0, petals.size() - 1)])
 		placed += 1
 	mm.instance_count = placed
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Flowers"
-	mmi.multimesh = mm
-	mmi.material_override = mat
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mmi)
+	_flower_instance = MultiMeshInstance3D.new()
+	_flower_instance.name = "Flowers"
+	_flower_instance.multimesh = mm
+	_flower_instance.material_override = mat
+	_flower_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_flower_instance)
+
+
+func set_season_palette(grass_shadow: Color, grass_dark: Color, grass_light: Color, leaf_shadow: Color, leaf_mid: Color, leaf_high: Color, pine_shadow: Color, pine_mid: Color, pine_high: Color, flowers_visible: bool) -> void:
+	if _grass_shader_mat:
+		_grass_shader_mat.set_shader_parameter("color_shadow", grass_shadow)
+		_grass_shader_mat.set_shader_parameter("color_dark", grass_dark)
+		_grass_shader_mat.set_shader_parameter("color_light", grass_light)
+	if _canopy_shader_mat:
+		_canopy_shader_mat.set_shader_parameter("color_shadow", leaf_shadow)
+		_canopy_shader_mat.set_shader_parameter("color_mid", leaf_mid)
+		_canopy_shader_mat.set_shader_parameter("color_high", leaf_high)
+	if _pine_shader_mat:
+		_pine_shader_mat.set_shader_parameter("color_shadow", pine_shadow)
+		_pine_shader_mat.set_shader_parameter("color_mid", pine_mid)
+		_pine_shader_mat.set_shader_parameter("color_high", pine_high)
+	if _flower_instance:
+		_flower_instance.visible = flowers_visible
 
 
 func _make_blade_mesh() -> ArrayMesh:

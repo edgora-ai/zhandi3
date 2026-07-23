@@ -18,6 +18,7 @@
 - 搜刮武器（冲锋枪/突击步枪/射手步枪）、护甲、医疗包、弹药——物资聚集在 3 座村庄（小屋/两层楼/仓库/瞭望塔）里，也有码头、废墟可探索
 - 毒圈分 5 个阶段收缩，圈外持续掉血，越到后期越痛
 - 地图上有 3 面旗帜据点（A/B/C），沙袋工事环绕，在圈内停留 5 秒占领，占领后**持续回血 + 伤害提升 10%**
+- 春夏秋冬实时切换：地面、草木、水面、天空雾光、花瓣/落叶/雪和建筑雪盖同步变化
 - 活到最后：**大吉大利，今晚吃鸡！**
 
 ## 操作
@@ -33,6 +34,7 @@
 | C | 趴下（更慢，扩散大幅降低） |
 | G | 投掷烟雾弹（烟球遮挡 AI 视线，初始 3 枚） |
 | F | 靠近吉普车驾驶 / 下车（W/S 油门倒车，A/D 转向） |
+| V | 循环切换春 / 夏 / 秋 / 冬 |
 | R | 换弹 / 结算后重开 |
 | E | 拾取 |
 | 1 / 2 | 切换武器槽 |
@@ -58,6 +60,7 @@ scripts/
   main.gd                # 比赛总控：生成、击杀播报、胜负、buff 结算
   world/terrain.gd       # 噪声地形 + 顶点色 + 解析高度采样 + 水面（高度图驱动的水波 shader）
   world/props.gd         # 树木/灌木/岩石/草（树冠/草丛 MultiMesh + 行进风场 shader）
+  world/season_system.gd # 四季总控：地表/植被/水片/天空雾光/天气联动
   world/tex_gen.gd       # 程序化贴图工厂：叶簇/草叶/花朵 alpha 贴图
   world/buildings.gd     # 程序化建筑：村庄（小屋/两层楼/仓库/瞭望塔/废墟）、据点沙袋工事、码头小船
   world/toon.gd          # 卡通材质工厂（toon 光照 + grow 描边）
@@ -73,8 +76,9 @@ scripts/
   fx/fx.gd               # 曳光/命中特效
   fx/sfx_bank.gd         # 音效池（2D/3D）
 assets/
+  shaders/ground.gdshader # 多尺度地表斑驳 + 岩层 + 积雪/湿润
   shaders/grass.gdshader # 草叶广告牌化 + 行进风场阵风 + 三段色带
-  shaders/water.gdshader # 深度渐变水色 + 岸线泡沫环 + 波光 + 顶点涌浪
+  shaders/water.gdshader # 深度水色 + 岸线环 + 雨滴扩散 + 冬季冰裂
   sfx/*.wav              # tools/gen_sfx.py 生成（Python 标准库），含音乐/环境音循环
   fonts/                 # Noto Sans SC（HUD 中文）
 tools/
@@ -93,10 +97,14 @@ tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 30000 -- -
 tools/Godot.app/Contents/MacOS/Godot --path . -- --ground --arm
 # 固定随机种子（可复现的比赛布局，便于调试/截图定位）
 tools/Godot.app/Contents/MacOS/Godot --path . -- --seed 7
+# 指定初始季节（spring / summer / autumn / winter）
+tools/Godot.app/Contents/MacOS/Godot --path . -- --season winter
 # 射击链路自检（生成测试bot并开火，打印血量）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm
 # 失焦恢复自检（模拟漏收恢复通知，确认暂停外定时器能自动解锁）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --focusrecoverytest
+# 四季联动自检（春→夏→秋→冬）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --seasontest
 # 结算画面预览
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/end.png --endtest
 ```
@@ -110,6 +118,8 @@ python3 tools/gen_sfx.py   # 仅依赖 Python 标准库
 ## AI 开发与测试过程
 
 本项目由 Kimi k3 在与用户很少的交互下完成，典型闭环：用户提需求/报告问题 → AI 读代码定位 → 修复 → 自动化验证 → 用户试玩确认。
+
+完整的问题复盘、Godot/GDScript 踩坑记录和推荐排障顺序见 [开发与排障笔记](docs/DEVELOPMENT_NOTES.md)。
 
 ### 自动化验证手段（全部内置在工程里）
 

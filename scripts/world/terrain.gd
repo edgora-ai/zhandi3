@@ -108,7 +108,8 @@ func _build() -> void:
 	body.add_child(col)
 	add_child(body)
 
-	_build_water()
+	if not OS.get_cmdline_user_args().has("--noworld"):
+		_build_water()
 
 
 func _vertex_color(x: float, y: float, z: float, n: Vector3) -> Color:
@@ -130,15 +131,28 @@ func _vertex_color(x: float, y: float, z: float, n: Vector3) -> Color:
 func _build_water() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(SIZE * 1.1, SIZE * 1.1)
+	plane.subdivide_width = 64
+	plane.subdivide_depth = 64
 	var water := MeshInstance3D.new()
 	water.name = "Water"
 	water.mesh = plane
 	water.position.y = WATER_LEVEL
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.15, 0.62, 0.72, 0.78)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.roughness = 0.12
-	m.metallic = 0.0
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	water.material_override = m
+	var sm := ShaderMaterial.new()
+	sm.shader = load("res://assets/shaders/water.gdshader")
+	sm.set_shader_parameter("u_height_map", _bake_heightmap())
+	sm.set_shader_parameter("u_water_level", WATER_LEVEL)
+	sm.set_shader_parameter("u_ground_half", HALF)
+	water.material_override = sm
 	add_child(water)
+
+
+# 水面 shader 用：把解析高度烘成单通道纹理（R = 高度，米）
+func _bake_heightmap() -> ImageTexture:
+	var img := Image.create(GRID + 1, GRID + 1, false, Image.FORMAT_RF)
+	var step := SIZE / GRID
+	for gz in range(GRID + 1):
+		for gx in range(GRID + 1):
+			var x := -HALF + gx * step
+			var z := -HALF + gz * step
+			img.set_pixel(gx, gz, Color(get_height(x, z), 0, 0))
+	return ImageTexture.create_from_image(img)

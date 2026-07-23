@@ -6,6 +6,7 @@ signal died(victim, killer)
 signal health_changed(hp: float, armor: float)
 signal damaged(amount: float)
 signal landed
+signal grenade_thrown(left: int)
 
 const WALK_SPEED := 5.5
 const SPRINT_SPEED := 8.6
@@ -34,8 +35,14 @@ var slot_index := -1
 var mags := {}
 var reserves := {}
 var nearby_loot: Loot = null
+var nearby_vehicle: Vehicle = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
+var prone := false           # 趴下：更慢更稳
+var vehicle: Vehicle = null  # 驾驶中
+var smoke_count := 3
+var _ladder: Area3D = null
+var _col: CollisionShape3D
 
 
 func _ready() -> void:
@@ -49,6 +56,25 @@ func _ready() -> void:
 	col.shape = cap
 	col.position.y = 0.85
 	add_child(col)
+	_col = col
+
+	# 梯子探测
+	var det := Area3D.new()
+	var dc := CollisionShape3D.new()
+	var ds := SphereShape3D.new()
+	ds.radius = 0.9
+	dc.shape = ds
+	dc.position.y = 1.0
+	det.add_child(dc)
+	add_child(det)
+	det.area_entered.connect(func(a: Area3D) -> void:
+		if a.is_in_group("ladder"):
+			_ladder = a
+	)
+	det.area_exited.connect(func(a: Area3D) -> void:
+		if a == _ladder:
+			_ladder = null
+	)
 
 	camera = Camera3D.new()
 	camera.position.y = 1.58
@@ -93,6 +119,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				# 捕获丢失（Esc/焦点切换）后点击左键重新捕获，这次点击不开枪
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventKey and event.pressed and not event.echo:
+		if vehicle and event.physical_keycode != KEY_F:
+			return  # 驾驶中只响应下车
 		match event.physical_keycode:
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
@@ -100,15 +128,54 @@ func _unhandled_input(event: InputEvent) -> void:
 				weapon.start_reload()
 			KEY_E:
 				_try_pickup()
+			KEY_C:
+				_toggle_prone()
+			KEY_G:
+				_throw_smoke()
+			KEY_F:
+				_toggle_vehicle()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
 				switch_slot(1)
 
 
+func _toggle_prone() -> void:
+	prone = not prone
+	if prone:
+		_col.shape.height = 0.9
+		_col.position.y = 0.45
+	else:
+		_col.shape.height = 1.7
+		_col.position.y = 0.85
+
+
+func _throw_smoke() -> void:
+	if smoke_count <= 0:
+		return
+	smoke_count -= 1
+	var g := SmokeGrenade.new()
+	get_parent().add_child(g)
+	var dir := get_aim_dir()
+	g.global_position = camera.global_position + dir * 0.6 - Vector3(0, 0.1, 0)
+	g.linear_velocity = dir * 13.0 + Vector3(0, 3.5, 0)
+	grenade_thrown.emit(smoke_count)
+
+
+func _toggle_vehicle() -> void:
+	if vehicle:
+		vehicle.exit()
+	elif nearby_vehicle:
+		nearby_vehicle.enter(self)
+
+
 func _physics_process(delta: float) -> void:
 	if not alive:
 		return
+	if vehicle:
+		return  # 驾驶中：移动由车辆接管
+	# 趴下时相机压低
+	camera.position.y = lerpf(camera.position.y, 0.55 if prone else 1.58, delta * 8.0)
 	var f := float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
 	if debug_move != 0.0:
 		f = debug_move
@@ -118,10 +185,12 @@ func _physics_process(delta: float) -> void:
 	wish = wish.normalized()
 
 	var speed := WALK_SPEED
-	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads:
+	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads and not prone:
 		speed = SPRINT_SPEED
 	if weapon.is_ads:
 		speed *= 0.55
+	if prone:
+		speed *= 0.35
 
 	var accel := ACCEL if is_on_floor() else AIR_ACCEL
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
@@ -129,7 +198,12 @@ func _physics_process(delta: float) -> void:
 	velocity.x = hv.x
 	velocity.z = hv.z
 
-	if is_on_floor():
+	if _ladder and f > 0.0:
+		# 攀爬：W 沿梯子上升
+		velocity.y = 3.2
+	elif _ladder:
+		velocity.y = 0.0
+	elif is_on_floor():
 		if is_dropping:
 			is_dropping = false
 			landed.emit()
@@ -155,6 +229,7 @@ func _physics_process(delta: float) -> void:
 
 func _scan_loot() -> void:
 	nearby_loot = null
+	nearby_vehicle = null
 	var best := INTERACT_DIST
 	for item in get_tree().get_nodes_in_group("loot"):
 		if item.consumed:
@@ -166,6 +241,12 @@ func _scan_loot() -> void:
 			if to_item.dot(get_aim_dir()) > 0.35 or d < 1.6:
 				best = d
 				nearby_loot = item
+	var best_v := 4.0
+	for v in get_tree().get_nodes_in_group("vehicle"):
+		var d := global_position.distance_to(v.global_position)
+		if d < best_v:
+			best_v = d
+			nearby_vehicle = v
 
 
 func _try_pickup() -> void:

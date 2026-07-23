@@ -96,6 +96,8 @@ func current_spread() -> float:
 	if weapon_id == "":
 		return 0.0
 	var s: float = data.ads_spread if is_ads else data.spread
+	if owner_body.get("prone") == true:
+		s *= 0.65
 	var speed := Vector3(owner_body.velocity.x, 0, owner_body.velocity.z).length()
 	s *= 1.0 + speed * 0.09
 	if not owner_body.is_on_floor():
@@ -268,3 +270,49 @@ func _build_viewmodel() -> void:
 	_flash.omni_range = 5.0
 	_flash.omni_attenuation = 2.0
 	muzzle.add_child(_flash)
+
+	# 程序化手部：右手握把、左手托护木，袖口按武器配色
+	var skin := Toon.make_material(Color(0.87, 0.70, 0.55), true, 0.003)
+	var sleeve := Toon.make_material(accent_color.darkened(0.15), true, 0.003)
+	var hand_r := MeshInstance3D.new()
+	var hr := SphereMesh.new()
+	hr.radius = 0.045
+	hr.height = 0.08
+	hr.radial_segments = 8
+	hr.rings = 4
+	hand_r.mesh = hr
+	hand_r.material_override = skin
+	hand_r.scale = Vector3(0.9, 1.1, 1.3)
+	hand_r.position = Vector3(0.005, -0.075, 0.10)
+	gun.add_child(hand_r)
+	var arm_r := MeshInstance3D.new()
+	var ar := CapsuleMesh.new()
+	ar.radius = 0.038
+	ar.height = 0.30
+	ar.radial_segments = 6
+	arm_r.mesh = ar
+	arm_r.material_override = sleeve
+	arm_r.rotation_degrees = Vector3(-38.0, 0.0, -12.0)
+	arm_r.position = Vector3(0.06, -0.24, 0.26)
+	gun.add_child(arm_r)
+	var hand_l := MeshInstance3D.new()
+	var hl := SphereMesh.new()
+	hl.radius = 0.042
+	hl.height = 0.075
+	hl.radial_segments = 8
+	hl.rings = 4
+	hand_l.mesh = hl
+	hand_l.material_override = skin
+	hand_l.scale = Vector3(1.0, 0.9, 1.2)
+	hand_l.position = Vector3(-0.01, -0.035, -0.19)
+	gun.add_child(hand_l)
+	var arm_l := MeshInstance3D.new()
+	var al := CapsuleMesh.new()
+	al.radius = 0.038
+	al.height = 0.30
+	al.radial_segments = 6
+	arm_l.mesh = al
+	arm_l.material_override = sleeve
+	arm_l.rotation_degrees = Vector3(-52.0, 22.0, 14.0)
+	arm_l.position = Vector3(-0.12, -0.21, -0.02)
+	gun.add_child(arm_l)

@@ -15,9 +15,9 @@
 ## 玩法
 
 - 你 + 23 个 AI 战士空降到 500m×500m 的海岛，赤手空拳落地
-- 搜刮武器（冲锋枪/突击步枪/射手步枪）、护甲、医疗包、弹药
+- 搜刮武器（冲锋枪/突击步枪/射手步枪）、护甲、医疗包、弹药——物资聚集在 3 座村庄（小屋/两层楼/仓库/瞭望塔）里，也有码头、废墟可探索
 - 毒圈分 5 个阶段收缩，圈外持续掉血，越到后期越痛
-- 地图上有 3 面旗帜据点（A/B/C），在圈内停留 5 秒占领，占领后**持续回血 + 伤害提升 10%**
+- 地图上有 3 面旗帜据点（A/B/C），沙袋工事环绕，在圈内停留 5 秒占领，占领后**持续回血 + 伤害提升 10%**
 - 活到最后：**大吉大利，今晚吃鸡！**
 
 ## 操作
@@ -29,7 +29,10 @@
 | 左键 | 射击 |
 | 右键 | 机瞄（射手步枪带高倍镜） |
 | Shift | 冲刺 |
-| 空格 | 跳跃 |
+| 空格 | 跳跃（在瞭望塔梯子处按 W 攀爬） |
+| C | 趴下（更慢，扩散大幅降低） |
+| G | 投掷烟雾弹（烟球遮挡 AI 视线，初始 3 枚） |
+| F | 靠近吉普车驾驶 / 下车（W/S 油门倒车，A/D 转向） |
 | R | 换弹 / 结算后重开 |
 | E | 拾取 |
 | 1 / 2 | 切换武器槽 |
@@ -53,8 +56,10 @@ project.godot            # 工程配置（主场景 scenes/main.tscn）
 scenes/main.tscn         # 极简根场景，一切由代码生成
 scripts/
   main.gd                # 比赛总控：生成、击杀播报、胜负、buff 结算
-  world/terrain.gd       # 噪声地形 + 顶点色 + 解析高度采样 + 水面
-  world/props.gd         # 树木/岩石/草（MultiMesh + 风摆 shader）
+  world/terrain.gd       # 噪声地形 + 顶点色 + 解析高度采样 + 水面（高度图驱动的水波 shader）
+  world/props.gd         # 树木/灌木/岩石/草（树冠/草丛 MultiMesh + 行进风场 shader）
+  world/tex_gen.gd       # 程序化贴图工厂：叶簇/草叶/花朵 alpha 贴图
+  world/buildings.gd     # 程序化建筑：村庄（小屋/两层楼/仓库/瞭望塔/废墟）、据点沙袋工事、码头小船
   world/toon.gd          # 卡通材质工厂（toon 光照 + grow 描边）
   player/player.gd       # FPS 控制器（移动/空降/伤害/武器槽/拾取）
   player/weapon.gd       # hitscan 武器逻辑 + 程序化视模型
@@ -63,11 +68,14 @@ scripts/
   game/zone.gd           # 毒圈：5 阶段收缩、圈外伤害、圈墙可视化
   game/capture_point.gd  # 据点：占领进度、旗帜变色、增益归属
   game/loot.gd           # 战利品：光柱稀有度、拾取逻辑
+  game/vehicle.gd        # 吉普车：F 上下车、街机驾驶、贴地形
+  game/smoke_grenade.gd  # 烟雾弹：引信起烟、遮挡 AI 视线
   fx/fx.gd               # 曳光/命中特效
   fx/sfx_bank.gd         # 音效池（2D/3D）
 assets/
-  shaders/grass.gdshader # 草叶风摆 + 双色渐变
-  sfx/*.wav              # tools/gen_sfx.py 生成（Python 标准库）
+  shaders/grass.gdshader # 草叶广告牌化 + 行进风场阵风 + 三段色带
+  shaders/water.gdshader # 深度渐变水色 + 岸线泡沫环 + 波光 + 顶点涌浪
+  sfx/*.wav              # tools/gen_sfx.py 生成（Python 标准库），含音乐/环境音循环
   fonts/                 # Noto Sans SC（HUD 中文）
 tools/
   Godot.app              # Godot 4.7.1 编辑器/运行时
@@ -83,8 +91,12 @@ tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/shot.png [--f
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 30000 -- --sim
 # 玩家直接落地 + 自带步枪
 tools/Godot.app/Contents/MacOS/Godot --path . -- --ground --arm
+# 固定随机种子（可复现的比赛布局，便于调试/截图定位）
+tools/Godot.app/Contents/MacOS/Godot --path . -- --seed 7
 # 射击链路自检（生成测试bot并开火，打印血量）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm
+# 失焦恢复自检（模拟漏收恢复通知，确认暂停外定时器能自动解锁）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --focusrecoverytest
 # 结算画面预览
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/end.png --endtest
 ```

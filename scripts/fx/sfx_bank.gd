@@ -19,6 +19,8 @@ var _pool_2d: Array[AudioStreamPlayer] = []
 var _pool_3d: Array[AudioStreamPlayer3D] = []
 var _idx_2d := 0
 var _idx_3d := 0
+var _music_player: AudioStreamPlayer
+var _ambience_player: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -60,3 +62,52 @@ func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.94, 1.06)
 	p.play()
+
+
+## 循环背景音乐 + 环境音（风/海浪/鸟鸣）
+func start_ambience() -> void:
+	var music: AudioStreamWAV = load("res://assets/sfx/music.wav")
+	music.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	music.loop_end = int(music.get_length() * music.mix_rate)
+	_music_player = AudioStreamPlayer.new()
+	_music_player.stream = music
+	_music_player.volume_db = -16.0
+	add_child(_music_player)
+	_music_player.play()
+
+	var amb: AudioStreamWAV = load("res://assets/sfx/ambience.wav")
+	amb.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	amb.loop_end = int(amb.get_length() * amb.mix_rate)
+	_ambience_player = AudioStreamPlayer.new()
+	_ambience_player.stream = amb
+	_ambience_player.volume_db = -13.0
+	add_child(_ambience_player)
+	_ambience_player.play()
+
+
+func set_streams_paused(paused: bool) -> void:
+	for p in _pool_2d:
+		p.stream_paused = paused
+	for p in _pool_3d:
+		p.stream_paused = paused
+	if _music_player:
+		_music_player.stream_paused = paused
+	if _ambience_player:
+		_ambience_player.stream_paused = paused
+
+
+func _exit_tree() -> void:
+	# 主动断开 AudioServer playback，避免场景重载后循环流继续持有 WAV 资源。
+	for p in _pool_2d:
+		p.stop()
+		p.stream = null
+	for p in _pool_3d:
+		p.stop()
+		p.stream = null
+	if _music_player:
+		_music_player.stop()
+		_music_player.stream = null
+	if _ambience_player:
+		_ambience_player.stop()
+		_ambience_player.stream = null
+	_streams.clear()

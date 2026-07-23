@@ -106,4 +106,103 @@ write_wav("defeat.wav", dft)
 # 拾取：轻弹
 write_wav("pickup.wav", sweep(0.09, 500.0, 900.0, 0.06, 0.35))
 
+
+# ---------- 音乐与环境音（无缝循环） ----------
+
+def crossfade(a, b, fade):
+    """a 尾部淡出与 b 头部淡入交叠拼接"""
+    f = int(SR * fade)
+    out = a[:-f]
+    for i in range(f):
+        w = i / f
+        out.append(a[len(a) - f + i] * (1.0 - w) + b[i] * w)
+    out += b[f:]
+    return out
+
+
+def pad_note(dur, freq, amp):
+    """柔和 pad 音色：基频 + 八度 + 微失谐，慢起音"""
+    n = int(SR * dur)
+    attack = SR * 1.2
+    out = []
+    for i in range(n):
+        t = i / SR
+        env = min(1.0, i / attack) * math.exp(-i / (SR * dur * 0.6))
+        x = (math.sin(2 * math.pi * freq * t) * 0.6
+             + math.sin(2 * math.pi * freq * 2.0 * t) * 0.22
+             + math.sin(2 * math.pi * freq * 1.005 * t) * 0.18)
+        out.append(amp * x * env)
+    return out
+
+
+def chord(dur, freqs, amp=0.13):
+    s = []
+    for f in freqs:
+        s = mix(s, pad_note(dur, f, amp))
+    return s
+
+
+# 音乐：I–V–vi–IV 和弦进行的氛围 pad，交叠拼接成无缝循环
+CHORDS = [
+    [261.63, 329.63, 392.00],   # C
+    [196.00, 246.94, 293.66],   # G
+    [220.00, 261.63, 329.63],   # Am
+    [174.61, 220.00, 261.63],   # F
+]
+SEG = 6.0
+music = chord(SEG, CHORDS[0])
+for ci in range(1, 4):
+    music = crossfade(music, chord(SEG, CHORDS[ci]), 2.0)
+music = crossfade(music, chord(SEG, CHORDS[0]), 2.0)   # 回到起始和弦，首尾无缝
+# 稀疏五声音阶铃音点缀
+PENTA = [523.25, 587.33, 659.25, 783.99, 880.00]
+for ni in range(7):
+    off = int(SR * random.uniform(1.0, len(music) / SR - 2.0))
+    bell = tone(1.2, random.choice(PENTA), 0.9, 0.07)
+    for j, x in enumerate(bell):
+        if off + j < len(music):
+            music[off + j] += x
+write_wav("music.wav", music)
+
+
+def bird_chirp():
+    """一声短促鸟鸣：两到三个快速滑音"""
+    f0 = random.uniform(2200, 3000)
+    s = sweep(0.09, f0, f0 * random.uniform(1.15, 1.35), 0.03, 0.10)
+    if random.random() < 0.7:
+        s2 = sweep(0.07, f0 * 1.1, f0 * 0.9, 0.03, 0.08)
+        s = mix(s, [0.0] * int(SR * 0.10) + s2)
+    return s
+
+
+# 环境音：海风 + 浪涌 + 随机鸟鸣，30s 无缝循环
+AMB_DUR = 30.0
+n = int(SR * AMB_DUR)
+amb = []
+brown = 0.0
+surf_prev = 0.0
+for i in range(n):
+    t = i / SR
+    # 风：棕噪声（漏积分白噪声）+ 慢速 LFO 起伏
+    brown += (random.uniform(-1, 1) - brown) * 0.02
+    wind = brown * 2.0 * (0.72 + 0.28 * math.sin(2 * math.pi * 0.07 * t))
+    # 海浪：低通白噪声 × 缓慢涌动包络
+    surf_prev += 0.06 * (random.uniform(-1, 1) - surf_prev)
+    surf_env = 0.5 + 0.5 * math.sin(2 * math.pi * 0.09 * t + 1.3)
+    surf = surf_prev * (0.5 + 3.0 * surf_env * surf_env) * 0.35
+    amb.append(wind * 0.30 + surf * 0.22)
+for _ in range(9):
+    off = int(SR * random.uniform(0.5, AMB_DUR - 1.0))
+    c = bird_chirp()
+    for j, x in enumerate(c):
+        if off + j < n:
+            amb[off + j] += x
+# 首尾 1s 交叠，循环无接缝
+f = SR
+for i in range(f):
+    w = i / f
+    amb[i] = amb[i] * w + amb[n - f + i] * (1.0 - w)
+amb = amb[:-f]
+write_wav("ambience.wav", amb)
+
 print("done")

@@ -38,6 +38,11 @@ var _burst_pause := 0.0
 var _strafe_dir := 1.0
 var _head_index := 1
 var _corpse_t := -1.0
+var _anim_t := 0.0
+var _arm_l: Node3D
+var _arm_r: Node3D
+var _leg_l: Node3D
+var _leg_r: Node3D
 
 
 func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3) -> void:
@@ -78,46 +83,130 @@ func _ready() -> void:
 func _build_visual() -> void:
 	var palette := [Color(0.55, 0.35, 0.20), Color(0.40, 0.45, 0.30), Color(0.30, 0.35, 0.50), Color(0.50, 0.25, 0.25), Color(0.45, 0.40, 0.25), Color(0.35, 0.45, 0.48)]
 	var jacket: Color = palette[randi_range(0, palette.size() - 1)]
+	var pants := jacket.darkened(0.35)
+	var skin := Color(0.87, 0.70, 0.55)
 
-	var body := MeshInstance3D.new()
+	# 骨盆 + 躯干
+	_bp(Vector3(0.34, 0.24, 0.27), pants, Vector3(0, 0.76, 0))
+	_caps(self, 0.29, 0.92, jacket, Vector3(0, 1.10, 0))
+	# 战术背心 + 胸前弹匣袋
+	_bp(Vector3(0.42, 0.42, 0.33), jacket.darkened(0.40), Vector3(0, 1.16, 0), null, 0.010)
+	for i in range(3):
+		_bp(Vector3(0.09, 0.13, 0.06), jacket.darkened(0.58), Vector3(-0.11 + i * 0.11, 1.13, -0.19), null, 0.006)
+	# 背包 + 包盖 + 侧袋
+	_bp(Vector3(0.36, 0.44, 0.18), jacket.darkened(0.45), Vector3(0, 1.18, 0.28), null, 0.010)
+	_bp(Vector3(0.30, 0.10, 0.16), jacket.darkened(0.58), Vector3(0, 1.43, 0.28), null, 0.006)
+	_bp(Vector3(0.10, 0.20, 0.12), jacket.darkened(0.52), Vector3(0.22, 1.10, 0.24), null, 0.006)
+	# 腰带 + 腿挂包
+	_bp(Vector3(0.40, 0.09, 0.32), pants.darkened(0.35), Vector3(0, 0.86, 0), null, 0.006)
+	_bp(Vector3(0.12, 0.16, 0.10), pants.darkened(0.25), Vector3(0.20, 0.70, -0.06), null, 0.006)
+
+	# 头 + 眼睛 + 鼻子
+	_sph(self, 0.21, 0.40, skin, Vector3(0, 1.58, 0))
+	for sx in [-1.0, 1.0]:
+		var eye := _sph(self, 0.030, 0.05, Color(0.10, 0.08, 0.08), Vector3(sx * 0.075, 1.60, -0.175), 0.0)
+		eye.scale = Vector3(1.0, 1.4, 0.6)
+	_bp(Vector3(0.05, 0.07, 0.05), skin.darkened(0.08), Vector3(0, 1.53, -0.20), null, 0.0)
+	# 头盔：盔体 + 帽檐 + 盔带
+	_sph(self, 0.25, 0.32, jacket.darkened(0.35), Vector3(0, 1.67, 0))
+	var brim := MeshInstance3D.new()
+	var bm := CylinderMesh.new()
+	bm.top_radius = 0.265
+	bm.bottom_radius = 0.265
+	bm.height = 0.035
+	bm.radial_segments = 10
+	brim.mesh = bm
+	brim.material_override = Toon.make_material(jacket.darkened(0.42), true, 0.008)
+	brim.position.y = 1.615
+	add_child(brim)
+	_bp(Vector3(0.05, 0.12, 0.03), jacket.darkened(0.55), Vector3(0.20, 1.55, 0), null, 0.0)
+	_bp(Vector3(0.05, 0.12, 0.03), jacket.darkened(0.55), Vector3(-0.20, 1.55, 0), null, 0.0)
+
+	# 四肢：肩/髋为枢轴，行走时绕 X 摆动
+	_arm_l = _make_arm(Vector3(-0.43, 1.38, 0), jacket, skin)
+	_arm_r = _make_arm(Vector3(0.43, 1.38, 0), jacket, skin)
+	_leg_l = _make_leg(Vector3(-0.15, 0.74, 0), pants)
+	_leg_r = _make_leg(Vector3(0.15, 0.74, 0), pants)
+
+	# 步枪挂在右手：机匣 + 枪管 + 弹匣 + 枪托
+	var gun := Node3D.new()
+	gun.position = Vector3(0, -0.60, -0.14)
+	_arm_r.add_child(gun)
+	_bp(Vector3(0.07, 0.11, 0.44), Color(0.14, 0.15, 0.17), Vector3.ZERO, gun, 0.006)
+	var barrel := MeshInstance3D.new()
+	var bc := CylinderMesh.new()
+	bc.top_radius = 0.018
+	bc.bottom_radius = 0.018
+	bc.height = 0.24
+	bc.radial_segments = 6
+	barrel.mesh = bc
+	barrel.material_override = Toon.make_material(Color(0.10, 0.11, 0.13), false)
+	barrel.rotation_degrees.x = 90.0
+	barrel.position = Vector3(0, 0.02, -0.32)
+	gun.add_child(barrel)
+	_bp(Vector3(0.05, 0.13, 0.06), Color(0.20, 0.21, 0.23), Vector3(0, -0.10, 0.04), gun, 0.0)
+	_bp(Vector3(0.06, 0.09, 0.14), jacket.darkened(0.50), Vector3(0, -0.01, 0.27), gun, 0.006)
+
+
+func _bp(size: Vector3, color: Color, pos: Vector3, parent: Node3D = null, outline: float = 0.012) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = Toon.make_material(color, outline > 0.0, outline)
+	mi.position = pos
+	(parent if parent else self).add_child(mi)
+	return mi
+
+
+func _caps(parent: Node3D, radius: float, height: float, color: Color, pos: Vector3, outline: float = 0.012) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
 	var cm := CapsuleMesh.new()
-	cm.radius = 0.34
-	cm.height = 1.15
-	cm.radial_segments = 8
-	body.mesh = cm
-	body.material_override = Toon.make_material(jacket, true, 0.015)
-	body.position.y = 0.82
-	add_child(body)
+	cm.radius = radius
+	cm.height = height
+	cm.radial_segments = 7
+	mi.mesh = cm
+	mi.material_override = Toon.make_material(color, outline > 0.0, outline)
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
 
-	var head := MeshInstance3D.new()
+
+func _sph(parent: Node3D, radius: float, height: float, color: Color, pos: Vector3, outline: float = 0.012) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
 	var sm := SphereMesh.new()
-	sm.radius = 0.23
-	sm.height = 0.42
+	sm.radius = radius
+	sm.height = height
 	sm.radial_segments = 8
 	sm.rings = 4
-	head.mesh = sm
-	head.material_override = Toon.make_material(Color(0.87, 0.70, 0.55), true, 0.015)
-	head.position.y = 1.56
-	add_child(head)
+	mi.mesh = sm
+	mi.material_override = Toon.make_material(color, outline > 0.0, outline)
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
 
-	var helmet := MeshInstance3D.new()
-	var hm := SphereMesh.new()
-	hm.radius = 0.26
-	hm.height = 0.34
-	hm.radial_segments = 8
-	hm.rings = 4
-	helmet.mesh = hm
-	helmet.material_override = Toon.make_material(jacket.darkened(0.35), true, 0.015)
-	helmet.position.y = 1.64
-	add_child(helmet)
 
-	var gun := MeshInstance3D.new()
-	var gb := BoxMesh.new()
-	gb.size = Vector3(0.08, 0.12, 0.62)
-	gun.mesh = gb
-	gun.material_override = Toon.make_material(Color(0.14, 0.15, 0.17), true, 0.008)
-	gun.position = Vector3(0.32, 1.22, -0.22)
-	add_child(gun)
+func _make_arm(pivot: Vector3, jacket: Color, skin: Color) -> Node3D:
+	var j := Node3D.new()
+	j.position = pivot
+	add_child(j)
+	_bp(Vector3(0.17, 0.12, 0.17), jacket.darkened(0.30), Vector3(0, 0.02, 0), j)  # 肩甲
+	_caps(j, 0.080, 0.30, jacket, Vector3(0, -0.16, 0))                              # 上臂
+	_caps(j, 0.068, 0.28, jacket.darkened(0.10), Vector3(0, -0.44, 0))               # 前臂
+	_bp(Vector3(0.10, 0.08, 0.10), jacket.darkened(0.35), Vector3(0, -0.31, 0), j, 0.0)  # 肘部
+	_sph(j, 0.062, 0.11, skin, Vector3(0, -0.60, 0))                                 # 手
+	return j
+
+
+func _make_leg(pivot: Vector3, pants: Color) -> Node3D:
+	var j := Node3D.new()
+	j.position = pivot
+	add_child(j)
+	_caps(j, 0.105, 0.34, pants, Vector3(0, -0.18, 0))                               # 大腿
+	_bp(Vector3(0.14, 0.12, 0.08), pants.darkened(0.30), Vector3(0, -0.36, -0.08), j, 0.0)  # 护膝
+	_caps(j, 0.082, 0.32, pants.darkened(0.10), Vector3(0, -0.50, 0))                # 小腿
+	_bp(Vector3(0.15, 0.10, 0.28), Color(0.16, 0.14, 0.12), Vector3(0, -0.68, -0.04), j, 0.008)  # 军靴
+	return j
 
 
 func get_aim_origin() -> Vector3:
@@ -219,10 +308,21 @@ func _find_visible_enemy() -> CharacterBody3D:
 		var target_eye: Vector3 = c.global_position + Vector3(0, 1.4, 0)
 		var query := PhysicsRayQueryParameters3D.create(eye, target_eye, 1 | 2 | 4, [get_rid()])
 		var result := get_world_3d().direct_space_state.intersect_ray(query)
-		if not result.is_empty() and result.collider == c:
+		if not result.is_empty() and result.collider == c and not _smoke_blocks(eye, target_eye):
 			best = c
 			best_d = d
 	return best
+
+
+# 烟雾球遮挡视线：线段与烟球求交
+func _smoke_blocks(a: Vector3, b: Vector3) -> bool:
+	for s in get_tree().get_nodes_in_group("smoke"):
+		var c: Vector3 = s.global_position
+		var ab := b - a
+		var t: float = clampf((c - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		if (a + ab * t).distance_to(c) < SmokeGrenade.SMOKE_RADIUS:
+			return true
+	return false
 
 
 func _find_nearest_loot(kind: String) -> Loot:
@@ -317,6 +417,19 @@ func _physics_process(delta: float) -> void:
 
 	if regen_rate > 0.0 and hp < MAX_HP:
 		hp = minf(MAX_HP, hp + regen_rate * delta)
+
+	# 四肢程序动画：移动摆臂摆腿，交战时右臂端枪
+	var h_speed := Vector2(velocity.x, velocity.z).length()
+	_anim_t += delta * h_speed * 2.4
+	var amp := clampf(h_speed / RUN, 0.0, 1.0) * 0.6
+	var swing := sin(_anim_t) * amp
+	_leg_l.rotation.x = swing
+	_leg_r.rotation.x = -swing
+	_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -swing * 0.8, delta * 12.0)
+	if state == State.FIGHT and aim_target:
+		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -1.3, delta * 10.0)
+	else:
+		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, swing * 0.8, delta * 12.0)
 
 
 func _seek(target: Vector3) -> Vector3:

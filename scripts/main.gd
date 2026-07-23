@@ -3,9 +3,11 @@ extends Node3D
 
 const BOT_COUNT := 23
 const BOT_NAMES := ["战虎", "孤狼", "夜莺", "雷霆", "幽灵", "猎鹰", "毒蝎", "雪豹", "黑曜", "赤狐", "苍狼", "飞鹰", "铁壁", "疾风", "灰烬", "寒鸦", "断刃", "追猎", "重锤", "影袭", "怒涛", "磐石", "烈阳"]
+const INSTANCE_LOCK := "user://zhandi3_game.pid"
 
 var terrain: Terrain
 var props: Props
+var buildings: Buildings
 var player: Player
 var hud: HUD
 var zone: Zone
@@ -24,9 +26,21 @@ var _ft_bot: Bot = null
 var _ft_frames := -1
 var _mt := -1
 var _mt_start := Vector3.ZERO
+var _reloadtest := false
+var _smoketest := false
+var _owns_instance_lock := false
+var _focus_pause_owned := false
+var _focus_recovery_timer: Timer
+var _focus_recovery_test_frame := -1
+var _focus_recovery_test_pending := false
 
 
 func _ready() -> void:
+	if not _acquire_instance_lock():
+		get_tree().quit()
+		return
+	tree_exiting.connect(_release_instance_lock)
+	var args := OS.get_cmdline_user_args()
 	_setup_environment()
 	terrain = Terrain.new()
 	terrain.name = "Terrain"
@@ -34,7 +48,13 @@ func _ready() -> void:
 	props = Props.new()
 	props.name = "Props"
 	add_child(props)
-	props.generate(terrain)
+	if not args.has("--noveg"):
+		props.generate(terrain)
+	buildings = Buildings.new()
+	buildings.name = "Buildings"
+	add_child(buildings)
+	if not args.has("--noworld"):
+		buildings.generate(terrain)
 
 	zone = Zone.new()
 	zone.name = "Zone"
@@ -48,21 +68,30 @@ func _ready() -> void:
 		if sh:
 			sfx.play("zone_alarm", -4.0)
 	)
+	if DisplayServer.get_name() != "headless":
+		sfx.start_ambience()
 
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	var si := args.find("--seed")
+	if si >= 0 and si + 1 < args.size():
+		rng.seed = args[si + 1].to_int()
+	else:
+		rng.randomize()
 	_spawn_player(rng)
-	_spawn_bots(rng)
-	_spawn_capture_points(rng)
-	_spawn_loot_field(rng)
+	if not args.has("--noworld"):
+		_spawn_bots(rng)
+		_spawn_capture_points(rng)
+		_spawn_loot_field(rng)
 	zone.start(10.0)
-
-	var args := OS.get_cmdline_user_args()
 	if args.has("--ground"):
 		player.global_position.y = terrain.get_height(player.global_position.x, player.global_position.z) + 1.0
 	if args.has("--arm"):
 		player.give_weapon("rifle")
 	_sim = args.has("--sim")
+	_reloadtest = args.has("--reloadtest")
+	_smoketest = args.has("--smoketest")
+	if args.has("--focusrecoverytest"):
+		_focus_recovery_test_frame = 0
 	if args.has("--endtest"):
 		hud.show_end(false, 12, 3, 24)
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
@@ -78,7 +107,34 @@ func _ready() -> void:
 		_ft_frames = 0
 	if args.has("--movetest") and args.has("--ground"):
 		_mt = 0
+	_setup_focus_recovery()
 	_setup_screenshot_mode()
+	print("[boot] nodes=%d objs=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+
+
+func _acquire_instance_lock() -> bool:
+	var current := OS.get_process_id()
+	if FileAccess.file_exists(INSTANCE_LOCK):
+		var existing := FileAccess.open(INSTANCE_LOCK, FileAccess.READ)
+		if existing:
+			var other := existing.get_as_text().to_int()
+			if other > 0 and other != current and OS.is_process_running(other):
+				print("[startup] another game instance is running: pid=", other)
+				return false
+	var lock := FileAccess.open(INSTANCE_LOCK, FileAccess.WRITE)
+	if lock:
+		lock.store_string(str(current))
+		_owns_instance_lock = true
+	return true
+
+
+func _release_instance_lock() -> void:
+	if not _owns_instance_lock:
+		return
+	var existing := FileAccess.open(INSTANCE_LOCK, FileAccess.READ)
+	if existing and existing.get_as_text().to_int() == OS.get_process_id():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(INSTANCE_LOCK))
+	_owns_instance_lock = false
 
 
 func find_land_point(rng: RandomNumberGenerator, margin: float = 0.62) -> Vector3:
@@ -116,6 +172,7 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	player.weapon.ammo_changed.connect(hud.set_ammo)
 	player.weapon.fired.connect(func() -> void: sfx.play("shot_" + player.weapon.weapon_id, -2.0))
 	player.weapon.hit_landed.connect(func() -> void: sfx.play("hit", -8.0))
+	player.grenade_thrown.connect(func(left: int) -> void: hud.add_feed("掷出烟雾弹（剩 %d）" % left))
 	hud.set_health(player.hp, player.armor)
 	hud.set_weapon_name("徒手")
 	hud.set_ammo_text("--")
@@ -158,6 +215,7 @@ func _spawn_capture_points(rng: RandomNumberGenerator) -> void:
 				break
 		if ok:
 			spots.append(p)
+	print("[capture] spots: ", spots)
 	for i in range(spots.size()):
 		var cp := CapturePoint.new()
 		cp.name = "Capture_%s" % names[i]
@@ -166,15 +224,19 @@ func _spawn_capture_points(rng: RandomNumberGenerator) -> void:
 		cp.global_position = spots[i]
 		cp.owner_changed.connect(_on_capture_changed)
 		capture_points.append(cp)
+		buildings.fortify(spots[i])
 
 
 func _spawn_loot_field(rng: RandomNumberGenerator) -> void:
-	# 6 个物资点 + 全图散刷
-	for p in range(6):
-		var center := find_land_point(rng, 0.7)
+	# 物资聚集在村庄（建筑内/周边），另加 2 个野点 + 全图散刷
+	var clusters: Array[Vector3] = []
+	clusters.append_array(buildings.village_centers)
+	for i in range(2):
+		clusters.append(find_land_point(rng, 0.7))
+	for center in clusters:
 		var count := rng.randi_range(9, 13)
 		for i in range(count):
-			var off := Vector3(rng.randf_range(-13, 13), 0, rng.randf_range(-13, 13))
+			var off := Vector3(rng.randf_range(-14, 14), 0, rng.randf_range(-14, 14))
 			_drop_loot_at(rng, center + off)
 	for i in range(24):
 		_drop_loot_at(rng, find_land_point(rng, 0.8))
@@ -252,25 +314,74 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_tree().reload_current_scene()
 
 
-# 窗口失去焦点（Cmd+Space、切应用、手势误触）时自动暂停，切回继续，
-# 避免输入全断、角色定在原地任人宰割，看起来像"卡死"
+# 窗口失去焦点（Cmd+Space、切应用、手势误触）时自动暂停，切回继续。
+# macOS 偶尔会漏发 WINDOW_FOCUS_IN，因此另有 ALWAYS Timer 轮询兜底，
+# 避免场景树永久停在 paused、但音频线程仍播放，看起来像"卡死"。
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		if match_over or player == null or not player.alive or get_tree().paused:
-			return
-		get_tree().paused = true
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_pause_for_focus()
+	elif what == NOTIFICATION_WM_WINDOW_FOCUS_IN or what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_resume_from_focus_pause()
+
+
+func _setup_focus_recovery() -> void:
+	_focus_recovery_timer = Timer.new()
+	_focus_recovery_timer.name = "FocusRecoveryTimer"
+	_focus_recovery_timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	_focus_recovery_timer.wait_time = 0.25
+	_focus_recovery_timer.timeout.connect(_poll_focus_recovery)
+	add_child(_focus_recovery_timer)
+	_focus_recovery_timer.start()
+
+
+func _pause_for_focus() -> void:
+	if _focus_pause_owned or match_over or player == null or not player.alive or get_tree().paused:
+		return
+	_focus_pause_owned = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if sfx:
+		sfx.set_streams_paused(true)
+	if hud:
 		hud.show_pause()
-	elif what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
-		if not get_tree().paused:
-			return
-		get_tree().paused = false
+	get_tree().paused = true
+	print("[focus] paused after focus loss")
+
+
+func _resume_from_focus_pause() -> void:
+	# 只恢复由本节点发起的暂停，不能覆盖其他系统未来可能增加的暂停状态。
+	if not _focus_pause_owned:
+		return
+	_focus_pause_owned = false
+	get_tree().paused = false
+	if hud:
 		hud.hide_pause()
-		if player and player.alive and not match_over:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if sfx:
+		sfx.set_streams_paused(false)
+	if player and player.alive and not match_over:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	print("[focus] resumed")
+
+
+func _poll_focus_recovery() -> void:
+	if _focus_recovery_test_pending:
+		_focus_recovery_test_pending = false
+		print("[focustest] ALWAYS timer ticked while the scene tree was paused")
+		_resume_from_focus_pause()
+		return
+	if _focus_pause_owned and DisplayServer.window_is_focused():
+		_resume_from_focus_pause()
 
 
 func _process(delta: float) -> void:
+	if _focus_recovery_test_frame >= 0:
+		_focus_recovery_test_frame += 1
+		if _focus_recovery_test_frame == 20:
+			_focus_recovery_test_frame = -1
+			_focus_recovery_test_pending = true
+			print("[focustest] simulating a lost focus-in notification")
+			_pause_for_focus()
+	if _smoketest and Engine.get_process_frames() == 30:
+		player._throw_smoke()
 	if _shot_frames >= 0:
 		_shot_frames -= 1
 		if _shot_frames == 0:
@@ -280,6 +391,11 @@ func _process(delta: float) -> void:
 			get_tree().quit()
 		return
 	if player == null or hud == null:
+		return
+
+	if _reloadtest and Engine.get_process_frames() % 240 == 0 and Engine.get_process_frames() > 0:
+		print("[reloadtest] reloading scene")
+		get_tree().reload_current_scene()
 		return
 
 	for c in _clouds:
@@ -325,10 +441,7 @@ func _process(delta: float) -> void:
 		_sim_acc += delta
 		if _sim_acc >= 10.0:
 			_sim_acc = 0.0
-			print("[sim] frame=%d alive=%d zone_r=%d phase=%d match_over=%s" % [Engine.get_process_frames(), _alive_count(), int(zone.radius), zone.phase, str(match_over)])
-		if _sim_acc >= 10.0:
-			_sim_acc = 0.0
-			print("[sim] frame=%d alive=%d zone_r=%d phase=%d match_over=%s" % [Engine.get_process_frames(), _alive_count(), int(zone.radius), zone.phase, str(match_over)])
+			print("[sim] frame=%d alive=%d zone_r=%d phase=%d match_over=%s nodes=%d objs=%d res=%d mem=%dMB" % [Engine.get_process_frames(), _alive_count(), int(zone.radius), zone.phase, str(match_over), Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
 
 	if not player.alive:
 		return
@@ -336,6 +449,10 @@ func _process(delta: float) -> void:
 	hud.set_crosshair_visible(player.weapon.weapon_id != "")
 	if player.nearby_loot:
 		hud.set_interact("按 E 拾取  " + player.nearby_loot.describe())
+	elif player.vehicle:
+		hud.set_interact("按 F 下车")
+	elif player.nearby_vehicle:
+		hud.set_interact("按 F 驾驶吉普车")
 	else:
 		hud.set_interact("")
 	hud.set_weapon_name(player.weapon.label())
@@ -358,6 +475,12 @@ func _process(delta: float) -> void:
 
 func _setup_environment() -> void:
 	var env := Environment.new()
+	if OS.get_cmdline_user_args().has("--flatsky"):
+		env.background_mode = Environment.BG_CLEAR_COLOR
+		var we0 := WorldEnvironment.new()
+		we0.environment = env
+		add_child(we0)
+		return
 	var sky := Sky.new()
 	var psm := ProceduralSkyMaterial.new()
 	psm.sky_top_color = Color(0.24, 0.56, 0.95)
@@ -389,15 +512,34 @@ func _setup_environment() -> void:
 	we.environment = env
 	add_child(we)
 
+	# 三灯架设（参考 Elemental-Serenity）：暖色主光 + 天蓝补光 + 暖橙轮廓光
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.light_color = Color(1.0, 0.93, 0.78)
-	sun.light_energy = 1.1
+	sun.light_color = Color(1.0, 0.957, 0.902)
+	sun.light_energy = 1.15
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 250.0
 	sun.shadow_bias = 0.03
 	sun.rotation_degrees = Vector3(-48.0, -35.0, 0.0)
 	add_child(sun)
+
+	var fill := DirectionalLight3D.new()
+	fill.name = "FillLight"
+	fill.light_color = Color(0.53, 0.81, 0.92)
+	fill.light_energy = 0.42
+	fill.shadow_enabled = false
+	fill.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY   # 不在天上画太阳盘
+	fill.rotation_degrees = Vector3(-22.0, 145.0, 0.0)
+	add_child(fill)
+
+	var rim := DirectionalLight3D.new()
+	rim.name = "RimLight"
+	rim.light_color = Color(1.0, 0.84, 0.64)
+	rim.light_energy = 0.35
+	rim.shadow_enabled = false
+	rim.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
+	rim.rotation_degrees = Vector3(-62.0, 190.0, 0.0)
+	add_child(rim)
 
 	_spawn_clouds()
 
@@ -405,6 +547,8 @@ func _setup_environment() -> void:
 var _clouds: Array[Node3D] = []
 
 func _spawn_clouds() -> void:
+	if OS.get_cmdline_user_args().has("--noclouds"):
+		return
 	# 扁平大朵白云，缓慢漂移（旷野之息招牌天空）
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 88

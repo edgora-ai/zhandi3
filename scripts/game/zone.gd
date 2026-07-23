@@ -45,6 +45,8 @@ func _ready() -> void:
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_wall.material_override = m
 	_wall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if OS.get_cmdline_user_args().has("--nozonewall"):
+		_wall.visible = false
 	add_child(_wall)
 	_update_wall()
 

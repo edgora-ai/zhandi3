@@ -10,6 +10,7 @@ const TURN := 1.5
 var terrain: Terrain
 var driver: Player = null
 var speed := 0.0
+var ride_label := "驾驶吉普车"
 
 var _cam: Camera3D
 

@@ -15,6 +15,7 @@ var _weapon_label: Label
 var _zone_label: Label
 var _alive_label: Label
 var _kills_label: Label
+var _world_state_label: Label
 var _feed_box: VBoxContainer
 var _interact_label: Label
 var _capture_bar: ColorRect
@@ -23,6 +24,8 @@ var _capture_label: Label
 var _vignette: TextureRect
 var _end_panel: Control
 var _pause_panel: Control
+var _backpack_panel: Control
+var _map_panel: Control
 var _spread_px := 8.0
 
 
@@ -186,6 +189,10 @@ func _build_top() -> void:
 	_kills_label = _mk_label(rw, "击杀 0", 20, Color(1.0, 0.85, 0.4))
 	_kills_label.position = Vector2(0, 26)
 
+	_world_state_label = _mk_label(_ui, "", 17, Color(0.86, 0.95, 0.76))
+	_world_state_label.position = Vector2(22, 18)
+	_world_state_label.size = Vector2(420, 54)
+
 	_capture_wrap = Control.new()
 	_capture_wrap.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_capture_wrap.position = Vector2(-130, 52)
@@ -207,8 +214,16 @@ func set_alive(n: int) -> void:
 	_alive_label.text = "存活 %d" % n
 
 
+func set_alive_text(text: String) -> void:
+	_alive_label.text = text
+
+
 func set_kills(n: int) -> void:
 	_kills_label.text = "击杀 %d" % n
+
+
+func set_world_state(text: String) -> void:
+	_world_state_label.text = text
 
 
 func set_capture(text: String, frac: float) -> void:
@@ -350,3 +365,91 @@ func hide_pause() -> void:
 	if _pause_panel:
 		_pause_panel.queue_free()
 		_pause_panel = null
+
+
+# ---------- 背包 ----------
+
+func show_backpack(lines: Array[String], selected: int) -> void:
+	if _backpack_panel:
+		_backpack_panel.queue_free()
+	_backpack_panel = Control.new()
+	_backpack_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_backpack_panel.position = Vector2(-330, -245)
+	_backpack_panel.size = Vector2(660, 490)
+	_ui.add_child(_backpack_panel)
+	_mk_rect(_backpack_panel, Vector2.ZERO, Vector2(660, 490), Color(0.035, 0.075, 0.075, 0.94))
+	_mk_rect(_backpack_panel, Vector2(8, 8), Vector2(644, 474), Color(0.09, 0.17, 0.16, 0.88))
+	var title := _mk_label(_backpack_panel, "旅 行 背 包", 31, Color(0.97, 0.83, 0.42))
+	title.position = Vector2(30, 24)
+	var subtitle := _mk_label(_backpack_panel, "↑↓ / W S 选择    E / Enter 取出或使用    X 存入当前武器    B 关闭", 15, Color(0.68, 0.88, 0.83))
+	subtitle.position = Vector2(30, 70)
+	for i in range(lines.size()):
+		var active := i == selected
+		if active:
+			_mk_rect(_backpack_panel, Vector2(25, 111 + i * 48), Vector2(610, 41), Color(0.18, 0.50, 0.45, 0.65))
+		var label := _mk_label(_backpack_panel, ("▶  " if active else "    ") + lines[i], 19, Color(1.0, 0.94, 0.68) if active else Color(0.86, 0.90, 0.82))
+		label.position = Vector2(38, 118 + i * 48)
+	_ignore_mouse(_backpack_panel)
+
+
+func hide_backpack() -> void:
+	if _backpack_panel:
+		_backpack_panel.queue_free()
+		_backpack_panel = null
+
+
+# ---------- 地图选择 ----------
+
+func show_map_selector(current_map: String) -> void:
+	if _map_panel:
+		return
+	_map_panel = Control.new()
+	_map_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ui.add_child(_map_panel)
+	_mk_rect(_map_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0.015, 0.035, 0.05, 0.96))
+	var title := _mk_label(_map_panel, "选 择 地 图", 42, Color(1.0, 0.88, 0.46))
+	title.position = Vector2(490, 70)
+	title.size.x = 300
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_build_map_card(_map_panel, Vector2(145, 175), "1", "群岛战场", "500m 海岛 · 24 人战术吃鸡\n村庄、据点、载具、四季毒圈", current_map == "battlefield", Color(0.24, 0.49, 0.65))
+	_build_map_card(_map_panel, Vector2(685, 175), "2", "海拉鲁阔野", "旷野之息风格 · 高原河谷\n神庙、驿站、骑乘、生态与巨龙", current_map == "wild", Color(0.28, 0.58, 0.32))
+	var hint := _mk_label(_map_panel, "按 1 / 2 进入地图    M 返回当前地图", 19, Color(0.76, 0.91, 0.88))
+	hint.position = Vector2(420, 640)
+	hint.size.x = 440
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ignore_mouse(_map_panel)
+
+
+func _build_map_card(parent: Control, pos: Vector2, number: String, map_name: String, description: String, active: bool, color: Color) -> void:
+	var card := Control.new()
+	card.position = pos
+	card.size = Vector2(450, 330)
+	parent.add_child(card)
+	_mk_rect(card, Vector2.ZERO, card.size, Color(color.r * 0.22, color.g * 0.22, color.b * 0.22, 0.96))
+	_mk_rect(card, Vector2(8, 8), Vector2(434, 314), Color(color.r, color.g, color.b, 0.48 if active else 0.28))
+	# 程序化缩略景观：天空、山、河和地标剪影。
+	_mk_rect(card, Vector2(20, 20), Vector2(410, 142), Color(0.32, 0.65, 0.87))
+	_mk_rect(card, Vector2(20, 125), Vector2(410, 37), Color(0.17, 0.50, 0.65) if map_name == "群岛战场" else Color(0.16, 0.66, 0.67))
+	for i in range(5):
+		var mountain := Polygon2D.new()
+		var base_x := 22.0 + i * 82.0
+		var peak_y := 48.0 + (i % 3) * 15.0
+		mountain.polygon = PackedVector2Array([Vector2(base_x, 142), Vector2(base_x + 55, peak_y), Vector2(base_x + 105, 142)])
+		mountain.color = Color(0.24 + i * 0.025, 0.43 + i * 0.025, 0.18)
+		card.add_child(mountain)
+	# 远景塔/神庙剪影让两张卡片不只是抽象色块。
+	_mk_rect(card, Vector2(318, 78), Vector2(18, 64), Color(0.18, 0.27, 0.23))
+	_mk_rect(card, Vector2(303, 76), Vector2(48, 9), Color(0.18, 0.27, 0.23))
+	var badge := _mk_label(card, number, 34, Color(1.0, 0.88, 0.35))
+	badge.position = Vector2(30, 174)
+	var name_label := _mk_label(card, map_name + ("  · 当前" if active else ""), 28, Color.WHITE)
+	name_label.position = Vector2(88, 178)
+	var desc := _mk_label(card, description, 18, Color(0.90, 0.94, 0.87))
+	desc.position = Vector2(30, 232)
+	desc.size = Vector2(390, 80)
+
+
+func hide_map_selector() -> void:
+	if _map_panel:
+		_map_panel.queue_free()
+		_map_panel = null

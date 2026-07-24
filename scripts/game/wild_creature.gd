@@ -1,0 +1,281 @@
+class_name WildCreature
+extends CharacterBody3D
+## 阔野动物：野猪、狼、熊、鸟。具有游荡/逃跑/反击行为，死亡掉落肉。
+
+var species := "boar"
+var terrain: Terrain
+var player: Player
+var alive := true
+var hp := 40.0
+var display_name := "野猪"
+var damage_mult := 1.0
+var kills := 0
+
+var _move_target := Vector3.ZERO
+var _think_time := 0.0
+var _attack_cooldown := 0.0
+var _anim_time := 0.0
+var _legs: Array[Node3D] = []
+var _wings: Array[Node3D] = []
+var _home := Vector3.ZERO
+
+
+func setup(p_species: String, p_terrain: Terrain, p_player: Player) -> void:
+	species = p_species
+	terrain = p_terrain
+	player = p_player
+	match species:
+		"wolf":
+			hp = 48.0
+			display_name = "狼"
+		"bear":
+			hp = 130.0
+			display_name = "熊"
+		"bird":
+			hp = 16.0
+			display_name = "山鸟"
+		_:
+			hp = 62.0
+			display_name = "野猪"
+
+
+func _ready() -> void:
+	add_to_group("wildlife")
+	collision_layer = 4
+	collision_mask = 1
+	_home = global_position
+	_move_target = global_position
+	_build_collision()
+	_build_model()
+
+
+func _build_collision() -> void:
+	var col := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.52 if species == "bear" else 0.34
+	shape.height = 1.9 if species == "bear" else 1.1
+	if species == "bird":
+		shape.radius = 0.18
+		shape.height = 0.45
+	col.shape = shape
+	col.position.y = 0.9 if species == "bear" else 0.48
+	add_child(col)
+
+
+func _build_model() -> void:
+	match species:
+		"wolf":
+			_build_wolf()
+		"bear":
+			_build_bear()
+		"bird":
+			_build_bird()
+		_:
+			_build_boar()
+
+
+func _build_boar() -> void:
+	var fur := Toon.make_material(Color(0.30, 0.20, 0.14), true, 0.014)
+	var mane := Toon.make_material(Color(0.13, 0.10, 0.075), true, 0.01)
+	var tusk := Toon.make_material(Color(0.92, 0.83, 0.60), true, 0.006)
+	_sphere(self, 0.55, fur, Vector3(0, 0.78, 0), Vector3(0.92, 0.82, 1.45))
+	_sphere(self, 0.38, fur, Vector3(0, 0.78, -0.72), Vector3(1.0, 0.85, 1.1))
+	_sphere(self, 0.24, mane, Vector3(0, 0.70, -1.02), Vector3(1.15, 0.72, 1.0))
+	for sx in [-1.0, 1.0]:
+		var tusk_part := _capsule(self, 0.045, 0.38, tusk, Vector3(sx * 0.23, 0.64, -1.14))
+		tusk_part.rotation_degrees = Vector3(52, 0, sx * 28)
+		var ear := _part(Vector3(0.18, 0.28, 0.08), fur, Vector3(sx * 0.31, 1.08, -0.72), self)
+		ear.rotation_degrees.z = sx * -20.0
+	for i in range(7):
+		var bristle := _part(Vector3(0.07, 0.26, 0.15), mane, Vector3(0, 1.24, -0.35 + i * 0.15), self)
+		bristle.rotation_degrees.x = float(i - 3) * 3.0
+	_add_four_legs(fur, 0.58, 0.36, 0.52)
+
+
+func _build_wolf() -> void:
+	var fur := Toon.make_material(Color(0.42, 0.46, 0.44), true, 0.014)
+	var light := Toon.make_material(Color(0.70, 0.72, 0.65), true, 0.01)
+	var dark := Toon.make_material(Color(0.12, 0.14, 0.14), true, 0.008)
+	_sphere(self, 0.42, fur, Vector3(0, 0.82, 0.0), Vector3(0.85, 0.82, 1.55))
+	_capsule(self, 0.25, 0.78, fur, Vector3(0, 1.04, -0.58)).rotation_degrees.x = 55.0
+	_sphere(self, 0.31, fur, Vector3(0, 1.24, -0.82), Vector3(1.0, 0.95, 1.1))
+	_sphere(self, 0.18, light, Vector3(0, 1.12, -1.12), Vector3(1.0, 0.7, 1.45))
+	_sphere(self, 0.075, dark, Vector3(0, 1.14, -1.34), Vector3.ONE)
+	for sx in [-1.0, 1.0]:
+		var ear := _part(Vector3(0.16, 0.42, 0.10), fur, Vector3(sx * 0.22, 1.59, -0.83), self)
+		ear.rotation_degrees.z = sx * -10.0
+		_sphere(self, 0.035, dark, Vector3(sx * 0.12, 1.31, -1.08), Vector3.ONE)
+	_add_four_legs(fur, 0.64, 0.28, 0.58)
+	var tail := _capsule(self, 0.13, 1.0, fur, Vector3(0, 0.96, 0.96))
+	tail.rotation_degrees.x = -58.0
+
+
+func _build_bear() -> void:
+	var fur := Toon.make_material(Color(0.29, 0.18, 0.105), true, 0.02)
+	var muzzle := Toon.make_material(Color(0.58, 0.42, 0.26), true, 0.012)
+	var dark := Toon.make_material(Color(0.07, 0.055, 0.045), true, 0.008)
+	_sphere(self, 0.84, fur, Vector3(0, 1.18, 0.15), Vector3(1.0, 1.08, 1.25))
+	_sphere(self, 0.57, fur, Vector3(0, 1.62, -0.72), Vector3(1.0, 1.0, 1.05))
+	_sphere(self, 0.31, muzzle, Vector3(0, 1.46, -1.18), Vector3(1.2, 0.72, 1.15))
+	_sphere(self, 0.10, dark, Vector3(0, 1.58, -1.45), Vector3(1.1, 0.7, 0.8))
+	for sx in [-1.0, 1.0]:
+		_sphere(self, 0.20, fur, Vector3(sx * 0.45, 2.04, -0.67), Vector3.ONE)
+		_sphere(self, 0.045, dark, Vector3(sx * 0.20, 1.73, -1.12), Vector3.ONE)
+	_add_four_legs(fur, 0.78, 0.44, 0.72)
+
+
+func _build_bird() -> void:
+	var blue := Toon.make_material(Color(0.16, 0.43, 0.60), true, 0.008)
+	var cream := Toon.make_material(Color(0.90, 0.78, 0.50), true, 0.006)
+	var dark := Toon.make_material(Color(0.08, 0.10, 0.12), true, 0.004)
+	_sphere(self, 0.22, blue, Vector3.ZERO, Vector3(0.9, 0.85, 1.3))
+	_sphere(self, 0.16, blue, Vector3(0, 0.13, -0.28), Vector3.ONE)
+	var beak := _part(Vector3(0.09, 0.07, 0.28), cream, Vector3(0, 0.10, -0.48), self)
+	beak.rotation_degrees.x = 8.0
+	for sx in [-1.0, 1.0]:
+		_sphere(self, 0.028, dark, Vector3(sx * 0.10, 0.18, -0.40), Vector3.ONE)
+		var wing := Node3D.new()
+		wing.position = Vector3(sx * 0.18, 0.02, 0)
+		add_child(wing)
+		_wings.append(wing)
+		var feather := _part(Vector3(0.78, 0.045, 0.34), blue, Vector3(sx * 0.36, 0, 0.08), wing)
+		feather.rotation_degrees.y = sx * -12.0
+	for i in range(3):
+		var tail := _part(Vector3(0.10, 0.035, 0.52), blue, Vector3((i - 1) * 0.09, 0, 0.47), self)
+		tail.rotation_degrees.x = -8.0
+
+
+func _add_four_legs(mat: Material, y: float, x: float, z: float) -> void:
+	for sx in [-x, x]:
+		for sz in [-z, z]:
+			var leg := Node3D.new()
+			leg.position = Vector3(sx, y, sz)
+			add_child(leg)
+			_legs.append(leg)
+			_capsule(leg, 0.105 if species != "bear" else 0.17, 0.62 if species != "bear" else 0.82, mat, Vector3(0, -0.30, 0))
+
+
+func _part(size: Vector3, mat: Material, pos: Vector3, parent: Node3D) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
+
+
+func _sphere(parent: Node3D, radius: float, mat: Material, pos: Vector3, shape_scale: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	mesh.radial_segments = 9
+	mesh.rings = 5
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.scale = shape_scale
+	parent.add_child(mi)
+	return mi
+
+
+func _capsule(parent: Node3D, radius: float, height: float, mat: Material, pos: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
+
+
+func get_hit_part(_shape_idx: int) -> String:
+	return "body"
+
+
+func take_damage(amount: float, from: Variant = null, _part_name: String = "body") -> void:
+	if not alive:
+		return
+	hp -= amount
+	if from == player and species != "bird":
+		_move_target = player.global_position
+	if hp <= 0.0:
+		_die(from)
+
+
+func _die(from: Variant) -> void:
+	alive = false
+	if from and from.get("kills") != null:
+		from.kills += 1
+	var meat_count := 1 if species == "bird" else 4 if species == "bear" else 2
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.25, 0), "meat", "", meat_count, 1)
+	queue_free()
+
+
+func _physics_process(delta: float) -> void:
+	if not alive or terrain == null or player == null:
+		return
+	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
+	_anim_time += delta
+	if species == "bird":
+		_update_bird(delta)
+		return
+	_think_time -= delta
+	var distance := global_position.distance_to(player.global_position)
+	var aggressive := species in ["wolf", "bear"] and distance < (24.0 if species == "wolf" else 18.0)
+	if _think_time <= 0.0:
+		_think_time = randf_range(1.2, 2.8)
+		if aggressive:
+			_move_target = player.global_position
+		elif distance < 15.0:
+			_move_target = global_position + (global_position - player.global_position).normalized() * 18.0
+		else:
+			_move_target = _home + Vector3(randf_range(-18, 18), 0, randf_range(-18, 18))
+	var direction := _move_target - global_position
+	direction.y = 0.0
+	var move_speed := 0.0
+	if direction.length() > 1.0:
+		direction = direction.normalized()
+		move_speed = 7.2 if aggressive else 4.5 if species == "wolf" else 3.5
+		var next := global_position + direction * move_speed * delta
+		if terrain.is_in_water(next.x, next.z):
+			direction = direction.rotated(Vector3.UP, 1.5)
+		velocity.x = direction.x * move_speed
+		velocity.z = direction.z * move_speed
+		var yaw := atan2(direction.x, direction.z) + PI
+		rotation.y = lerp_angle(rotation.y, yaw, delta * 7.0)
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, delta * 10.0)
+		velocity.z = move_toward(velocity.z, 0.0, delta * 10.0)
+	velocity.y = -4.0
+	move_and_slide()
+	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
+	if aggressive and distance < (2.2 if species == "bear" else 1.6) and _attack_cooldown <= 0.0:
+		player.take_damage(22.0 if species == "bear" else 11.0, self)
+		_attack_cooldown = 1.15
+	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 7.0, 0.0, 1.0) * 0.65
+	for i in range(_legs.size()):
+		_legs[i].rotation.x = sin(_anim_time * 9.0 + (0.0 if i in [0, 3] else PI)) * stride
+
+
+func _update_bird(delta: float) -> void:
+	_think_time -= delta
+	if _think_time <= 0.0:
+		_think_time = randf_range(2.0, 4.0)
+		var away := (global_position - player.global_position).normalized() if global_position.distance_to(player.global_position) < 14.0 else Vector3.ZERO
+		_move_target = _home + Vector3(randf_range(-25, 25), randf_range(6, 13), randf_range(-25, 25)) + away * 20.0
+	var direction := (_move_target - global_position).normalized()
+	velocity = velocity.lerp(direction * 8.5, delta * 2.2)
+	move_and_slide()
+	if velocity.length_squared() > 0.1:
+		var forward := velocity.normalized()
+		if absf(forward.dot(Vector3.UP)) < 0.98:
+			look_at(global_position + velocity, Vector3.UP)
+	for i in range(_wings.size()):
+		_wings[i].rotation.z = sin(_anim_time * 13.0) * 0.75 * (-1.0 if i == 0 else 1.0)

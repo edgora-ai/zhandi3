@@ -35,8 +35,8 @@ void fragment() {
 
 	// 陡坡增加横向岩层，不改变碰撞形状。
 	float steep = smoothstep(0.78, 0.48, v_world_normal.y);
-	float strata = 0.5 + 0.5 * sin(v_world.y * 2.6 + macro_patch * 5.0);
-	col *= 1.0 - steep * strata * 0.12;
+	float strata = 0.5 + 0.5 * sin(v_world.y * 1.25 + macro_patch * 8.0 + fine_patch * 3.0);
+	col *= 1.0 - steep * (0.025 + strata * 0.045);
 
 	// 雪优先积在朝上的表面，并用噪声打碎边界。
 	float snow_noise = macro_patch * 0.65 + fine_patch * 0.35;

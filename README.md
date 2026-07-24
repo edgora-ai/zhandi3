@@ -1,6 +1,6 @@
 # 战地3 (zhandi3)
 
-战地式大地图 FPS × 吃鸡大逃杀框架 × 旷野之息卡通渲染。使用 **Godot 4.7.1 + GDScript** 开发，全部素材（地形、植被、武器模型、音效）程序化生成，零外部素材依赖。
+战地式大地图 FPS × 吃鸡大逃杀框架 × 旷野之息风格卡通渲染。使用 **Godot 4.7.1 + GDScript** 开发，全部素材（地形、植被、角色、建筑、载具、特效和音效）程序化生成，零外部素材依赖。
 
 > **本项目是一款用 Kimi k3（Kimi Code CLI）开发的测试游戏**：从需求、编码、调试、验证到截图提交，全部由 AI 完成，用于检验 AI Agent 独立交付一个完整可玩游戏的能力。
 
@@ -12,7 +12,9 @@
 | --- | --- | --- |
 | ![第一人称](docs/screenshots/firstperson.png) | ![海岛全景](docs/screenshots/island.png) | ![结算画面](docs/screenshots/end.png) |
 
-## 玩法
+## 两张地图
+
+### 群岛战场
 
 - 你 + 23 个 AI 战士空降到 500m×500m 的海岛，赤手空拳落地
 - 搜刮武器（冲锋枪/突击步枪/射手步枪）、护甲、医疗包、弹药——物资聚集在 3 座村庄（小屋/两层楼/仓库/瞭望塔）里，也有码头、废墟可探索
@@ -20,6 +22,17 @@
 - 地图上有 3 面旗帜据点（A/B/C），沙袋工事环绕，在圈内停留 5 秒占领，占领后**持续回血 + 伤害提升 10%**
 - 春夏秋冬实时切换：地面、草木、水面、天空雾光、花瓣/落叶/雪和建筑雪盖同步变化
 - 活到最后：**大吉大利，今晚吃鸡！**
+
+### 海拉鲁阔野
+
+- 解析式地貌塑造初始高原、双子山裂谷、海布拉雪山、中央丘陵、S 形海利亚河与奥尔汀火山；不是用随机噪声平均铺满的无名地形
+- 神庙、驿站、时间神殿遗迹、木桥、道路、芦苇、火堆和发光熔岩火口组成可辨识的探索地标
+- 河流具备水波、深浅色与岸线泡沫；玩家自动浮向水面，可游泳、上浮、下潜和加速，不再沉底行走
+- 可骑乘 4 匹马和古代科技摩托；马匹带鞍具和步态动画，摩托带悬挂、车轮与发光核心
+- 8 个山野小怪会投石并近身冲锋；3 台飞行攻击器发射能量弹；火山巨龙巡航并喷火
+- 野猪、狼、熊和鸟构成野生生态，击败动物掉落兽肉；蘑菇、兽肉和龙鳞可存入背包并用于恢复生命或护甲
+- 空降中按住空格展开滑翔斗篷，以 WASD 控制下降方向；最大下坠速度限制为 3.1m/s
+- 阔野地图是一套受开放世界卡通冒险启发的原创程序化实现，不包含外部游戏资产
 
 ## 操作
 
@@ -30,10 +43,12 @@
 | 左键 | 射击 |
 | 右键 | 机瞄（射手步枪带高倍镜） |
 | Shift | 冲刺 |
-| 空格 | 跳跃（在瞭望塔梯子处按 W 攀爬） |
-| C | 趴下（更慢，扩散大幅降低） |
+| 空格 | 地面跳跃；空降时按住展开滑翔斗篷；水中上浮 |
+| C | 地面趴下（更慢，扩散大幅降低）；水中下潜 |
 | G | 投掷烟雾弹（烟球遮挡 AI 视线，初始 3 枚） |
-| F | 靠近吉普车驾驶 / 下车（W/S 油门倒车，A/D 转向） |
+| F | 靠近吉普车、马或摩托时骑乘 / 下车（W/S 前后，A/D 转向） |
+| B | 打开 / 关闭背包（W/S 选择，E 取出或使用，X 存入当前武器） |
+| M | 打开地图选择（1 群岛战场，2 海拉鲁阔野） |
 | V | 循环切换春 / 夏 / 秋 / 冬 |
 | R | 换弹 / 结算后重开 |
 | E | 拾取 |
@@ -59,12 +74,13 @@ scenes/main.tscn         # 极简根场景，一切由代码生成
 scripts/
   main.gd                # 比赛总控：生成、击杀播报、胜负、buff 结算
   world/terrain.gd       # 噪声地形 + 顶点色 + 解析高度采样 + 水面（高度图驱动的水波 shader）
+  world/wild_world.gd    # 阔野地图总成：神庙/驿站/遗迹/桥梁/火山/生态生成
   world/props.gd         # 树木/灌木/岩石/草（树冠/草丛 MultiMesh + 行进风场 shader）
   world/season_system.gd # 四季总控：地表/植被/水片/天空雾光/天气联动
   world/tex_gen.gd       # 程序化贴图工厂：叶簇/草叶/花朵 alpha 贴图
   world/buildings.gd     # 程序化建筑：村庄（小屋/两层楼/仓库/瞭望塔/废墟）、据点沙袋工事、码头小船
   world/toon.gd          # 卡通材质工厂（toon 光照 + grow 描边）
-  player/player.gd       # FPS 控制器（移动/空降/伤害/武器槽/拾取）
+  player/player.gd       # FPS 控制器（移动/空降/游泳/滑翔/背包/骑乘）
   player/weapon.gd       # hitscan 武器逻辑 + 程序化视模型
   player/hud.gd          # 全套 HUD（中文用内置 Noto Sans SC 渲染）
   bots/bot.gd            # AI 状态机：空降→搜刮→跑圈→占点→交战
@@ -72,6 +88,13 @@ scripts/
   game/capture_point.gd  # 据点：占领进度、旗帜变色、增益归属
   game/loot.gd           # 战利品：光柱稀有度、拾取逻辑
   game/vehicle.gd        # 吉普车：F 上下车、街机驾驶、贴地形
+  game/horse.gd          # 马匹：程序化模型、骑乘控制与步态
+  game/wild_motorcycle.gd # 古代摩托：程序化模型、悬挂与骑乘控制
+  game/wild_creature.gd  # 野猪/狼/熊/鸟生态、攻击与掉落
+  game/wild_monster.gd   # 山野小怪：巡逻、投石与冲锋
+  game/wild_dragon.gd    # 火山巨龙：巡航、喷火与龙鳞掉落
+  game/flying_attacker.gd # 古代飞行攻击器
+  game/wild_projectile.gd # 石块/火焰/能量弹共用投射物
   game/smoke_grenade.gd  # 烟雾弹：引信起烟、遮挡 AI 视线
   fx/fx.gd               # 曳光/命中特效
   fx/sfx_bank.gd         # 音效池（2D/3D）
@@ -99,6 +122,13 @@ tools/Godot.app/Contents/MacOS/Godot --path . -- --ground --arm
 tools/Godot.app/Contents/MacOS/Godot --path . -- --seed 7
 # 指定初始季节（spring / summer / autumn / winter）
 tools/Godot.app/Contents/MacOS/Godot --path . -- --season winter
+# 直接进入指定地图（battlefield / wild）
+tools/Godot.app/Contents/MacOS/Godot --path . -- --map wild
+# 阔野完整玩法回归：背包、游泳、滑翔、骑马、投射物、掉落、摩托
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 520 -- --wildtest --ground --arm --seed 7
+# 地图选择与背包界面截图预览
+tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/map.png --mapmenutest
+tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/backpack.png --backpacktest --map wild
 # 射击链路自检（生成测试bot并开火，打印血量）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm
 # 失焦恢复自检（模拟漏收恢复通知，确认暂停外定时器能自动解锁）

@@ -4,10 +4,12 @@ extends Node3D
 const BOT_COUNT := 23
 const BOT_NAMES := ["战虎", "孤狼", "夜莺", "雷霆", "幽灵", "猎鹰", "毒蝎", "雪豹", "黑曜", "赤狐", "苍狼", "飞鹰", "铁壁", "疾风", "灰烬", "寒鸦", "断刃", "追猎", "重锤", "影袭", "怒涛", "磐石", "烈阳"]
 const INSTANCE_LOCK := "user://zhandi3_game.pid"
+const MAP_SELECTION := "user://selected_map.txt"
 
 var terrain: Terrain
 var props: Props
 var buildings: Buildings
+var wild_world: WildWorld
 var seasons: SeasonSystem
 var player: Player
 var hud: HUD
@@ -35,17 +37,33 @@ var _focus_recovery_timer: Timer
 var _focus_recovery_test_frame := -1
 var _focus_recovery_test_pending := false
 var _season_test_frame := -1
+var _map_id := "battlefield"
+var _map_menu_open := false
+var _map_from_cli := false
+var _show_initial_map_menu := false
+var _map_pause_owned := false
+var _wild_test_frame := -1
+var _wild_test_height := 0.0
+var _wild_test_horse_start := Vector3.ZERO
+var _wild_test_bike_start := Vector3.ZERO
+var _wild_test_hp := 0.0
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not _acquire_instance_lock():
 		get_tree().quit()
 		return
 	tree_exiting.connect(_release_instance_lock)
 	var args := OS.get_cmdline_user_args()
+	_map_id = _resolve_map(args)
+	_map_from_cli = args.find("--map") >= 0
+	_show_initial_map_menu = args.has("--mapmenutest") or (not args.has("--wildtest") and not _map_from_cli and not FileAccess.file_exists(MAP_SELECTION) and DisplayServer.get_name() != "headless")
+	total_combatants = 1 if _map_id == "wild" else BOT_COUNT + 1
 	_setup_environment()
 	terrain = Terrain.new()
 	terrain.name = "Terrain"
+	terrain.configure(_map_id)
 	add_child(terrain)
 	props = Props.new()
 	props.name = "Props"
@@ -55,12 +73,13 @@ func _ready() -> void:
 	buildings = Buildings.new()
 	buildings.name = "Buildings"
 	add_child(buildings)
-	if not args.has("--noworld"):
+	if not args.has("--noworld") and _map_id == "battlefield":
 		buildings.generate(terrain)
 
 	zone = Zone.new()
 	zone.name = "Zone"
 	add_child(zone)
+	zone.visible = _map_id == "battlefield"
 
 	sfx = SfxBank.new()
 	sfx.name = "SfxBank"
@@ -91,11 +110,20 @@ func _ready() -> void:
 	if season_i >= 0 and season_i + 1 < args.size():
 		initial_season = args[season_i + 1]
 	seasons.setup(terrain, props, buildings, player, initial_season)
-	if not args.has("--noworld"):
+	if not args.has("--noworld") and _map_id == "battlefield":
 		_spawn_bots(rng)
 		_spawn_capture_points(rng)
 		_spawn_loot_field(rng)
-	zone.start(10.0)
+	elif not args.has("--noworld"):
+		wild_world = WildWorld.new()
+		wild_world.name = "WildWorld"
+		add_child(wild_world)
+		wild_world.generate(terrain, player)
+	if _map_id == "battlefield":
+		zone.start(10.0)
+	else:
+		hud.set_alive_text("阔野探索")
+		hud.set_kills(0)
 	if args.has("--ground"):
 		player.global_position.y = terrain.get_height(player.global_position.x, player.global_position.z) + 1.0
 	if args.has("--arm"):
@@ -111,6 +139,16 @@ func _ready() -> void:
 		for i in range(12):
 			hud.add_feed("播报上限回归 %02d" % i)
 		print("[feedtest] items=%d expected=%d" % [hud.feed_item_count(), HUD.MAX_FEED_ITEMS])
+	if args.has("--wildtest"):
+		_wild_test_frame = 0
+	if args.has("--backpacktest"):
+		player.give_weapon("rifle")
+		player.give_weapon("smg")
+		player.give_weapon("dmr")
+		player.give_item("mushroom", 4)
+		player.give_item("meat", 3)
+		player.give_item("dragon_scale", 1)
+		call_deferred("_open_backpack_test")
 	if args.has("--endtest"):
 		hud.show_end(false, 12, 3, 24)
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
@@ -128,7 +166,31 @@ func _ready() -> void:
 		_mt = 0
 	_setup_focus_recovery()
 	_setup_screenshot_mode()
-	print("[boot] nodes=%d objs=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+	if _show_initial_map_menu:
+		call_deferred("_toggle_map_menu")
+	print("[boot] map=%s nodes=%d objs=%d mem=%dMB" % [_map_id, Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+
+
+func _resolve_map(args: PackedStringArray) -> String:
+	var map_index := args.find("--map")
+	if map_index >= 0 and map_index + 1 < args.size():
+		return "wild" if args[map_index + 1] in ["wild", "hyrule", "open"] else "battlefield"
+	if args.has("--wildtest"):
+		return "wild"
+	if DisplayServer.get_name() == "headless":
+		return "battlefield"
+	if FileAccess.file_exists(MAP_SELECTION):
+		var file := FileAccess.open(MAP_SELECTION, FileAccess.READ)
+		if file:
+			var saved := file.get_as_text().strip_edges()
+			if saved in ["battlefield", "wild"]:
+				return saved
+	return "battlefield"
+
+
+func _open_backpack_test() -> void:
+	if player and not player.backpack_open:
+		player._toggle_backpack()
 
 
 func _acquire_instance_lock() -> bool:
@@ -181,11 +243,15 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	player.name = "Player"
 	add_child(player)
 	var land := find_land_point(rng)
-	player.global_position = land + Vector3(0, 130, 0)
+	if _map_id == "wild":
+		land = Vector3(-138, terrain.get_height(-138, 108), 108)
+	player.terrain = terrain
+	player.global_position = land + Vector3(0, 92 if _map_id == "wild" else 130, 0)
 	player.died.connect(_on_combatant_died)
 
 	hud = HUD.new()
 	add_child(hud)
+	player.hud = hud
 	player.health_changed.connect(hud.set_health)
 	player.damaged.connect(func(_a: float) -> void: hud.flash_damage())
 	player.weapon.ammo_changed.connect(hud.set_ammo)
@@ -205,6 +271,8 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	var a := land + Vector3(rng.randf_range(-5, 5), 0, rng.randf_range(-5, 5))
 	a.y = terrain.get_height(a.x, a.z) + 0.1
 	Loot.spawn(self, a, "armor", "", 25, 1)
+	if _map_id == "wild":
+		Loot.spawn(self, land + Vector3(-2.5, 0.15, 2.0), "mushroom", "", 3, 1)
 
 
 func _spawn_bots(rng: RandomNumberGenerator) -> void:
@@ -329,8 +397,60 @@ func _recompute_buffs() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_M:
+			_toggle_map_menu()
+			get_viewport().set_input_as_handled()
+			return
+		if _map_menu_open:
+			if event.physical_keycode == KEY_1:
+				_select_map("battlefield")
+			elif event.physical_keycode == KEY_2:
+				_select_map("wild")
+			get_viewport().set_input_as_handled()
+			return
 	if match_over and event is InputEventKey and event.pressed and event.physical_keycode == KEY_R:
 		get_tree().reload_current_scene()
+
+
+func _toggle_map_menu() -> void:
+	if hud == null:
+		return
+	_map_menu_open = not _map_menu_open
+	if _map_menu_open:
+		hud.show_map_selector(_map_id)
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if not get_tree().paused:
+			_map_pause_owned = true
+			get_tree().paused = true
+			if sfx:
+				sfx.set_streams_paused(true)
+	else:
+		hud.hide_map_selector()
+		if _map_pause_owned:
+			_map_pause_owned = false
+			get_tree().paused = false
+			if sfx:
+				sfx.set_streams_paused(false)
+		if player and player.alive and not player.backpack_open:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _select_map(next_map: String) -> void:
+	if _map_from_cli and next_map != _map_id:
+		hud.add_feed("当前由命令行 --map 锁定地图")
+		_toggle_map_menu()
+		return
+	var file := FileAccess.open(MAP_SELECTION, FileAccess.WRITE)
+	if file:
+		file.store_string(next_map)
+	if next_map == _map_id:
+		_toggle_map_menu()
+		return
+	if _map_menu_open:
+		_toggle_map_menu()
+	_map_id = next_map
+	get_tree().reload_current_scene()
 
 
 # 窗口失去焦点（Cmd+Space、切应用、手势误触）时自动暂停，切回继续。
@@ -392,6 +512,8 @@ func _poll_focus_recovery() -> void:
 
 
 func _process(delta: float) -> void:
+	if _wild_test_frame >= 0:
+		_update_wild_test()
 	if _season_test_frame >= 0:
 		_season_test_frame += 1
 		if _season_test_frame in [20, 40, 60]:
@@ -467,7 +589,7 @@ func _process(delta: float) -> void:
 		_sim_acc += delta
 		if _sim_acc >= 10.0:
 			_sim_acc = 0.0
-			print("[sim] frame=%d alive=%d zone_r=%d phase=%d match_over=%s nodes=%d objs=%d res=%d mem=%dMB" % [Engine.get_process_frames(), _alive_count(), int(zone.radius), zone.phase, str(match_over), Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+			print("[sim] frame=%d map=%s alive=%d zone_r=%d phase=%d match_over=%s nodes=%d objs=%d res=%d mem=%dMB" % [Engine.get_process_frames(), _map_id, _alive_count(), int(zone.radius), zone.phase, str(match_over), Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
 
 	if not player.alive:
 		return
@@ -478,15 +600,29 @@ func _process(delta: float) -> void:
 	elif player.vehicle:
 		hud.set_interact("按 F 下车")
 	elif player.nearby_vehicle:
-		hud.set_interact("按 F 驾驶吉普车")
+		var ride_value: Variant = player.nearby_vehicle.get("ride_label")
+		var ride_text := str(ride_value) if ride_value != null else "驾驶吉普车"
+		hud.set_interact("按 F %s" % ride_text)
 	else:
 		hud.set_interact("")
 	hud.set_weapon_name(player.weapon.label())
 	if player.weapon.weapon_id == "":
 		hud.set_ammo_text("--")
-	hud.set_zone_text(zone.status_text())
-	if zone.active and zone.is_outside(player.global_position):
-		hud.set_danger(true)
+	if _map_id == "wild" and wild_world:
+		var state := ""
+		if player.is_swimming:
+			state = " · 游泳（Space 上浮 / C 下潜）"
+		elif player.is_gliding:
+			state = " · 斗篷滑翔中"
+		elif player.vehicle:
+			state = " · 骑乘中"
+		hud.set_zone_text(wild_world.get_region_name(player.global_position))
+		hud.set_world_state("海拉鲁阔野%s\nM 地图  ·  B 背包  ·  F 骑乘" % state)
+	else:
+		hud.set_zone_text(zone.status_text())
+		hud.set_world_state("群岛战场\nM 地图选择")
+		if zone.active and zone.is_outside(player.global_position):
+			hud.set_danger(true)
 	# 占点提示
 	var shown := false
 	for cp in capture_points:
@@ -497,6 +633,91 @@ func _process(delta: float) -> void:
 			break
 	if not shown:
 		hud.set_capture("", -1.0)
+
+
+func _update_wild_test() -> void:
+	_wild_test_frame += 1
+	match _wild_test_frame:
+		10:
+			player.give_weapon("rifle")
+			player.give_weapon("smg")
+			player.give_weapon("dmr")
+			player.give_item("mushroom", 3)
+			player.give_item("meat", 2)
+			print("[wildtest] backpack weapons=%d mushrooms=%d meat=%d" % [player.backpack_weapons.size(), int(player.backpack_items["mushroom"]), int(player.backpack_items["meat"])])
+		12:
+			player._retrieve_weapon(0)
+			print("[wildtest] backpack retrieve current=%s stored=%d" % [player.weapon.weapon_id, player.backpack_weapons.size()])
+		20:
+			var river_z := 0.0
+			var river_x := sin(river_z * 0.021) * 24.0 - 8.0 + sin(river_z * 0.049) * 7.0
+			player.global_position = Vector3(river_x, Terrain.WATER_LEVEL - 1.7, river_z)
+			player.velocity = Vector3.ZERO
+			player.is_dropping = false
+		80:
+			print("[wildtest] swim active=%s y=%.2f surface=%.2f" % [str(player.is_swimming), player.global_position.y, terrain.get_water_level()])
+			player.global_position = Vector3(-112, terrain.get_height(-112, 92) + 38.0, 92)
+			player.velocity = Vector3(0, -20, 0)
+			player.is_dropping = true
+			player.debug_glide = true
+			_wild_test_height = player.global_position.y
+		145:
+			print("[wildtest] glide active=%s fall=%.2f vy=%.2f" % [str(player.is_gliding), _wild_test_height - player.global_position.y, player.velocity.y])
+			player.debug_glide = false
+			var horse := get_tree().get_first_node_in_group("vehicle") as Horse
+			if horse:
+				player.global_position = horse.global_position + Vector3(1, 0, 0)
+				horse.enter(player)
+				horse.debug_forward = 1.0
+				_wild_test_horse_start = horse.global_position
+		220:
+			var horse := player.vehicle as Horse
+			if horse:
+				print("[wildtest] horse moved=%.2f mounted=%s" % [_wild_test_horse_start.distance_to(horse.global_position), str(horse.driver == player)])
+				horse.debug_forward = 0.0
+				horse.exit()
+			player.global_position = Vector3(-22, terrain.get_height(-22, 104) + 0.1, 104)
+			player.collision_layer = 2
+			player.collision_mask = 1 | 4
+			_wild_test_hp = player.hp
+			var enemy := get_tree().get_first_node_in_group("wild_enemy") as WildMonster
+			if enemy:
+				var enemy_pos := player.global_position + Vector3(0, 0, -9)
+				enemy_pos.y = terrain.get_height(enemy_pos.x, enemy_pos.z) + 0.05
+				enemy.global_position = enemy_pos
+				enemy._throw_at_player()
+		300:
+			var projectiles := get_tree().get_nodes_in_group("wild_projectile")
+			var projectile_pos := Vector3.ZERO
+			if not projectiles.is_empty():
+				var remaining: Node3D = projectiles[0]
+				projectile_pos = remaining.global_position
+			print("[wildtest] projectile in_flight remaining=%d sample_pos=%s" % [projectiles.size(), str(projectile_pos)])
+			var before := get_tree().get_nodes_in_group("loot").size()
+			var creature := get_tree().get_first_node_in_group("wildlife") as WildCreature
+			if creature:
+				creature.take_damage(999.0, player)
+			print("[wildtest] meat_drop before=%d after=%d" % [before, get_tree().get_nodes_in_group("loot").size()])
+		350:
+			print("[wildtest] projectile damage=%.1f" % [_wild_test_hp - player.hp])
+			var bike: WildMotorcycle = null
+			for candidate in get_tree().get_nodes_in_group("vehicle"):
+				if candidate is WildMotorcycle:
+					bike = candidate as WildMotorcycle
+					break
+			if bike:
+				player.global_position = bike.global_position + Vector3(1, 0, 0)
+				bike.enter(player)
+				bike.debug_forward = 1.0
+				_wild_test_bike_start = bike.global_position
+		430:
+			var bike := player.vehicle as WildMotorcycle
+			if bike:
+				print("[wildtest] motorcycle moved=%.2f mounted=%s" % [_wild_test_bike_start.distance_to(bike.global_position), str(bike.driver == player)])
+				bike.debug_forward = 0.0
+				bike.exit()
+			print("[wildtest] done nodes=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+			_wild_test_frame = -1
 
 
 func _setup_environment() -> void:

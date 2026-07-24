@@ -137,14 +137,14 @@ func _apply_environment(palette: Dictionary) -> void:
 		_sky_material.ground_horizon_color = palette["ground_sky"]
 	if _environment:
 		_environment.fog_light_color = palette["fog"]
-		_environment.fog_density = palette["fog_density"]
-		_environment.tonemap_exposure = palette["exposure"]
+		_environment.fog_density = float(palette["fog_density"]) * (0.68 if _terrain and _terrain.profile == "wild" else 1.0)
+		_environment.tonemap_exposure = float(palette["exposure"]) * (0.88 if _terrain and _terrain.profile == "wild" else 1.0)
 	if _sun:
 		_sun.light_color = palette["sun"]
-		_sun.light_energy = palette["sun_energy"]
+		_sun.light_energy = float(palette["sun_energy"]) * (0.88 if _terrain and _terrain.profile == "wild" else 1.0)
 	if _fill:
 		_fill.light_color = palette["fill"]
-		_fill.light_energy = palette["fill_energy"]
+		_fill.light_energy = float(palette["fill_energy"]) * (0.72 if _terrain and _terrain.profile == "wild" else 1.0)
 	if _rim:
 		_rim.light_color = palette["rim"]
 

@@ -55,6 +55,14 @@ func set_weapon(id: String, p_mag: int = -1, p_reserve: int = -1) -> void:
 	weapon_id = id
 	if id == "":
 		data = {}
+		mag_left = 0
+		reserve = 0
+		if viewmodel:
+			viewmodel.queue_free()
+			viewmodel = null
+			muzzle = null
+			_flash = null
+		ammo_changed.emit(0, 0)
 		return
 	data = WEAPONS[id]
 	mag_left = p_mag if p_mag >= 0 else data.mag

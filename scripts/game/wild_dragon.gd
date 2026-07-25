@@ -5,7 +5,7 @@ extends CharacterBody3D
 var player: Player
 var center := Vector3.ZERO
 var alive := true
-var hp := 420.0
+var hp := 260.0
 var display_name := "赤焰巨龙"
 var damage_mult := 1.0
 var kills := 0
@@ -130,6 +130,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	if not alive:
 		return
 	hp -= amount
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.5, 0), str(int(amount)), Color(1.0, 0.80, 0.30))
 	if hp <= 0.0:
 		alive = false
 		if from and from.get("kills") != null:

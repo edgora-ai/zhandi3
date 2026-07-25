@@ -5,7 +5,7 @@ extends CharacterBody3D
 var terrain: Terrain
 var player: Player
 var alive := true
-var hp := 82.0
+var hp := 60.0
 var display_name := "山地小怪"
 var damage_mult := 1.0
 var kills := 0
@@ -19,6 +19,8 @@ var _anim_time := 0.0
 var _arm_left: Node3D
 var _arm_right: Node3D
 var _legs: Array[Node3D] = []
+var _flash := 0.0
+var _death_t := -1.0
 
 
 func setup(p_terrain: Terrain, p_player: Player) -> void:
@@ -126,15 +128,34 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	if not alive:
 		return
 	hp -= amount
+	_flash = 0.14
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
 	if hp <= 0.0:
 		alive = false
 		if from and from.get("kills") != null:
 			from.kills += 1
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "mushroom", "", 2, 1)
-		queue_free()
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 1, 1)
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "mushroom", "", 1, 1)
+		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.4, 0), "击败!", Color(1.0, 0.55, 0.20))
+		var scene := get_tree().current_scene
+		if scene and scene.get("hud") != null and from == scene.get("player"):
+			scene.hud.add_feed("你 击败了 山地小怪")
+		set_deferred("collision_layer", 0)
+		set_deferred("collision_mask", 0)
+		_death_t = 0.0
 
 
 func _physics_process(delta: float) -> void:
+	if _death_t >= 0.0:
+		_death_t += delta
+		rotation.z = lerpf(rotation.z, 1.5, minf(1.0, delta * 6.0))
+		position.y -= delta * 0.4
+		if _death_t > 1.0:
+			queue_free()
+		return
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta)
+		scale = Vector3.ONE * (1.0 + _flash * 1.2)
 	if not alive or player == null or terrain == null:
 		return
 	_throw_cooldown = maxf(0.0, _throw_cooldown - delta)
@@ -167,6 +188,13 @@ func _physics_process(delta: float) -> void:
 	velocity.x = move_dir.x * speed
 	velocity.z = move_dir.z * speed
 	velocity.y = -4.0
+	# 避水：下一步会走进深水就停在岸边，并把游荡目标改回出生点一侧。
+	if terrain:
+		var next := global_position + Vector3(velocity.x, 0, velocity.z) * delta * 2.0
+		if terrain.is_in_water(next.x, next.z) and terrain.get_height(next.x, next.z) < Terrain.WATER_LEVEL - 0.35:
+			velocity.x = 0.0
+			velocity.z = 0.0
+			_wander_target = _home
 	move_and_slide()
 	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
 	if move_dir.length_squared() > 0.05:

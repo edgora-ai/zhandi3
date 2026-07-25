@@ -163,7 +163,10 @@ func _fire_ray() -> void:
 			if part == "head":
 				dmg *= data.head_mult
 			col.take_damage(dmg, owner_body, part)
-			FX.blood(end_point)
+			if col.has_method("is_plant"):
+				FX.impact(end_point)
+			else:
+				FX.blood(end_point)
 			if is_player:
 				hit_landed.emit()
 		else:

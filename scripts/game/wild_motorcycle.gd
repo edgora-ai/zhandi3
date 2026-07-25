@@ -1,21 +1,33 @@
 class_name WildMotorcycle
 extends CharacterBody3D
-## 古代科技摩托：可骑乘、快速越野、发光能量核心与悬挂姿态。
+## 古代科技摩托：渐进动力、轮胎抓地、速度相关转向、车身压弯与越野悬挂。
 
-const TOP_SPEED := 24.0
-const REVERSE_SPEED := 7.0
-const ACCEL := 18.0
-const TURN_SPEED := 1.85
+const TOP_SPEED := 27.0
+const REVERSE_SPEED := 6.0
+const ENGINE_ACCEL := 11.5
+const BRAKE_ACCEL := 22.0
+const COAST_DECEL := 3.0
+const TURN_SPEED := 1.72
+const CAMERA_SENS := 0.0022
 
 var terrain: Terrain
 var driver: Player = null
 var speed := 0.0
 var ride_label := "骑古代摩托"
 var debug_forward := 0.0
+var debug_turn := 0.0
 
+var _visual: Node3D
+var _camera_rig: Node3D
 var _camera: Camera3D
 var _wheels: Array[MeshInstance3D] = []
+var _front_fork: Node3D
 var _core: MeshInstance3D
+var _steer := 0.0
+var _camera_yaw := 0.0
+var _camera_pitch := -0.22
+var _camera_idle := 0.0
+var _pulse_time := 0.0
 
 
 func _ready() -> void:
@@ -24,99 +36,160 @@ func _ready() -> void:
 	collision_mask = 1
 	var col := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(1.2, 1.2, 2.9)
+	shape.size = Vector3(1.15, 1.25, 2.95)
 	col.shape = shape
-	col.position.y = 0.75
+	col.position.y = 0.78
 	add_child(col)
 	_build_model()
+	_build_camera()
 
 
 func _build_model() -> void:
-	var stone := Toon.make_material(Color(0.19, 0.25, 0.27), true, 0.015)
-	var dark := Toon.make_material(Color(0.055, 0.07, 0.075), true, 0.012)
-	var bronze := Toon.make_material(Color(0.58, 0.38, 0.16), true, 0.012)
+	_visual = Node3D.new()
+	_visual.name = "AncientBikeVisual"
+	add_child(_visual)
+	var stone := Toon.make_material(Color(0.17, 0.25, 0.27), true, 0.015)
+	var stone_light := Toon.make_material(Color(0.30, 0.40, 0.39), true, 0.012)
+	var dark := Toon.make_material(Color(0.045, 0.058, 0.063), true, 0.012)
+	var bronze := Toon.make_material(Color(0.62, 0.40, 0.15), true, 0.012)
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = Color(0.08, 0.88, 0.82)
+	glow.albedo_color = Color(0.07, 0.90, 0.84)
 	glow.emission_enabled = true
-	glow.emission = Color(0.05, 1.0, 0.88)
-	glow.emission_energy_multiplier = 2.5
-	for z in [-1.2, 1.2]:
-		var wheel := MeshInstance3D.new()
-		var wm := CylinderMesh.new()
-		wm.top_radius = 0.53
-		wm.bottom_radius = 0.53
-		wm.height = 0.30
-		wm.radial_segments = 14
-		wheel.mesh = wm
-		wheel.material_override = dark
-		wheel.rotation_degrees.z = 90.0
-		wheel.position = Vector3(0, 0.55, z)
-		add_child(wheel)
-		_wheels.append(wheel)
-		_cylinder(0.14, 0.42, bronze, Vector3(0, 0.55, z), Vector3(0, 0, 90))
-		for spoke in range(6):
-			var bar := _part(Vector3(0.05, 0.86, 0.05), bronze, Vector3(0, 0.55, z))
-			bar.rotation_degrees.z = float(spoke) * 30.0
-	_part(Vector3(0.72, 0.44, 1.65), stone, Vector3(0, 0.92, 0))
-	_part(Vector3(0.58, 0.18, 0.85), dark, Vector3(0, 1.25, 0.42))
-	# 前后叉、把手、脚踏和排气管形成机械层次。
+	glow.emission = Color(0.04, 1.0, 0.89)
+	glow.emission_energy_multiplier = 2.7
+
+	# 后轮固定，前轮和前叉共用转向枢轴。
+	_build_wheel(Vector3(0, 0.56, 1.22), dark, bronze, _visual)
+	_front_fork = Node3D.new()
+	_front_fork.position = Vector3(0, 0, -1.20)
+	_visual.add_child(_front_fork)
+	_build_wheel(Vector3(0, 0.56, 0), dark, bronze, _front_fork)
 	for sx in [-0.38, 0.38]:
-		var fork := _part(Vector3(0.09, 1.22, 0.09), bronze, Vector3(sx, 1.03, -0.93))
-		fork.rotation_degrees.x = -18.0
-		_part(Vector3(0.08, 0.68, 0.08), bronze, Vector3(sx, 0.82, 1.05))
-	_part(Vector3(1.25, 0.09, 0.09), bronze, Vector3(0, 1.66, -1.08))
-	_part(Vector3(1.05, 0.08, 0.12), bronze, Vector3(0, 0.82, 0.15))
-	_part(Vector3(0.13, 0.13, 1.35), dark, Vector3(0.42, 0.75, 0.62))
+		var fork := _part(Vector3(0.09, 1.24, 0.09), bronze, Vector3(sx, 1.04, 0.22), Vector3(-18, 0, 0), _front_fork)
+		fork.position.z = 0.18
+	_part(Vector3(1.28, 0.09, 0.09), bronze, Vector3(0, 1.68, 0.02), Vector3.ZERO, _front_fork)
+
+	_part(Vector3(0.76, 0.46, 1.70), stone, Vector3(0, 0.94, 0))
+	_part(Vector3(0.62, 0.20, 0.92), dark, Vector3(0, 1.29, 0.43))
+	_part(Vector3(0.52, 0.30, 0.70), stone_light, Vector3(0, 1.16, -0.55), Vector3(-12, 0, 0))
+	# 油箱、座垫、发动机散热片、挡泥板、头灯与握把，让轮廓一眼读作摩托。
+	var tank := MeshInstance3D.new()
+	var tank_mesh := SphereMesh.new()
+	tank_mesh.radius = 0.42
+	tank_mesh.height = 0.84
+	tank_mesh.radial_segments = 10
+	tank_mesh.rings = 6
+	tank.mesh = tank_mesh
+	tank.material_override = stone_light
+	tank.position = Vector3(0, 1.34, -0.30)
+	tank.scale = Vector3(0.72, 0.52, 1.05)
+	_visual.add_child(tank)
+	_part(Vector3(0.42, 0.14, 0.85), dark, Vector3(0, 1.32, 0.62), Vector3(-4, 0, 0))
+	_part(Vector3(0.34, 0.34, 0.52), dark, Vector3(0, 0.82, 0.05))
+	for i in range(3):
+		_part(Vector3(0.40, 0.05, 0.46), bronze, Vector3(0, 0.72 + i * 0.12, 0.05))
+	for sx in [-1.0, 1.0]:
+		var grip := _cylinder(0.05, 0.22, dark, Vector3(sx * 0.66, 1.68, 0.02), Vector3(0, 0, 90), _front_fork)
+		grip.rotation_degrees.z = 90.0
+	_part(Vector3(0.72, 0.08, 0.85), stone_light, Vector3(0, 1.02, 1.22), Vector3(-14, 0, 0))
+	var front_fender := _part(Vector3(0.60, 0.07, 0.75), stone_light, Vector3(0, 1.04, -0.02), Vector3(12, 0, 0), _front_fork)
+	front_fender.rotation_degrees.x = 12.0
+	var headlight := MeshInstance3D.new()
+	var hl_mesh := SphereMesh.new()
+	hl_mesh.radius = 0.13
+	hl_mesh.height = 0.26
+	hl_mesh.radial_segments = 8
+	hl_mesh.rings = 5
+	headlight.mesh = hl_mesh
+	headlight.material_override = glow
+	headlight.position = Vector3(0, 1.52, -0.34)
+	_front_fork.add_child(headlight)
+	# 后摇臂、脚踏、排气和车把形成机械层次。
+	for sx in [-0.38, 0.38]:
+		_part(Vector3(0.09, 0.78, 0.09), bronze, Vector3(sx, 0.84, 1.02), Vector3(17, 0, 0))
+		_part(Vector3(0.52, 0.07, 0.10), bronze, Vector3(sx * 0.72, 0.76, 0.18))
+	_part(Vector3(0.14, 0.14, 1.42), dark, Vector3(0.44, 0.76, 0.62))
+	_part(Vector3(0.22, 0.22, 0.42), bronze, Vector3(0.44, 0.77, 1.35))
+
 	_core = MeshInstance3D.new()
 	var core_mesh := SphereMesh.new()
-	core_mesh.radius = 0.33
-	core_mesh.height = 0.66
-	core_mesh.radial_segments = 12
-	core_mesh.rings = 7
+	core_mesh.radius = 0.35
+	core_mesh.height = 0.70
+	core_mesh.radial_segments = 14
+	core_mesh.rings = 8
 	_core.mesh = core_mesh
 	_core.material_override = glow
-	_core.position = Vector3(0, 0.95, -0.08)
-	add_child(_core)
-	for i in range(3):
-		var rune := _part(Vector3(0.05, 0.34 + i * 0.08, 0.68), glow, Vector3(0.37 + i * 0.018, 0.92, -0.08))
-		rune.rotation_degrees.x = float(i - 1) * 28.0
+	_core.position = Vector3(0, 0.98, -0.08)
+	_visual.add_child(_core)
+	for i in range(4):
+		var rune := _part(Vector3(0.055, 0.34 + i * 0.06, 0.70), glow, Vector3(0.39, 0.96, -0.08), Vector3(float(i - 1) * 24.0, 0, 0))
+		rune.rotation_degrees.x = float(i - 1) * 24.0
 	var light := OmniLight3D.new()
 	light.light_color = Color(0.08, 0.95, 0.85)
-	light.light_energy = 1.2
-	light.omni_range = 4.5
+	light.light_energy = 1.25
+	light.omni_range = 4.8
 	light.position = _core.position
-	add_child(light)
+	_visual.add_child(light)
+
+
+func _build_wheel(pos: Vector3, tire: Material, hub_mat: Material, parent: Node3D) -> void:
+	var wheel := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.56
+	mesh.bottom_radius = 0.56
+	mesh.height = 0.31
+	mesh.radial_segments = 16
+	wheel.mesh = mesh
+	wheel.material_override = tire
+	wheel.rotation_degrees.z = 90.0
+	wheel.position = pos
+	parent.add_child(wheel)
+	_wheels.append(wheel)
+	_cylinder(0.16, 0.37, hub_mat, pos, Vector3(0, 0, 90), parent)
+	for spoke_index in range(6):
+		var spoke := _part(Vector3(0.045, 0.92, 0.045), hub_mat, pos, Vector3(0, 0, float(spoke_index) * 30.0), parent)
+		spoke.rotation_degrees.z = float(spoke_index) * 30.0
+
+
+func _build_camera() -> void:
+	_camera_rig = Node3D.new()
+	_camera_rig.name = "BikeCameraRig"
+	_camera_rig.position = Vector3(0, 1.55, 0.35)
+	add_child(_camera_rig)
 	_camera = Camera3D.new()
-	_camera.position = Vector3(0, 3.0, 6.0)
-	_camera.rotation_degrees.x = -13.0
+	_camera.position = Vector3(0, 1.45, 6.5)
+	_camera.fov = 76.0
 	_camera.far = 1800.0
-	add_child(_camera)
+	_camera_rig.add_child(_camera)
+	_camera_rig.rotation.x = _camera_pitch
 
 
-func _part(size: Vector3, mat: Material, pos: Vector3) -> MeshInstance3D:
+func _part(size: Vector3, mat: Material, pos: Vector3, rot: Vector3 = Vector3.ZERO, parent: Node3D = null) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	mi.mesh = mesh
 	mi.material_override = mat
 	mi.position = pos
-	add_child(mi)
+	mi.rotation_degrees = rot
+	var target_parent: Node3D = parent if parent != null else _visual
+	target_parent.add_child(mi)
 	return mi
 
 
-func _cylinder(radius: float, height: float, mat: Material, pos: Vector3, rot: Vector3) -> MeshInstance3D:
+func _cylinder(radius: float, height: float, mat: Material, pos: Vector3, rot: Vector3, parent: Node3D) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = radius
 	mesh.bottom_radius = radius
 	mesh.height = height
-	mesh.radial_segments = 10
+	mesh.radial_segments = 12
 	mi.mesh = mesh
 	mi.material_override = mat
 	mi.position = pos
 	mi.rotation_degrees = rot
-	add_child(mi)
+	parent.add_child(mi)
 	return mi
 
 
@@ -128,6 +201,9 @@ func enter(p: Player) -> void:
 	driver.visible = false
 	driver.set_deferred("collision_layer", 0)
 	driver.set_deferred("collision_mask", 0)
+	_camera_yaw = 0.0
+	_camera_pitch = -0.22
+	_camera_idle = 0.0
 	_camera.make_current()
 
 
@@ -137,7 +213,8 @@ func exit() -> void:
 	var p := driver
 	driver = null
 	speed = 0.0
-	p.global_position = global_position + global_transform.basis.x * 1.5 + Vector3(0, 0.4, 0)
+	velocity = Vector3.ZERO
+	p.global_position = global_position + global_transform.basis.x * 1.55 + Vector3(0, 0.35, 0)
 	p.visible = true
 	p.set_deferred("collision_layer", 2)
 	p.set_deferred("collision_mask", 1 | 4)
@@ -145,34 +222,114 @@ func exit() -> void:
 	p.camera.make_current()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if driver == null or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		return
+	if event is InputEventMouseMotion:
+		_camera_idle = 0.0
+		_camera_yaw = wrapf(_camera_yaw - event.relative.x * CAMERA_SENS, -PI, PI)
+		_camera_pitch = clampf(_camera_pitch - event.relative.y * CAMERA_SENS, -0.50, -0.06)
+
+
 func _physics_process(delta: float) -> void:
-	var forward_input := 0.0
-	var turn_input := 0.0
+	var throttle := 0.0
+	var side_input := 0.0
 	if driver:
-		forward_input = float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
+		throttle = float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
+		side_input = float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
 		if debug_forward != 0.0:
-			forward_input = debug_forward
-		turn_input = float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
-	var target := forward_input * (TOP_SPEED if forward_input >= 0.0 else REVERSE_SPEED)
-	speed = move_toward(speed, target, ACCEL * delta)
-	if absf(speed) > 0.45:
-		rotation.y -= turn_input * TURN_SPEED * delta * signf(speed)
+			throttle = debug_forward
+		if debug_turn != 0.0:
+			side_input = debug_turn
+
+	# 镜头相对控制：W 朝镜头方向加速，A/D 修正方向；车身平滑跟上。
+	var wish := Vector3.ZERO
+	if driver and (throttle > 0.05 or (absf(side_input) > 0.05 and throttle >= 0.0)):
+		var cam_basis := Basis(Vector3.UP, rotation.y + _camera_yaw)
+		wish = cam_basis * Vector3(side_input, 0.0, -maxf(throttle, 0.15))
+		wish.y = 0.0
+		wish = wish.normalized()
+
+	var target_speed := 0.0
+	var accel_rate := COAST_DECEL
+	if throttle > 0.05 or (absf(side_input) > 0.05 and throttle >= 0.0):
+		target_speed = TOP_SPEED
+		accel_rate = ENGINE_ACCEL
+	elif throttle < -0.05:
+		if speed > 0.8:
+			target_speed = 0.0
+			accel_rate = BRAKE_ACCEL
+		else:
+			target_speed = -REVERSE_SPEED
+			accel_rate = ENGINE_ACCEL * 0.75
+	speed = move_toward(speed, target_speed, accel_rate * delta)
+	var speed_ratio := clampf(absf(speed) / TOP_SPEED, 0.0, 1.0)
+	if wish.length_squared() > 0.01 and speed > 0.25:
+		var target_yaw := atan2(-wish.x, -wish.z)
+		var yaw_diff := wrapf(target_yaw - rotation.y, -PI, PI)
+		var max_turn := lerpf(2.2, 0.85, speed_ratio) * delta
+		rotation.y += clampf(yaw_diff, -max_turn, max_turn)
+		_steer = clampf(yaw_diff * 1.5, -1.0, 1.0)
+	elif absf(side_input) > 0.05 and absf(throttle) <= 0.05:
+		rotation.y -= side_input * 1.1 * delta
+		_steer = side_input * 0.4
+	else:
+		_steer = move_toward(_steer, 0.0, delta * 4.5)
+
 	var forward := -global_transform.basis.z
-	var next := global_position + forward * speed * delta
-	if terrain and terrain.is_in_water(next.x, next.z) and terrain.get_height(next.x, next.z) < Terrain.WATER_LEVEL - 0.4:
-		speed = move_toward(speed, 0.0, ACCEL * 3.0 * delta)
-	velocity = forward * speed
-	velocity.y = 0.0
-	move_and_slide()
+	forward.y = 0.0
+	forward = forward.normalized()
+	var next := global_position + forward * speed * delta * 2.0
 	if terrain:
-		var ground := terrain.get_height(global_position.x, global_position.z) + 0.08
+		var next_normal := terrain.get_normal(next.x, next.z, 1.3)
+		var deep_water := terrain.is_in_water(next.x, next.z) and terrain.get_height(next.x, next.z) < Terrain.WATER_LEVEL - 0.38
+		if deep_water or (next_normal.y < 0.43 and speed > 0.0):
+			speed = move_toward(speed, 0.0, BRAKE_ACCEL * delta)
+
+	var desired := forward * speed
+	var planar := Vector3(velocity.x, 0, velocity.z)
+	var traction := lerpf(13.5, 7.0, speed_ratio)
+	planar = planar.move_toward(desired, traction * delta)
+	velocity = Vector3(planar.x, 0.0, planar.z)
+	move_and_slide()
+	if _hit_wall():
+		speed = move_toward(speed, 0.0, BRAKE_ACCEL * 0.72 * delta)
+
+	if terrain:
+		var ground := terrain.get_height(global_position.x, global_position.z) + 0.04
 		global_position.y = lerpf(global_position.y, ground, minf(1.0, delta * 14.0))
-		var normal := terrain.get_normal(global_position.x, global_position.z, 1.8)
-		rotation.x = lerpf(rotation.x, atan2(normal.z, normal.y), delta * 6.0)
-		rotation.z = lerpf(rotation.z, -atan2(normal.x, normal.y) - turn_input * minf(absf(speed) / TOP_SPEED, 1.0) * 0.14, delta * 6.0)
+		var normal := terrain.get_normal(global_position.x, global_position.z, 1.35)
+		var local_normal := global_transform.basis.inverse() * normal
+		var target_pitch := atan2(local_normal.z, local_normal.y)
+		var lean := -_steer * speed_ratio * lerpf(0.10, 0.32, speed_ratio)
+		var target_roll := -atan2(local_normal.x, local_normal.y) + lean
+		_visual.rotation.x = lerp_angle(_visual.rotation.x, target_pitch, minf(1.0, delta * 8.0))
+		_visual.rotation.z = lerp_angle(_visual.rotation.z, target_roll, minf(1.0, delta * 8.0))
+
+	_front_fork.rotation.y = lerpf(_front_fork.rotation.y, -_steer * 0.38, minf(1.0, delta * 10.0))
 	for wheel in _wheels:
-		wheel.rotate_x(speed * delta * 1.9)
-	_core.scale = Vector3.ONE * (1.0 + sin(Time.get_ticks_msec() * 0.008) * 0.055)
+		wheel.rotate_x(-speed * delta / 0.56)
+	_pulse_time += delta
+	_core.scale = Vector3.ONE * (1.0 + sin(_pulse_time * 8.0) * (0.045 + speed_ratio * 0.035))
 	if driver:
-		driver.global_position = global_position + Vector3(0, 1.35, 0)
+		driver.global_position = global_position + global_transform.basis * Vector3(0, 1.38, 0.24)
 		driver.rotation.y = rotation.y
+	_update_camera(delta, speed_ratio)
+
+
+func _hit_wall() -> bool:
+	for i in range(get_slide_collision_count()):
+		var collision := get_slide_collision(i)
+		if collision.get_normal().y < 0.55:
+			return true
+	return false
+
+
+func _update_camera(delta: float, speed_ratio: float) -> void:
+	_camera_idle += delta
+	if driver and _camera_idle > 1.5 and absf(speed) > 2.0:
+		_camera_yaw = lerp_angle(_camera_yaw, 0.0, minf(1.0, delta * 1.0))
+	_camera_rig.rotation.y = lerp_angle(_camera_rig.rotation.y, _camera_yaw, minf(1.0, delta * 10.0))
+	_camera_rig.rotation.x = lerp_angle(_camera_rig.rotation.x, _camera_pitch, minf(1.0, delta * 10.0))
+	_camera.position.z = lerpf(_camera.position.z, 6.5 + speed_ratio * 1.45, minf(1.0, delta * 3.2))
+	_camera.fov = lerpf(_camera.fov, 76.0 + speed_ratio * 9.0, minf(1.0, delta * 2.8))

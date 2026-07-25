@@ -22,6 +22,9 @@ var _broadleaf_transforms: Array[Transform3D] = []
 var _broadleaf_colors: Array[Color] = []
 var _pine_transforms: Array[Transform3D] = []
 var _pine_colors: Array[Color] = []
+var _broad_mm: MultiMesh
+var _pine_mm: MultiMesh
+var _canopy_ranges: Dictionary = {}   # Tree node -> [broad_start, broad_count, pine_start, pine_count]
 
 const CANOPY_CARDS := 12
 
@@ -92,6 +95,10 @@ func _collect_leaf_cards(node: Node3D) -> void:
 	if not node.has_meta("leaf_cards"):
 		return
 	var cards: Array = node.get_meta("leaf_cards")
+	var broad_start := _broadleaf_transforms.size()
+	var pine_start := _pine_transforms.size()
+	var broad_count := 0
+	var pine_count := 0
 	for card in cards:
 		var pos: Vector3 = card["position"]
 		var scale_value: float = card["scale"]
@@ -103,10 +110,41 @@ func _collect_leaf_cards(node: Node3D) -> void:
 		if card["pine"]:
 			_pine_transforms.append(instance_transform)
 			_pine_colors.append(Color(light, light, light, 1.0))
+			pine_count += 1
 		else:
 			_broadleaf_transforms.append(instance_transform)
 			_broadleaf_colors.append(Color(light, light, light, 1.0))
+			broad_count += 1
 	node.remove_meta("leaf_cards")
+	if node.name.begins_with("Tree"):
+		_canopy_ranges[node] = [broad_start, broad_count, pine_start, pine_count]
+
+
+# 砍树：把该树的所有树冠卡片实例缩放至 0（MultiMesh 不重建，开销固定）。
+func chop_canopy(node: Node3D) -> void:
+	if not _canopy_ranges.has(node):
+		return
+	var r: Array = _canopy_ranges[node]
+	var zero := Transform3D(Basis().scaled(Vector3.ZERO), Vector3.ZERO)
+	for i in range(int(r[1])):
+		_broad_mm.set_instance_transform(int(r[0]) + i, zero)
+	for i in range(int(r[3])):
+		_pine_mm.set_instance_transform(int(r[2]) + i, zero)
+
+
+# 倒伏完成：原地留木桩，旁边掉一根可拾取的木材。
+func finish_chop(node: Node3D) -> void:
+	var stump := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.24
+	mesh.bottom_radius = 0.30
+	mesh.height = 0.5
+	mesh.radial_segments = 7
+	stump.mesh = mesh
+	stump.material_override = Toon.make_material(TRUNK_COLOR.lightened(0.05), true, 0.02)
+	stump.position = node.position + Vector3(0, 0.25, 0)
+	add_child(stump)
+	Loot.spawn(get_tree().current_scene, node.global_position + Vector3(0.7, 0.25, 0.3), "wood", "", 1, 1)
 
 
 func _build_card_multimesh(name: String, transforms: Array[Transform3D], colors: Array[Color], mat: ShaderMaterial) -> void:
@@ -126,6 +164,10 @@ func _build_card_multimesh(name: String, transforms: Array[Transform3D], colors:
 	mmi.material_override = mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
+	if name == "BroadleafCards":
+		_broad_mm = mm
+	else:
+		_pine_mm = mm
 
 
 func _scatter_forest(terrain: Terrain) -> void:
@@ -162,8 +204,8 @@ func _rand_point(terrain: Terrain, margin: float = 0.88) -> Vector3:
 func _usable(terrain: Terrain, p: Vector3, min_ny: float) -> bool:
 	if p.y < Terrain.WATER_LEVEL + 0.8:
 		return false
-	# 树线：边缘高山（>18m 灰岩雪线）不长植被
-	if p.y > 18.0:
+	# 树线：高山带（>26m 灰岩雪线）不长植被；初始高原与丘陵都有树
+	if p.y > 26.0:
 		return false
 	return terrain.get_normal(p.x, p.z).y > min_ny
 
@@ -196,7 +238,10 @@ func _place(factory: Callable, p: Vector3, max_scale: float) -> void:
 # ---------- 树木 ----------
 
 func _make_tree() -> Node3D:
-	if _rng.randf() < 0.55:
+	var roll := _rng.randf()
+	if roll < 0.08:
+		return _make_bigtree()
+	if roll < 0.58:
 		return _make_broadleaf()
 	return _make_pine()
 
@@ -204,36 +249,99 @@ func _make_tree() -> Node3D:
 func _make_broadleaf() -> Node3D:
 	var t := Node3D.new()
 	t.name = "TreeBroadleaf"
-	# 微弯的双段树干
+	# 微弯的双段树干：加高到 4m+，让“爬树”真的有高度。
 	var trunk_mat := Toon.make_material(TRUNK_COLOR.lightened(0.10), true, 0.02)
 	var lean := Vector3(_rng.randf_range(-0.3, 0.3), 0, _rng.randf_range(-0.3, 0.3))
 	var t1 := MeshInstance3D.new()
 	var c1 := CylinderMesh.new()
-	c1.top_radius = 0.15
-	c1.bottom_radius = 0.24
-	c1.height = 1.5
+	c1.top_radius = 0.17
+	c1.bottom_radius = 0.28
+	c1.height = 2.6
 	c1.radial_segments = 6
 	t1.mesh = c1
 	t1.material_override = trunk_mat
-	t1.position.y = 0.75
+	t1.position.y = 1.3
 	t.add_child(t1)
 	var t2 := MeshInstance3D.new()
 	var c2 := CylinderMesh.new()
-	c2.top_radius = 0.08
-	c2.bottom_radius = 0.15
-	c2.height = 1.4
+	c2.top_radius = 0.09
+	c2.bottom_radius = 0.17
+	c2.height = 2.2
 	c2.radial_segments = 6
 	t2.mesh = c2
 	t2.material_override = trunk_mat
-	t2.position = Vector3(lean.x * 0.5, 2.0, lean.z * 0.5)
+	t2.position = Vector3(lean.x * 0.5, 3.4, lean.z * 0.5)
 	t2.rotation = Vector3(lean.z * 0.3, 0, -lean.x * 0.3)
 	t.add_child(t2)
 
-	# 蓬松树冠：叶簇卡片球（不再是实心球）
-	_queue_leaf_cards(t, Vector3(lean.x, 3.0, lean.z), 1.55)
-	_queue_leaf_cards(t, Vector3(lean.x + 0.9, 2.4, lean.z + 0.3), 0.95)
-	_queue_leaf_cards(t, Vector3(lean.x - 0.8, 2.5, lean.z - 0.4), 0.85)
-	_add_trunk_collision(t, 0.35, 2.0)
+	# 蓬松树冠：叶簇卡片球（不再是实心球），每棵树的位置/大小都带随机。
+	_queue_leaf_cards(t, Vector3(lean.x, 5.0, lean.z), _rng.randf_range(1.7, 2.2))
+	_queue_leaf_cards(t, Vector3(lean.x + _rng.randf_range(0.8, 1.4), 4.1 + _rng.randf_range(-0.2, 0.4), lean.z + _rng.randf_range(-0.5, 0.7)), _rng.randf_range(1.0, 1.4))
+	_queue_leaf_cards(t, Vector3(lean.x - _rng.randf_range(0.8, 1.3), 4.2 + _rng.randf_range(-0.3, 0.3), lean.z - _rng.randf_range(0.3, 0.8)), _rng.randf_range(0.9, 1.3))
+	# 一半概率长出一根侧枝，枝头带小叶簇，树形不再千篇一律。
+	if _rng.randf() < 0.55:
+		var branch_dir := _rng.randf_range(0.0, TAU)
+		var branch := MeshInstance3D.new()
+		var bm := CylinderMesh.new()
+		bm.top_radius = 0.06
+		bm.bottom_radius = 0.11
+		bm.height = 1.9
+		bm.radial_segments = 5
+		branch.mesh = bm
+		branch.material_override = trunk_mat
+		branch.position = Vector3(cos(branch_dir) * 0.7, 3.0, sin(branch_dir) * 0.7)
+		branch.rotation = Vector3(sin(branch_dir) * 0.9, 0, cos(branch_dir) * 0.9)
+		t.add_child(branch)
+		_queue_leaf_cards(t, Vector3(cos(branch_dir) * 1.5, 4.0, sin(branch_dir) * 1.5), _rng.randf_range(0.7, 1.0))
+	_add_trunk_collision(t, 0.35, 3.4)
+	return t
+
+
+# 8% 概率生成大树：粗双段树干 + 五大簇树冠，是林子中的锚点。
+func _make_bigtree() -> Node3D:
+	var t := Node3D.new()
+	t.name = "TreeBig"
+	var trunk_mat := Toon.make_material(TRUNK_COLOR.darkened(0.08), true, 0.025)
+	var t1 := MeshInstance3D.new()
+	var c1 := CylinderMesh.new()
+	c1.top_radius = 0.42
+	c1.bottom_radius = 0.62
+	c1.height = 3.6
+	c1.radial_segments = 8
+	t1.mesh = c1
+	t1.material_override = trunk_mat
+	t1.position.y = 1.8
+	t.add_child(t1)
+	var t2 := MeshInstance3D.new()
+	var c2 := CylinderMesh.new()
+	c2.top_radius = 0.26
+	c2.bottom_radius = 0.42
+	c2.height = 3.0
+	c2.radial_segments = 8
+	t2.mesh = c2
+	t2.material_override = trunk_mat
+	t2.position.y = 4.9
+	t.add_child(t2)
+	# 根部膨大与两根高枝。
+	for i in range(3):
+		var a := float(i) * TAU / 3.0 + _rng.randf_range(-0.3, 0.3)
+		var root := MeshInstance3D.new()
+		var rm := CylinderMesh.new()
+		rm.top_radius = 0.14
+		rm.bottom_radius = 0.30
+		rm.height = 1.2
+		rm.radial_segments = 6
+		root.mesh = rm
+		root.material_override = trunk_mat
+		root.position = Vector3(cos(a) * 0.55, 0.45, sin(a) * 0.55)
+		root.rotation = Vector3(sin(a) * 0.5, 0, -cos(a) * 0.5)
+		t.add_child(root)
+	_queue_leaf_cards(t, Vector3(0, 7.2, 0), _rng.randf_range(2.2, 2.7))
+	_queue_leaf_cards(t, Vector3(2.1, 6.0, 0.8), _rng.randf_range(1.6, 2.1))
+	_queue_leaf_cards(t, Vector3(-2.0, 6.1, -0.7), _rng.randf_range(1.6, 2.1))
+	_queue_leaf_cards(t, Vector3(0.6, 5.6, -1.9), _rng.randf_range(1.4, 1.9))
+	_queue_leaf_cards(t, Vector3(-0.7, 5.7, 2.0), _rng.randf_range(1.4, 1.9))
+	_add_trunk_collision(t, 0.62, 6.0)
 	return t
 
 
@@ -242,21 +350,21 @@ func _make_pine() -> Node3D:
 	t.name = "TreePine"
 	var trunk := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
-	cm.top_radius = 0.10
-	cm.bottom_radius = 0.20
-	cm.height = 1.9
+	cm.top_radius = 0.12
+	cm.bottom_radius = 0.24
+	cm.height = 3.2
 	cm.radial_segments = 6
 	trunk.mesh = cm
 	trunk.material_override = Toon.make_material(TRUNK_COLOR, true, 0.02)
-	trunk.position.y = 0.95
+	trunk.position.y = 1.6
 	t.add_child(trunk)
 
 	# 针叶卡片塔：三层递减 + 塔尖
-	_queue_leaf_cards(t, Vector3(0, 2.1, 0), 1.05, true)
-	_queue_leaf_cards(t, Vector3(0, 3.0, 0), 0.80, true)
-	_queue_leaf_cards(t, Vector3(0, 3.8, 0), 0.55, true)
-	_queue_leaf_cards(t, Vector3(0, 4.4, 0), 0.32, true)
-	_add_trunk_collision(t, 0.35, 1.6)
+	_queue_leaf_cards(t, Vector3(0, 3.3, 0), 1.30, true)
+	_queue_leaf_cards(t, Vector3(0, 4.5, 0), 1.00, true)
+	_queue_leaf_cards(t, Vector3(0, 5.6, 0), 0.70, true)
+	_queue_leaf_cards(t, Vector3(0, 6.5, 0), 0.40, true)
+	_add_trunk_collision(t, 0.35, 3.2)
 	return t
 
 
@@ -270,15 +378,9 @@ func _make_bush() -> Node3D:
 
 
 func _add_trunk_collision(t: Node3D, radius: float, height: float) -> void:
-	var body := StaticBody3D.new()
-	body.collision_layer = 1
-	var col := CollisionShape3D.new()
-	var cyl := CylinderShape3D.new()
-	cyl.radius = radius
-	cyl.height = height
-	col.shape = cyl
-	col.position.y = height * 0.5
-	body.add_child(col)
+	# 树干碰撞体 = 可砍伐组件：射击/攻击树干两次即可砍倒这棵树。
+	var body := ChoppableTree.new()
+	body.configure(t, self, radius, height)
 	t.add_child(body)
 
 

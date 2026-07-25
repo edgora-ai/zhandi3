@@ -203,6 +203,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	if not alive:
 		return
 	hp -= amount
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.4, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
 	if from == player and species != "bird":
 		_move_target = player.global_position
 	if hp <= 0.0:
@@ -254,6 +255,12 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, delta * 10.0)
 		velocity.z = move_toward(velocity.z, 0.0, delta * 10.0)
 	velocity.y = -4.0
+	# 避水：陆生动物不走进深水区。
+	if terrain and species != "bird":
+		var next := global_position + Vector3(velocity.x, 0, velocity.z) * delta * 2.0
+		if terrain.is_in_water(next.x, next.z) and terrain.get_height(next.x, next.z) < Terrain.WATER_LEVEL - 0.3:
+			velocity.x = 0.0
+			velocity.z = 0.0
 	move_and_slide()
 	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
 	if aggressive and distance < (2.2 if species == "bear" else 1.6) and _attack_cooldown <= 0.0:

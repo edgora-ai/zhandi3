@@ -74,6 +74,8 @@ func _build_visual() -> void:
 			_build_box(Vector3(0.18, 0.12, 0.48), Color(0.94, 0.78, 0.62), Vector3(0.28, 0, 0))
 		"dragon_scale":
 			_build_scale()
+		"wood":
+			_build_log()
 
 
 func _build_box(size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
@@ -129,6 +131,30 @@ func _build_scale() -> void:
 	_item.add_child(mi)
 
 
+func _build_log() -> void:
+	var log_mesh := CylinderMesh.new()
+	log_mesh.top_radius = 0.15
+	log_mesh.bottom_radius = 0.17
+	log_mesh.height = 0.85
+	log_mesh.radial_segments = 8
+	var mi := MeshInstance3D.new()
+	mi.mesh = log_mesh
+	mi.material_override = Toon.make_material(Color(0.45, 0.31, 0.16), true, 0.008)
+	mi.rotation_degrees.z = 84.0
+	_item.add_child(mi)
+	var ring := MeshInstance3D.new()
+	var ring_mesh := CylinderMesh.new()
+	ring_mesh.top_radius = 0.155
+	ring_mesh.bottom_radius = 0.155
+	ring_mesh.height = 0.06
+	ring_mesh.radial_segments = 8
+	ring.mesh = ring_mesh
+	ring.material_override = Toon.make_material(Color(0.62, 0.46, 0.25), true, 0.006)
+	ring.rotation_degrees.z = 84.0
+	ring.position = Vector3(-0.28, 0.02, 0)
+	_item.add_child(ring)
+
+
 func _process(delta: float) -> void:
 	if consumed:
 		return
@@ -153,6 +179,8 @@ func describe() -> String:
 			return "兽肉 ×%d（收入背包）" % amount
 		"dragon_scale":
 			return "龙鳞 ×%d（收入背包）" % amount
+		"wood":
+			return "木材 ×%d（收入背包）" % amount
 	return ""
 
 
@@ -174,7 +202,7 @@ func apply_to(target: CharacterBody3D) -> void:
 		"ammo":
 			if target.has_method("give_ammo"):
 				target.give_ammo(amount)
-		"mushroom", "meat", "dragon_scale":
+		"mushroom", "meat", "dragon_scale", "wood":
 			if target.has_method("give_item"):
 				target.give_item(kind, amount)
 	consumed = true

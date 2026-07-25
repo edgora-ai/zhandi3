@@ -21,6 +21,7 @@ const INTERACT_DIST := 3.4
 const SWIM_SPEED := 4.8
 const GLIDE_SPEED := 8.2
 const GLIDE_FALL_SPEED := 3.1
+const CLIMB_SPEED := 2.6
 
 var hp := MAX_HP
 var armor := 0.0
@@ -42,6 +43,7 @@ var mags := {}
 var reserves := {}
 var nearby_loot: Loot = null
 var nearby_vehicle: Node = null
+var nearby_npc: Node = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
 var debug_glide := false     # 自动化测试用：强制展开斗篷
@@ -50,13 +52,16 @@ var vehicle: Node = null     # 吉普/马/摩托共用骑乘接口
 var smoke_count := 3
 var is_swimming := false
 var is_gliding := false
+var is_climbing := false
 var backpack_open := false
 var backpack_index := 0
 var backpack_weapons: Array[Dictionary] = []
-var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0}
+var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0}
 var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
+var _airborne_time := 0.0
+var _glider_open := 0.0
 
 
 func _ready() -> void:
@@ -71,6 +76,8 @@ func _ready() -> void:
 	col.position.y = 0.85
 	add_child(col)
 	_col = col
+	# 允许走上 0.5m 以内的台阶（塔梯/城堡台阶/桥头引桥）。
+	floor_snap_length = 0.5
 
 	# 梯子探测
 	var det := Area3D.new()
@@ -248,33 +255,62 @@ func _physics_process(delta: float) -> void:
 	velocity.x = hv.x
 	velocity.z = hv.z
 
-	if _ladder and f > 0.0:
+	if _update_climbing(delta, f, r):
+		# 攀爬中：速度由攀爬逻辑设置（W/S 上下、A/D 横移、Space 蹬离）
+		pass
+	elif _ladder and f > 0.0:
 		# 攀爬：W 沿梯子上升
 		velocity.y = 3.2
 	elif _ladder:
 		velocity.y = 0.0
 	elif is_on_floor():
+		_airborne_time = 0.0
 		if is_dropping:
 			is_dropping = false
 			landed.emit()
 		if Input.is_key_pressed(KEY_SPACE):
 			velocity.y = JUMP_VEL
 	else:
-		var wants_glide := is_dropping and (Input.is_key_pressed(KEY_SPACE) or debug_glide) and velocity.y < -0.4
+		_airborne_time += delta
+		# 初次空降和之后从任意悬崖跃下都能展开；普通小跳因离地高度不足不会误触。
+		var clearance := 99.0
+		if terrain:
+			clearance = global_position.y - terrain.get_height(global_position.x, global_position.z)
+		var can_deploy := is_dropping or (_airborne_time > 0.18 and clearance > 2.35)
+		var wants_glide := can_deploy and (Input.is_key_pressed(KEY_SPACE) or debug_glide) and velocity.y < -0.55
 		_set_gliding(wants_glide)
 		if is_gliding:
-			var glide_target := wish * GLIDE_SPEED
-			var glide_h := Vector3(velocity.x, 0, velocity.z).move_toward(glide_target, AIR_ACCEL * 0.75 * delta)
+			# 旷野式滑翔：始终向前飘；W 俯冲提速但下降更快，S 减速缓降，A/D 转向。
+			var glide_forward := -global_transform.basis.z
+			glide_forward.y = 0.0
+			glide_forward = glide_forward.normalized()
+			var glide_dir := glide_forward
+			var glide_speed := GLIDE_SPEED * 0.72
+			var fall_speed := GLIDE_FALL_SPEED
+			if wish.length_squared() > 0.01:
+				glide_dir = wish
+				if f > 0.0:
+					glide_speed = GLIDE_SPEED * 1.18
+					fall_speed = GLIDE_FALL_SPEED * 1.30
+				elif f < 0.0:
+					glide_speed = GLIDE_SPEED * 0.45
+					fall_speed = GLIDE_FALL_SPEED * 0.80
+			var glide_target := glide_dir * glide_speed
+			var glide_h := Vector3(velocity.x, 0, velocity.z).move_toward(glide_target, AIR_ACCEL * 0.85 * delta)
 			velocity.x = glide_h.x
 			velocity.z = glide_h.z
-			velocity.y = move_toward(velocity.y, -GLIDE_FALL_SPEED, GRAVITY * 1.5 * delta)
-			velocity.y = maxf(velocity.y, -GLIDE_FALL_SPEED)
+			velocity.y = move_toward(velocity.y, -fall_speed, GRAVITY * 1.5 * delta)
+			velocity.y = maxf(velocity.y, -fall_speed * 1.15)
 		else:
 			velocity.y = maxf(velocity.y - GRAVITY * delta, -30.0)
+	_update_glider_visual(delta)
 
 	move_and_slide()
 	if is_on_floor() and is_gliding:
 		_set_gliding(false)
+	# 自动上台阶：被低矮台基（驿站石基/神庙平台/断柱/台阶接缝）挡住时抬上去。
+	if f > 0.05 and not is_climbing and not prone:
+		_try_step_up()
 
 	# 占领点回血
 	if regen_rate > 0.0 and hp < MAX_HP:
@@ -310,11 +346,21 @@ func _scan_loot() -> void:
 		if d < best_v:
 			best_v = d
 			nearby_vehicle = v
+	nearby_npc = null
+	var best_n := 3.2
+	for candidate_n in get_tree().get_nodes_in_group("npc"):
+		var n: Node = candidate_n
+		var d_n := global_position.distance_to(n.global_position)
+		if d_n < best_n:
+			best_n = d_n
+			nearby_npc = n
 
 
 func _try_pickup() -> void:
 	if nearby_loot and not nearby_loot.consumed:
 		nearby_loot.apply_to(self)
+	elif nearby_npc:
+		nearby_npc.talk()
 
 
 func give_weapon(id: String) -> void:
@@ -390,6 +436,84 @@ func die(from: Variant = null) -> void:
 
 # ---------- 游泳 / 滑翔 ----------
 
+# ---------- 攀爬（树干 / 塔身 / 悬崖，一切陡面） ----------
+
+func _update_climbing(_delta: float, f: float, r: float) -> bool:
+	if _ladder != null or backpack_open or vehicle != null:
+		is_climbing = false
+		return false
+	var space := get_world_3d().direct_space_state
+	var facing := -global_transform.basis.z
+	facing.y = 0.0
+	facing = facing.normalized()
+	var chest := global_position + Vector3(0, 1.15, 0)
+	var hit := _ray_to_wall(space, chest, facing, 0.95)
+	if is_climbing:
+		if hit.is_empty():
+			# 胸口已越过顶沿：向前上方翻越。
+			velocity = facing * 2.4 + Vector3.UP * 3.2
+			is_climbing = false
+			return false
+		var n: Vector3 = hit["normal"]
+		n.y = 0.0
+		if n.length_squared() < 0.01:
+			n = -facing
+		n = n.normalized()
+		if f < -0.05 and is_on_floor():
+			is_climbing = false
+			return false
+		if Input.is_key_pressed(KEY_SPACE):
+			velocity = n * 4.2 + Vector3.UP * 3.0
+			is_climbing = false
+			return false
+		var side := n.cross(Vector3.UP).normalized()
+		velocity = Vector3.UP * f * CLIMB_SPEED + side * r * CLIMB_SPEED * 0.75 - n * 0.8
+		return true
+	# 进入攀爬：朝陡面推 W（树干、塔身、悬崖、石壁均可）。
+	if f > 0.05 and not hit.is_empty():
+		var n2: Vector3 = hit["normal"]
+		if n2.y < 0.45:
+			is_climbing = true
+			if is_gliding:
+				_set_gliding(false)
+			velocity = Vector3.UP * CLIMB_SPEED * 0.8 - n2 * 0.8
+			return true
+	return false
+
+
+func _ray_to_wall(space: PhysicsDirectSpaceState3D, from: Vector3, dir: Vector3, dist: float) -> Dictionary:
+	var query := PhysicsRayQueryParameters3D.create(from, from + dir * dist, 1, [get_rid()])
+	query.collide_with_areas = false
+	return space.intersect_ray(query)
+
+
+# 前进被挡且前方 0.62m 内有可站的面：把身体抬上台阶（Godot 胶囊不会自动上垂直台阶）。
+func _try_step_up() -> void:
+	var after := Vector2(get_real_velocity().x, get_real_velocity().z).length()
+	if OS.get_cmdline_user_args().has("--stepdebug") and Engine.get_process_frames() % 10 == 0:
+		print("[stepdbg] after=%.2f pos=%s" % [after, str(global_position)])
+	# 正在推前进但几乎没动 = 被矮台挡住（加速度模型下贴墙速度只有 0.5m/s，不能设速度阈值）
+	if after > 0.35:
+		return
+	var facing := -global_transform.basis.z
+	facing.y = 0.0
+	facing = facing.normalized()
+	var space := get_world_3d().direct_space_state
+	var from := global_position + facing * 0.55 + Vector3(0, 0.72, 0)
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3(0, -0.95, 0), 1, [get_rid()])
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		if OS.get_cmdline_user_args().has("--stepdebug"):
+			print("[stepdbg] ray miss at %s" % str(from))
+		return
+	var rise: float = (hit["position"] as Vector3).y - global_position.y
+	if rise > 0.05 and rise <= 0.68:
+		if OS.get_cmdline_user_args().has("--stepdebug"):
+			print("[stepdbg] STEP rise=%.2f" % rise)
+		global_position.y = (hit["position"] as Vector3).y + 0.03
+		global_position += facing * 0.22
+
+
 func _update_swimming(delta: float, wish: Vector3) -> void:
 	if is_gliding:
 		_set_gliding(false)
@@ -415,42 +539,92 @@ func _update_swimming(delta: float, wish: Vector3) -> void:
 
 
 func _set_gliding(enabled: bool) -> void:
+	if enabled and not is_gliding:
+		_glider_open = 0.0
 	is_gliding = enabled
 	if _glider:
 		_glider.visible = enabled
+	if weapon:
+		weapon.visible = not enabled
+
+
+func _update_glider_visual(delta: float) -> void:
+	if _glider == null:
+		return
+	if is_gliding:
+		_glider_open = move_toward(_glider_open, 1.0, delta * 7.5)
+		var ease := smoothstep(0.0, 1.0, _glider_open)
+		_glider.scale = Vector3(lerpf(0.56, 1.0, ease), lerpf(0.18, 1.0, ease), lerpf(0.72, 1.0, ease))
+		_glider.rotation.z = sin(Time.get_ticks_msec() * 0.0023) * 0.018
+	else:
+		_glider_open = 0.0
 
 
 func _build_glider() -> void:
 	_glider = Node3D.new()
 	_glider.name = "Paraglider"
-	_glider.position = Vector3(0, 2.45, 0.35)
+	# 置于第一人称镜头的前上方，展开后能看见伞缘、握杆和绳索，而不是在镜头背后浮空。
+	_glider.position = Vector3(0, 2.75, -1.65)
 	_glider.visible = false
 	add_child(_glider)
-	var cloth := Toon.make_material(Color(0.88, 0.67, 0.22), true, 0.01)
-	var trim := Toon.make_material(Color(0.18, 0.42, 0.48), true, 0.008)
+	var cloth := Toon.make_material(Color(0.92, 0.64, 0.16), true, 0.01)
+	var cloth_dark := Toon.make_material(Color(0.68, 0.20, 0.10), true, 0.01)
+	var trim := Toon.make_material(Color(0.10, 0.40, 0.50), true, 0.008)
 	var rope := Toon.make_material(Color(0.24, 0.17, 0.10), false)
-	for i in range(7):
+	var wood := Toon.make_material(Color(0.42, 0.24, 0.09), true, 0.008)
+	for i in range(9):
 		var panel := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.92, 0.10, 1.35)
+		mesh.size = Vector3(0.56, 0.085, 1.18)
 		panel.mesh = mesh
-		panel.material_override = cloth if i % 2 == 0 else trim
-		panel.position = Vector3((i - 3) * 0.72, -absf(float(i - 3)) * 0.11, 0)
-		panel.rotation_degrees.z = float(i - 3) * -5.5
+		panel.material_override = cloth_dark if i in [0, 4, 8] else cloth
+		panel.position = Vector3((i - 4) * 0.43, -absf(float(i - 4)) * 0.065, absf(float(i - 4)) * 0.020)
+		panel.rotation_degrees.z = float(i - 4) * -4.8
 		_glider.add_child(panel)
+		# 分段青色纹样和前缘木骨让伞面不再像一排黄色方砖。
+		var stripe := MeshInstance3D.new()
+		var stripe_mesh := BoxMesh.new()
+		stripe_mesh.size = Vector3(0.45, 0.025, 0.13)
+		stripe.mesh = stripe_mesh
+		stripe.material_override = trim
+		stripe.position = panel.position + Vector3(0, 0.055, -0.34)
+		stripe.rotation_degrees.z = panel.rotation_degrees.z
+		_glider.add_child(stripe)
+	_glider_part(Vector3(3.78, 0.09, 0.10), wood, Vector3(0, -0.20, -0.56), Vector3.ZERO)
+	_glider_part(Vector3(0.92, 0.09, 0.12), wood, Vector3(0, -1.65, 0.05), Vector3.ZERO)
+	_glider_part(Vector3(0.44, 0.18, 0.08), trim, Vector3(0, 0.13, -0.73), Vector3.ZERO)
 	for sx in [-1.0, 1.0]:
-		for z in [-0.45, 0.45]:
-			var line := MeshInstance3D.new()
-			var line_mesh := CylinderMesh.new()
-			line_mesh.top_radius = 0.012
-			line_mesh.bottom_radius = 0.012
-			line_mesh.height = 2.5
-			line_mesh.radial_segments = 5
-			line.mesh = line_mesh
-			line.material_override = rope
-			line.position = Vector3(sx * 1.9, -1.05, z)
-			line.rotation_degrees.z = sx * 28.0
-			_glider.add_child(line)
+		for z in [-0.48, 0.48]:
+			var canopy_point := Vector3(sx * 1.78, -0.15, z * 0.82)
+			var hand_point := Vector3(sx * 0.38, -1.65, 0.05 + z * 0.10)
+			_glider_line(canopy_point, hand_point, rope)
+
+
+func _glider_part(size: Vector3, mat: Material, pos: Vector3, rot: Vector3) -> MeshInstance3D:
+	var part := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	part.mesh = mesh
+	part.material_override = mat
+	part.position = pos
+	part.rotation_degrees = rot
+	_glider.add_child(part)
+	return part
+
+
+func _glider_line(a: Vector3, b: Vector3, mat: Material) -> void:
+	var direction := b - a
+	var line := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.014
+	mesh.bottom_radius = 0.014
+	mesh.height = direction.length()
+	mesh.radial_segments = 5
+	line.mesh = mesh
+	line.material_override = mat
+	line.position = (a + b) * 0.5
+	line.quaternion = Quaternion(Vector3.UP, direction.normalized())
+	_glider.add_child(line)
 
 
 # ---------- 背包 ----------
@@ -467,7 +641,7 @@ func _toggle_backpack() -> void:
 
 
 func _backpack_entry_count() -> int:
-	return backpack_weapons.size() + 3
+	return backpack_weapons.size() + 4
 
 
 func _refresh_backpack() -> void:
@@ -483,6 +657,7 @@ func get_backpack_lines() -> Array[String]:
 	lines.append("食材 · 海拉鲁蘑菇 × %d（回血 18）" % int(backpack_items["mushroom"]))
 	lines.append("食材 · 兽肉 × %d（回血 30）" % int(backpack_items["meat"]))
 	lines.append("珍品 · 龙鳞 × %d（护甲 35）" % int(backpack_items["dragon_scale"]))
+	lines.append("材料 · 木材 × %d（护甲 8）" % int(backpack_items["wood"]))
 	return lines
 
 
@@ -491,13 +666,15 @@ func _use_backpack_selection() -> void:
 		_retrieve_weapon(backpack_index)
 		return
 	var item_index := backpack_index - backpack_weapons.size()
-	var key: String = ["mushroom", "meat", "dragon_scale"][item_index]
+	var key: String = ["mushroom", "meat", "dragon_scale", "wood"][item_index]
 	var count := int(backpack_items[key])
 	if count <= 0:
 		return
 	backpack_items[key] = count - 1
 	if key == "dragon_scale":
 		armor = minf(100.0, armor + 35.0)
+	elif key == "wood":
+		armor = minf(100.0, armor + 8.0)
 	else:
 		hp = minf(MAX_HP, hp + (18.0 if key == "mushroom" else 30.0))
 	health_changed.emit(hp, armor)

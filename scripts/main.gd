@@ -46,6 +46,10 @@ var _wild_test_frame := -1
 var _wild_test_height := 0.0
 var _wild_test_horse_start := Vector3.ZERO
 var _wild_test_bike_start := Vector3.ZERO
+var _wild_test_jeep_start := Vector3.ZERO
+var _wild_test_jeep_yaw := 0.0
+var _wild_test_jeep_peak_speed := 0.0
+var _wild_test_loot_before := 0
 var _wild_test_hp := 0.0
 
 
@@ -59,7 +63,7 @@ func _ready() -> void:
 	_map_id = _resolve_map(args)
 	_map_from_cli = args.find("--map") >= 0
 	_show_initial_map_menu = args.has("--mapmenutest") or (not args.has("--wildtest") and not _map_from_cli and not FileAccess.file_exists(MAP_SELECTION) and DisplayServer.get_name() != "headless")
-	total_combatants = 1 if _map_id == "wild" else BOT_COUNT + 1
+	total_combatants = 9 if _map_id == "wild" else BOT_COUNT + 1
 	_setup_environment()
 	terrain = Terrain.new()
 	terrain.name = "Terrain"
@@ -119,6 +123,7 @@ func _ready() -> void:
 		wild_world.name = "WildWorld"
 		add_child(wild_world)
 		wild_world.generate(terrain, player)
+		_spawn_wild_bots(rng)
 	if _map_id == "battlefield":
 		zone.start(10.0)
 	else:
@@ -194,6 +199,10 @@ func _open_backpack_test() -> void:
 
 
 func _acquire_instance_lock() -> bool:
+	if DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--screenshot"):
+		# 无头/截图自动化（测试/截图）不占用单实例锁，避免与正在试玩的窗口实例冲突。
+		_owns_instance_lock = false
+		return true
 	var current := OS.get_process_id()
 	if FileAccess.file_exists(INSTANCE_LOCK):
 		var existing := FileAccess.open(INSTANCE_LOCK, FileAccess.READ)
@@ -284,6 +293,25 @@ func _spawn_bots(rng: RandomNumberGenerator) -> void:
 		bot.setup(BOT_NAMES[i], zone, terrain, land)
 		bot.global_position = land + Vector3(rng.randf_range(-20, 20), rng.randf_range(120.0, 170.0), rng.randf_range(-20, 20))
 		bot.rotation.y = rng.randf_range(0, TAU)
+		bot.died.connect(_on_combatant_died)
+		bot.weapon.fired.connect(func() -> void: sfx.play_at("shot_" + bot.weapon.weapon_id, bot.global_position, -10.0))
+
+
+# 阔野地图的 8 名 AI 战士：分布到各区域上空降落，形成完整大逃杀对抗。
+func _spawn_wild_bots(rng: RandomNumberGenerator) -> void:
+	var drops := [
+		Vector3(-60, 0, 40), Vector3(60, 0, 80), Vector3(100, 0, 30), Vector3(20, 0, -80),
+		Vector3(-120, 0, -50), Vector3(140, 0, -110), Vector3(-40, 0, 100), Vector3(90, 0, -30),
+	]
+	for i in range(drops.size()):
+		var bot := Bot.new()
+		bot.name = "WildBot_%s" % BOT_NAMES[i]
+		add_child(bot)
+		var land: Vector3 = drops[i]
+		land.y = terrain.get_height(land.x, land.z)
+		bot.setup(BOT_NAMES[i], zone, terrain, land)
+		bot.global_position = land + Vector3(rng.randf_range(-12, 12), rng.randf_range(70.0, 120.0), rng.randf_range(-12, 12))
+		bot.rotation.y = rng.randf_range(0.0, TAU)
 		bot.died.connect(_on_combatant_died)
 		bot.weapon.fired.connect(func() -> void: sfx.play_at("shot_" + bot.weapon.weapon_id, bot.global_position, -10.0))
 
@@ -603,6 +631,8 @@ func _process(delta: float) -> void:
 		var ride_value: Variant = player.nearby_vehicle.get("ride_label")
 		var ride_text := str(ride_value) if ride_value != null else "驾驶吉普车"
 		hud.set_interact("按 F %s" % ride_text)
+	elif player.nearby_npc:
+		hud.set_interact("按 E 与%s交谈" % str(player.nearby_npc.get("npc_name")))
 	else:
 		hud.set_interact("")
 	hud.set_weapon_name(player.weapon.label())
@@ -612,10 +642,14 @@ func _process(delta: float) -> void:
 		var state := ""
 		if player.is_swimming:
 			state = " · 游泳（Space 上浮 / C 下潜）"
+		elif player.is_climbing:
+			state = " · 攀爬中（W/S 上下 · Space 蹬离）"
 		elif player.is_gliding:
-			state = " · 斗篷滑翔中"
+			state = " · 滑翔伞展开（W 俯冲 / S 减速）"
 		elif player.vehicle:
 			state = " · 骑乘中"
+		elif not player.is_on_floor() and player.velocity.y < -0.55:
+			state = " · 按住 Space 展开滑翔伞"
 		hud.set_zone_text(wild_world.get_region_name(player.global_position))
 		hud.set_world_state("海拉鲁阔野%s\nM 地图  ·  B 背包  ·  F 骑乘" % state)
 	else:
@@ -658,11 +692,12 @@ func _update_wild_test() -> void:
 			print("[wildtest] swim active=%s y=%.2f surface=%.2f" % [str(player.is_swimming), player.global_position.y, terrain.get_water_level()])
 			player.global_position = Vector3(-112, terrain.get_height(-112, 92) + 38.0, 92)
 			player.velocity = Vector3(0, -20, 0)
-			player.is_dropping = true
+			# 专门覆盖“已经落地后从悬崖跃下仍能展开”，不再只测开局空降。
+			player.is_dropping = false
 			player.debug_glide = true
 			_wild_test_height = player.global_position.y
 		145:
-			print("[wildtest] glide active=%s fall=%.2f vy=%.2f" % [str(player.is_gliding), _wild_test_height - player.global_position.y, player.velocity.y])
+			print("[wildtest] cliff_glide active=%s visual=%s fall=%.2f vy=%.2f" % [str(player.is_gliding), str(player._glider.visible), _wild_test_height - player.global_position.y, player.velocity.y])
 			player.debug_glide = false
 			var horse := get_tree().get_first_node_in_group("vehicle") as Horse
 			if horse:
@@ -698,6 +733,18 @@ func _update_wild_test() -> void:
 			if creature:
 				creature.take_damage(999.0, player)
 			print("[wildtest] meat_drop before=%d after=%d" % [before, get_tree().get_nodes_in_group("loot").size()])
+			var monster := get_tree().get_first_node_in_group("wild_enemy") as WildMonster
+			if monster:
+				var loot_before_m := get_tree().get_nodes_in_group("loot").size()
+				monster.take_damage(999.0, player)
+				print("[wildtest] monster dead=%s loot_delta=%d" % [str(not monster.alive), get_tree().get_nodes_in_group("loot").size() - loot_before_m])
+		310:
+			var tree_body := _find_choppable()
+			_wild_test_loot_before = get_tree().get_nodes_in_group("loot").size()
+			if tree_body:
+				tree_body.take_damage(12.0, player)
+				tree_body.take_damage(12.0, player)
+				print("[wildtest] tree_chop falling=%s" % str(tree_body._falling))
 		350:
 			print("[wildtest] projectile damage=%.1f" % [_wild_test_hp - player.hp])
 			var bike: WildMotorcycle = null
@@ -716,8 +763,81 @@ func _update_wild_test() -> void:
 				print("[wildtest] motorcycle moved=%.2f mounted=%s" % [_wild_test_bike_start.distance_to(bike.global_position), str(bike.driver == player)])
 				bike.debug_forward = 0.0
 				bike.exit()
+			print("[wildtest] tree_wood loot_delta=%d" % [get_tree().get_nodes_in_group("loot").size() - _wild_test_loot_before])
+			# 临时生成吉普，覆盖加速、转弯和制动；测试完成后立即从树中移除。
+			var jeep := Vehicle.new()
+			jeep.terrain = terrain
+			add_child(jeep)
+			jeep.global_position = Vector3(-52, terrain.get_height(-52, 48) + 0.04, 48)
+			jeep.rotation.y = 0.2
+			player.global_position = jeep.global_position + Vector3(1.5, 0, 0)
+			jeep.enter(player)
+			jeep.debug_forward = 1.0
+			jeep.debug_turn = 0.42
+			_wild_test_jeep_start = jeep.global_position
+			_wild_test_jeep_yaw = jeep.rotation.y
+		470:
+			var jeep := player.vehicle as Vehicle
+			if jeep:
+				_wild_test_jeep_peak_speed = jeep.speed
+				jeep.debug_forward = -1.0
+		490:
+			var jeep := player.vehicle as Vehicle
+			if jeep:
+				print("[wildtest] jeep moved=%.2f turn=%.1fdeg peak=%.2f braked=%.2f" % [_wild_test_jeep_start.distance_to(jeep.global_position), rad_to_deg(absf(angle_difference(_wild_test_jeep_yaw, jeep.rotation.y))), _wild_test_jeep_peak_speed, jeep.speed])
+				jeep.debug_forward = 0.0
+				jeep.debug_turn = 0.0
+				jeep.exit()
+				remove_child(jeep)
+				jeep.queue_free()
+			# 城堡大门台阶回归：步行穿过城墙门洞走上基座平台。
+			player.global_position = Vector3(1.5, 30.3, -142.5)
+			player.rotation.y = PI
+			player.velocity = Vector3.ZERO
+			player.debug_move = 1.0
+			_wild_test_height = player.global_position.y
+		590:
+			player.debug_move = 0.0
+			print("[wildtest] castle_stairs start_y=%.2f end_y=%.2f climbed=%.2f" % [_wild_test_height, player.global_position.y, player.global_position.y - _wild_test_height])
+			# 攀爬回归：贴着测绘塔墙面推前进，应进入攀爬并升高。
+			player.global_position = Vector3(-129.3, terrain.get_height(-129.3, 109) + 0.1, 109)
+			player.rotation.y = PI * 0.5
+			player.velocity = Vector3.ZERO
+			player.debug_move = 1.0
+			_wild_test_height = player.global_position.y
+		680:
+			player.debug_move = 0.0
+			print("[wildtest] tower_climb start_y=%.2f end_y=%.2f climbing=%s rose=%.2f" % [_wild_test_height, player.global_position.y, str(player.is_climbing), player.global_position.y - _wild_test_height])
+			# 自动上台阶回归：走向驿站 0.37m 石基，应直接迈上去。
+			player.global_position = Vector3(-87.0, terrain.get_height(-87.0, 21) + 0.1, 21)
+			player.rotation.y = -PI * 0.5
+			player.velocity = Vector3.ZERO
+			player.debug_move = 1.0
+			_wild_test_height = player.global_position.y
+		720:
+			player.debug_move = 0.0
+			print("[wildtest] stable_step start_y=%.2f end_y=%.2f rose=%.2f" % [_wild_test_height, player.global_position.y, player.global_position.y - _wild_test_height])
+			var weapon_loot := 0
+			var ammo_loot := 0
+			for item in get_tree().get_nodes_in_group("loot"):
+				if item.kind == "weapon":
+					weapon_loot += 1
+				elif item.kind == "ammo":
+					ammo_loot += 1
+			print("[wildtest] wild_loot weapons=%d ammo=%d npcs=%d" % [weapon_loot, ammo_loot, get_tree().get_nodes_in_group("npc").size()])
 			print("[wildtest] done nodes=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
 			_wild_test_frame = -1
+
+
+func _find_choppable() -> ChoppableTree:
+	if props == null:
+		return null
+	for child in props.get_children():
+		if child.name.begins_with("Tree"):
+			for sub in child.get_children():
+				if sub is ChoppableTree:
+					return sub as ChoppableTree
+	return null
 
 
 func _setup_environment() -> void:
@@ -804,20 +924,20 @@ func _spawn_clouds() -> void:
 	mat.albedo_color = Color(1.0, 1.0, 1.0, 0.88)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.disable_fog = true
-	for i in range(14):
+	for i in range(22):
 		var cloud := Node3D.new()
-		cloud.position = Vector3(rng.randf_range(-420, 420), rng.randf_range(115, 155), rng.randf_range(-420, 420))
+		cloud.position = Vector3(rng.randf_range(-460, 460), rng.randf_range(105, 160), rng.randf_range(-460, 460))
 		for j in range(rng.randi_range(3, 5)):
 			var puff := MeshInstance3D.new()
 			var sm := SphereMesh.new()
-			sm.radius = rng.randf_range(7.0, 15.0)
+			sm.radius = rng.randf_range(10.0, 22.0)
 			sm.height = sm.radius * 2.0
 			sm.radial_segments = 8
 			sm.rings = 4
 			puff.mesh = sm
 			puff.material_override = mat
-			puff.position = Vector3(rng.randf_range(-16, 16), rng.randf_range(-2, 2), rng.randf_range(-7, 7))
-			puff.scale = Vector3(1.5, 0.42, 1.0)
+			puff.position = Vector3(rng.randf_range(-22, 22), rng.randf_range(-2.5, 2.5), rng.randf_range(-9, 9))
+			puff.scale = Vector3(1.6, 0.38, 1.0)
 			puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			cloud.add_child(puff)
 		add_child(cloud)

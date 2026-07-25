@@ -17,6 +17,19 @@ const ROCK := Color(0.48, 0.51, 0.55)
 const HIGH := Color(0.62, 0.62, 0.58)
 const SAND := Color(0.82, 0.76, 0.55)
 
+# 阔野地图的命名道路网：顶点色按到这些线段的距离混入土路色，远处近处都看得见。
+const WILD_ROADS := [
+	[Vector2(-72, 21), Vector2(-15.5, 18)],
+	[Vector2(-15.5, 18), Vector2(28.5, 18)],
+	[Vector2(28.5, 18), Vector2(84, 38)],
+	[Vector2(84, 38), Vector2(105, 25)],
+	[Vector2(-105, 82), Vector2(-72, 26)],
+	[Vector2(-68, 8), Vector2(-28, -34)],
+	[Vector2(-28, -34), Vector2(12, -78)],
+	[Vector2(12, -78), Vector2(4, -112)],
+	[Vector2(-112, 92), Vector2(-105, 82)],
+]
+
 var noise := FastNoiseLite.new()
 var patch_noise := FastNoiseLite.new()
 var detail_noise := FastNoiseLite.new()
@@ -70,36 +83,38 @@ func _wild_height(x: float, z: float) -> float:
 	var h := 7.0 + noise.get_noise_2d(x, z) * 4.8 + detail_noise.get_noise_2d(x, z) * 1.8
 	# 初始高原：西南侧平顶台地与陡峭边缘。
 	var plateau_d := maxf(absf(x + 112.0) / 72.0, absf(z - 92.0) / 58.0)
-	var plateau := 1.0 - smoothstep(0.72, 1.0, plateau_d)
+	var plateau := 1.0 - smoothstep(0.80, 0.985, plateau_d)
 	h = lerpf(h, 22.0 + detail_noise.get_noise_2d(x * 0.5, z * 0.5) * 0.8, plateau)
 	# 双子山：东南两座相邻高峰，中间留出河谷通道。
-	h += _hill(x, z, 63.0, 72.0, 42.0, 28.0)
-	h += _hill(x, z, 100.0, 62.0, 38.0, 25.0)
+	h += _hill(x, z, 63.0, 72.0, 40.0, 37.0)
+	h += _hill(x, z, 100.0, 62.0, 36.0, 33.0)
 	var twin_gap := exp(-pow((x - 81.0) / 12.0, 2.0) - pow((z - 67.0) / 34.0, 2.0))
 	h -= twin_gap * 17.0
 	# 西北雪山与东北火山构成远景天际线。
-	h += _hill(x, z, -166.0, -142.0, 92.0, 47.0)
-	h += _hill(x, z, -205.0, -96.0, 62.0, 29.0)
-	var volcano := _hill(x, z, 164.0, -145.0, 82.0, 62.0)
-	var crater := exp(-pow((x - 164.0) / 19.0, 2.0) - pow((z + 145.0) / 19.0, 2.0)) * 24.0
+	h += _hill(x, z, -166.0, -142.0, 84.0, 58.0)
+	h += _hill(x, z, -205.0, -96.0, 58.0, 34.0)
+	var volcano := _hill(x, z, 164.0, -145.0, 70.0, 74.0)
+	var crater := exp(-pow((x - 164.0) / 19.0, 2.0) - pow((z + 145.0) / 19.0, 2.0)) * 26.0
 	h += volcano - crater
 	# 北部城堡丘陵与东部台阶山脊。
-	h += _hill(x, z, 4.0, -112.0, 70.0, 18.0)
+	h += _hill(x, z, 4.0, -122.0, 62.0, 24.0)
 	h += _hill(x, z, 202.0, 16.0, 54.0, 24.0)
 	# 中央海利亚河：宽阔 S 形主河，东南分叉穿过双子山。
 	var river_x := sin(z * 0.021) * 24.0 - 8.0 + sin(z * 0.049) * 7.0
 	var river_dist := absf(x - river_x)
-	var river_mask := 1.0 - smoothstep(7.0, 13.0, river_dist)
+	# 河岸过渡带放宽到 20m：河床→滩涂→草坡，两侧形成可行走的海滩而不是陡坎。
+	var river_mask := 1.0 - smoothstep(8.0, 20.0, river_dist)
 	var river_bed := 0.15 + detail_noise.get_noise_2d(x * 2.0, z * 2.0) * 0.18
 	h = lerpf(h, river_bed, river_mask)
 	var branch_z := 58.0 + sin((x - 25.0) * 0.025) * 13.0
 	var branch_dist := absf(z - branch_z)
-	var branch_mask := (1.0 - smoothstep(5.0, 10.0, branch_dist)) * smoothstep(-15.0, 28.0, x) * smoothstep(145.0, 105.0, x)
+	var branch_mask := (1.0 - smoothstep(6.0, 14.0, branch_dist)) * smoothstep(-15.0, 28.0, x) * smoothstep(145.0, 105.0, x)
 	h = lerpf(h, 0.35, branch_mask)
 	# 地标基座必须平整，但边缘保留自然过渡。
 	h = _flatten_disc(h, x, z, Vector2(-112.0, 92.0), 16.0, 22.0)
 	h = _flatten_disc(h, x, z, Vector2(-72.0, 21.0), 22.0, 8.2)
 	h = _flatten_disc(h, x, z, Vector2(18.0, -94.0), 24.0, 20.0)
+	h = _flatten_disc(h, x, z, Vector2(4.0, -124.0), 30.0, 30.0)
 	# 地图边缘抬成连续远山，避免矩形边界感。
 	var edge := maxf(absf(x), absf(z)) / HALF
 	h += smoothstep(0.78, 1.0, edge) * 52.0
@@ -186,8 +201,8 @@ func _build() -> void:
 
 func _vertex_color(x: float, y: float, z: float, n: Vector3) -> Color:
 	var p := patch_noise.get_noise_2d(x, z)
-	var deep := Color(0.17, 0.37, 0.075) if profile == "wild" else GRASS_DEEP
-	var light := Color(0.46, 0.66, 0.14) if profile == "wild" else GRASS_LIGHT
+	var deep := Color(0.24, 0.46, 0.10) if profile == "wild" else GRASS_DEEP
+	var light := Color(0.57, 0.75, 0.21) if profile == "wild" else GRASS_LIGHT
 	var c := deep.lerp(light, clampf(p * 0.5 + 0.5, 0.0, 1.0))
 	if p > 0.30:
 		c = c.lerp(GRASS_DRY, smoothstep(0.30, 0.70, p) * 0.7)
@@ -201,12 +216,29 @@ func _vertex_color(x: float, y: float, z: float, n: Vector3) -> Color:
 		var high_color := Color(0.39, 0.43, 0.36) if profile == "wild" else HIGH
 		c = c.lerp(high_color, smoothstep(18.0, 34.0, y))
 	if profile == "wild":
+		# 道路网：距离路径 4.2m 以内混入干燥土色，形成可远看可行走的路。
+		if y > WATER_LEVEL + 0.4:
+			var road_d := _wild_road_distance(x, z)
+			if road_d < 4.2:
+				c = c.lerp(Color(0.58, 0.47, 0.28), smoothstep(4.2, 2.0, road_d) * 0.85)
 		# 火山暖岩与雪山冷岩形成强烈地区辨识。
 		var volcanic := 1.0 - smoothstep(45.0, 115.0, Vector2(x, z).distance_to(Vector2(164, -145)))
 		c = c.lerp(Color(0.30, 0.20, 0.16), volcanic * smoothstep(15.0, 35.0, y))
 		var snowland := 1.0 - smoothstep(55.0, 125.0, Vector2(x, z).distance_to(Vector2(-166, -142)))
 		c = c.lerp(Color(0.78, 0.86, 0.90), snowland * smoothstep(24.0, 48.0, y))
 	return c
+
+
+func _wild_road_distance(x: float, z: float) -> float:
+	var best := 9999.0
+	var p := Vector2(x, z)
+	for segment in WILD_ROADS:
+		var a: Vector2 = segment[0]
+		var b: Vector2 = segment[1]
+		var ab := b - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		best = minf(best, p.distance_to(a + ab * t))
+	return best
 
 
 func _build_water() -> void:
@@ -230,7 +262,7 @@ func _build_water() -> void:
 func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, water_shallow: Color, water_deep: Color, rain_amount: float, ice_amount: float) -> void:
 	if _ground_material:
 		if profile == "wild":
-			ground_tint *= Color(0.84, 0.90, 0.79, 1.0)
+			ground_tint *= Color(0.97, 1.0, 0.90, 1.0)
 		_ground_material.set_shader_parameter("season_tint", ground_tint)
 		_ground_material.set_shader_parameter("snow_amount", snow_amount)
 		_ground_material.set_shader_parameter("wetness", wetness)

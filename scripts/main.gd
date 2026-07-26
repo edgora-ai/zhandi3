@@ -221,7 +221,7 @@ func _ready() -> void:
 			var anim := pilot.find_child("AnimationPlayer", true, false) as AnimationPlayer
 			if anim and not anim.get_animation_list().is_empty():
 				anim.play(anim.get_animation_list()[0])
-			print("[pilot] anims=%s" % str(anim.get_animation_list() if anim else []))
+			print("[pilot] anims=%s loop=%s" % [str(anim.get_animation_list() if anim else []), str(anim.get_animation(anim.get_animation_list()[0]).loop_mode if anim and not anim.get_animation_list().is_empty() else -1)])
 	if args.has("--moblintest") and _map_id == "wild":
 		var mb := get_tree().get_first_node_in_group("wild_enemy") as WildMoblin
 		if mb:

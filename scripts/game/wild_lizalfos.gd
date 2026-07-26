@@ -14,6 +14,10 @@ var _home := Vector3.ZERO
 var _think := 0.0
 var _dash_cd := 0.0
 var _dash_t := 0.0
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
+var _anim_hold := 0.0
 var _strafe_dir := 1.0
 var _anim := 0.0
 var _legs: Array[Node3D] = []
@@ -42,7 +46,38 @@ func _ready() -> void:
 	col.shape = shape
 	col.position.y = 0.7
 	add_child(col)
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
+
+
+# glb 视觉：Blender 管线生成的蒙皮蜥蜴与动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/lizalfos.glb"):
+		return false
+	var scene_res := load("res://assets/models/lizalfos.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		# glTF 导入的动画默认不循环（loop_mode=0），持续状态剪辑手动开循环。
+		var anim_res := _ap.get_animation(clip)
+		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"smash", &"hit", &"die", &"buck", &"dash", &"attack"]):
+			anim_res.loop_mode = Animation.LOOP_LINEAR
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_model() -> void:
@@ -140,6 +175,8 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		return
 	hp -= amount
 	_flash = 0.14
+	_play(&"hit")
+	_anim_hold = 0.30
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
 	if hp <= 0.0:
 		alive = false
@@ -147,6 +184,11 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 			from.kills += 1
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 2, 1)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), "击破!", Color(1.0, 0.55, 0.20))
+		if _ap:
+			_play(&"die")
+			collision_layer = 0
+			collision_mask = 0
+			await get_tree().create_timer(0.8).timeout
 		queue_free()
 
 
@@ -192,6 +234,7 @@ func _physics_process(delta: float) -> void:
 		if _dash_cd <= 0.0 and dist < 9.0:
 			_dash_t = DASH_TIME
 			_dash_cd = DASH_CD
+			_play(&"dash")
 	velocity.y = -4.0
 	move_and_slide()
 	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
@@ -200,3 +243,11 @@ func _physics_process(delta: float) -> void:
 		_legs[i].rotation.x = sin(_anim * 11.0 + i * PI) * stride
 	if _tail:
 		_tail.rotation.y = sin(_anim * 4.0) * 0.4
+	_anim_hold = maxf(0.0, _anim_hold - delta)
+	if _ap and _anim_hold <= 0.0:
+		if _dash_t > 0.0:
+			pass
+		elif Vector2(velocity.x, velocity.z).length() > 0.3:
+			_play(&"strafe")
+		else:
+			_play(&"idle")

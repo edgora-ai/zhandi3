@@ -77,6 +77,10 @@ func _play(clip: StringName) -> void:
 	if _ap == null or _cur_anim == clip:
 		return
 	if _ap.has_animation(clip):
+		# glTF 导入的动画默认不循环（loop_mode=0），持续状态剪辑手动开循环。
+		var anim_res := _ap.get_animation(clip)
+		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"smash", &"hit", &"die", &"buck", &"dash", &"attack"]):
+			anim_res.loop_mode = Animation.LOOP_LINEAR
 		_cur_anim = clip
 		_ap.play(clip)
 

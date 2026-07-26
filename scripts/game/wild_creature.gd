@@ -20,6 +20,10 @@ var _wings: Array[Node3D] = []
 var _home := Vector3.ZERO
 var _alert_left := -1.0   # >0 表示正处于警觉冻结中
 var _alerted := false     # 本轮接近已警觉过，离开 26m 后重置
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
+var _anim_hold := 0.0
 
 
 func setup(p_species: String, p_terrain: Terrain, p_player: Player) -> void:
@@ -48,7 +52,8 @@ func _ready() -> void:
 	_home = global_position
 	_move_target = global_position
 	_build_collision()
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
 
 
 func _build_collision() -> void:
@@ -62,6 +67,33 @@ func _build_collision() -> void:
 	col.shape = shape
 	col.position.y = 0.9 if species == "bear" else 0.48
 	add_child(col)
+
+
+# glb 视觉：Blender 管线生成的蒙皮动物与动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	var path := "res://assets/models/%s.glb" % species
+	if not ResourceLoader.exists(path):
+		return false
+	var scene_res := load(path) as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_model() -> void:
@@ -217,6 +249,8 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		return
 	hp -= amount
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.4, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
+	_play(&"hit")
+	_anim_hold = 0.30
 	if from == player and species != "bird":
 		_move_target = player.global_position
 	if hp <= 0.0:
@@ -229,6 +263,11 @@ func _die(from: Variant) -> void:
 		from.kills += 1
 	var meat_count := 1 if species == "bird" else 4 if species == "bear" else 2
 	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.25, 0), "meat", "", meat_count, 1)
+	if _ap:
+		_play(&"die")
+		collision_layer = 0
+		collision_mask = 0
+		await get_tree().create_timer(0.9).timeout
 	queue_free()
 
 
@@ -315,9 +354,17 @@ func _physics_process(delta: float) -> void:
 	if aggressive and distance < (2.2 if species == "bear" else 1.6) and _attack_cooldown <= 0.0:
 		player.take_damage(22.0 if species == "bear" else 11.0, self)
 		_attack_cooldown = 1.15
+		_play(&"attack")
+		_anim_hold = 0.5
 	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 7.0, 0.0, 1.0) * 0.65
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(_anim_time * 9.0 + (0.0 if i in [0, 3] else PI)) * stride
+	_anim_hold = maxf(0.0, _anim_hold - delta)
+	if _ap and _anim_hold <= 0.0:
+		if Vector2(velocity.x, velocity.z).length() > 0.3:
+			_play(&"walk")
+		else:
+			_play(&"idle")
 
 
 func _update_bird(delta: float) -> void:

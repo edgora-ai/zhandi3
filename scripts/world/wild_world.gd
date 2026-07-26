@@ -36,6 +36,7 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	_build_shrine(Vector3(-112, terrain.get_height(-112, 92), 92), 0.15)
 	_build_shrine(_ground(Vector3(105, 0, 25)), -0.8, true)
 	_build_shrine(_ground(Vector3(-140, 0, -110)), 2.2, "plate")
+	_build_shrine(_ground(Vector3(55, 0, -30)), -0.4, "ball")
 	_build_stable(Vector3(-72, terrain.get_height(-72, 21), 21))
 	_build_temple_ruins(Vector3(18, terrain.get_height(18, -94), -94))
 	_build_river_bridge(18.0)
@@ -1001,6 +1002,13 @@ func _spawn_fish_and_circles() -> void:
 	var trail2 := FlowerTrail.new()
 	add_child(trail2)
 	trail2.configure(player, [_ground(Vector3(90, 0, 60), 0.5), _ground(Vector3(100, 0, 65), 0.5), _ground(Vector3(110, 0, 70), 0.5)])
+	# 两处跳水环呀哈哈。
+	for rz in [-60.0, 70.0]:
+		var rx := sin(rz * 0.021) * 24.0 - 8.0 + sin(rz * 0.049) * 7.0
+		var ring := DiveRing.new()
+		ring.configure(player)
+		add_child(ring)
+		ring.global_position = Vector3(rx, Terrain.WATER_LEVEL + 0.02, rz)
 
 
 # 林克之家：高原上的小屋与床铺，睡到天亮回满状态。

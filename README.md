@@ -118,6 +118,8 @@ scripts/
   world/tex_gen.gd       # 程序化贴图工厂：叶簇/草叶/花朵 alpha 贴图
   world/buildings.gd     # 程序化建筑：村庄（小屋/两层楼/仓库/瞭望塔/废墟）、据点沙袋工事、码头小船
   world/toon.gd          # 卡通材质工厂（toon 光照 + grow 描边）
+  world/day_night.gd     # 昼夜循环：太阳角度/天空雾色/血月计数
+  world/weather.gd       # 天气系统：晴雨交替、雨幕、闪电、地面湿滑与水面涟漪
   player/player.gd       # FPS 控制器（移动/空降/游泳/滑翔/背包/骑乘）
   player/weapon.gd       # hitscan 武器逻辑 + 程序化视模型
   player/hud.gd          # 全套 HUD（中文用内置 Noto Sans SC 渲染）
@@ -128,13 +130,28 @@ scripts/
   game/vehicle.gd        # 吉普车：F 上下车、街机驾驶、贴地形
   game/horse.gd          # 马匹：程序化模型、骑乘控制与步态
   game/wild_motorcycle.gd # 古代摩托：程序化模型、悬挂与骑乘控制
+  game/raft.gd           # 木筏：水面载具，F 上下、靠岸自停
   game/wild_creature.gd  # 野猪/狼/熊/鸟生态、攻击与掉落
   game/wild_monster.gd   # 山野小怪：巡逻、投石与冲锋
+  game/wild_moblin.gd    # 莫布林：长前摇重击，可格挡可闪避
+  game/wild_lizalfos.gd  # 蜥蜴战士：环绕游走与高速突进
+  game/guardian.gd       # 古代守卫：六足巡逻、激光锁定与毁灭光束（可盾反）
   game/wild_dragon.gd    # 火山巨龙：巡航、喷火与龙鳞掉落
   game/flying_attacker.gd # 古代飞行攻击器
   game/wild_projectile.gd # 石块/火焰/能量弹共用投射物
   game/smoke_grenade.gd  # 烟雾弹：引信起烟、遮挡 AI 视线
+  game/wild_npc.gd       # 旅人 NPC：地标驻留、E 交谈与任务链
+  game/choppable_tree.gd # 可砍树木：受击倒伏、留桩与木材掉落
+  game/shrine_trial.gd   # 神庙试炼：射符文/火盆/压力板/推球入臼
+  game/shrine_rune.gd    # 神庙符文靶：悬浮光环，射中点亮
+  game/korok_prop.gd     # 呀哈哈谜题：风车射击与可疑怪石
+  game/rock_circle.gd    # 呀哈哈石头阵：站进缺口补全出种子
+  game/flower_trail.gd   # 呀哈哈花径：按序触碰发光花
+  game/dive_ring.gd      # 呀哈哈跳水环：游进睡莲环心得种子
+  game/fish_spot.gd      # 河鱼点：水中鱼影，E 抓鱼
+  game/bed_spot.gd       # 床铺：睡到天亮，生命精力全满
   fx/fx.gd               # 曳光/命中特效
+  fx/damage_number.gd    # 飘字伤害反馈：命中弹数字、上浮淡出
   fx/sfx_bank.gd         # 音效池（2D/3D）
 assets/
   shaders/ground.gdshader # 多尺度地表斑驳 + 岩层 + 积雪/湿润

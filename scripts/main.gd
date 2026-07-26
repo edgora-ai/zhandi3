@@ -1287,6 +1287,18 @@ func _update_wild_test() -> void:
 			player.seed_count = 9
 			player.collect_seed()
 			print("[wildtest] bloodmoon_full respawned=%d enemies %d->%d charm=%.2f" % [respawned, enemies_before, get_tree().get_nodes_in_group("wild_enemy").size(), player.charm_mult])
+			# 跳水环与推球试炼回归。
+			var dring := get_tree().get_first_node_in_group("dive_ring") as DiveRing
+			player.is_swimming = true
+			if dring:
+				player.global_position = dring.global_position
+				dring._process(0.1)
+			player.is_swimming = false
+			var btrial: ShrineTrial = wild_world.trials[3]
+			if btrial.mode == "ball":
+				btrial._ball.global_position = btrial.global_position + btrial._socket
+				btrial._process(0.1)
+			print("[wildtest] dive_ring=%s ball_trial=%s" % [str(dring.completed if dring else false), str(btrial.completed)])
 			# 花径回归：顺序触碰全部花朵出种子。
 			var trail := get_tree().get_first_node_in_group("flower_trail") as FlowerTrail
 			if trail:

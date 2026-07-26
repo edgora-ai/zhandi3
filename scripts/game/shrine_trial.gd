@@ -27,6 +27,9 @@ func setup(p_player: Player, trial_mode: Variant = "rune") -> void:
 	if mode == "plate":
 		_build_plate()
 		return
+	if mode == "ball":
+		_build_ball_trial()
+		return
 	# 符文环绕神庙入口悬浮，高度错落，需要稍微找角度；火盆模式改为三座待点燃火盆。
 	var spots := [
 		Vector3(-2.6, 2.2, -4.6), Vector3(2.8, 3.4, -4.0),
@@ -75,6 +78,50 @@ func _build_plate() -> void:
 	add_child(ring)
 
 
+var _ball: RigidBody3D
+var _socket := Vector3.ZERO
+
+# 推球入臼：把重球推进发光圆环即完成。
+func _build_ball_trial() -> void:
+	_socket = Vector3(0, 0.4, -4.2)
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring_mat.albedo_color = Color(0.1, 0.9, 0.85)
+	ring_mat.emission_enabled = true
+	ring_mat.emission = Color(0.05, 0.95, 0.85)
+	ring_mat.emission_energy_multiplier = 2.0
+	var ring := MeshInstance3D.new()
+	var rm := TorusMesh.new()
+	rm.inner_radius = 0.08
+	rm.outer_radius = 1.3
+	rm.rings = 20
+	rm.ring_segments = 6
+	ring.mesh = rm
+	ring.material_override = ring_mat
+	ring.position = _socket
+	add_child(ring)
+	_ball = RigidBody3D.new()
+	_ball.mass = 3.0
+	_ball.linear_damp = 1.2
+	_ball.angular_damp = 1.5
+	var ball_mesh := MeshInstance3D.new()
+	var bm := SphereMesh.new()
+	bm.radius = 0.55
+	bm.height = 1.1
+	bm.radial_segments = 12
+	bm.rings = 7
+	ball_mesh.mesh = bm
+	ball_mesh.material_override = Toon.make_material(Color(0.35, 0.38, 0.42), true, 0.014)
+	_ball.add_child(ball_mesh)
+	var col := CollisionShape3D.new()
+	var shape := SphereShape3D.new()
+	shape.radius = 0.55
+	col.shape = shape
+	_ball.add_child(col)
+	add_child(_ball)
+	_ball.position = Vector3(0, 0.7, -10.5)
+
+
 func on_rune_hit(_rune: ShrineRune) -> void:
 	_hit_count += 1
 	var scene := get_tree().current_scene
@@ -103,6 +150,9 @@ func _complete() -> void:
 func hud_status(pos: Vector3) -> Array:
 	if completed or global_position.distance_to(pos) > 30.0:
 		return ["", -1.0]
+	if mode == "ball":
+		var d := _ball.global_position.distance_to(global_position + _socket) if _ball else 99.0
+		return ["把石球推进光环（%dm）" % int(d), 1.0 - clampf(d / 10.0, 0.0, 1.0)]
 	if mode == "plate":
 		if _plate_t > 0.05:
 			return ["压力板 %.1f / 4.0 秒" % _plate_t, _plate_t / 4.0]
@@ -127,6 +177,15 @@ func _process(delta: float) -> void:
 				Loot.spawn(scene, global_position + Vector3(0, 1.2, -5.2), "orb", "", 1, 3)
 		else:
 			_plate_t = maxf(0.0, _plate_t - delta * 2.0)
+		return
+	if mode == "ball":
+		if _ball and _ball.global_position.distance_to(global_position + _socket) < 1.3:
+			completed = true
+			_ball.freeze = true
+			var scene := get_tree().current_scene
+			if scene and scene.get("hud") != null:
+				scene.hud.add_feed("石球归位！获得精灵宝珠")
+			Loot.spawn(scene, global_position + Vector3(0, 1.2, -5.2), "orb", "", 1, 3)
 		return
 	var dist := global_position.distance_to(player.global_position)
 	if not _active and dist < START_DIST:

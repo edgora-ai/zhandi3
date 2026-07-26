@@ -69,6 +69,34 @@ func _build_model() -> void:
 	horn.material_override = bone
 	horn.position = Vector3(0, 2.62, -0.1)
 	add_child(horn)
+	# 长尖耳与咧嘴獠牙：波克布林式的头部识别。
+	for sx in [-1.0, 1.0]:
+		var ear := MeshInstance3D.new()
+		var em := CylinderMesh.new()
+		em.top_radius = 0.015
+		em.bottom_radius = 0.085
+		em.height = 0.48
+		em.radial_segments = 6
+		ear.mesh = em
+		ear.material_override = skin
+		ear.position = Vector3(sx * 0.44, 2.30, -0.08)
+		ear.rotation_degrees.z = sx * -78.0
+		add_child(ear)
+	var mouth := MeshInstance3D.new()
+	var mm := BoxMesh.new()
+	mm.size = Vector3(0.30, 0.09, 0.05)
+	mouth.mesh = mm
+	mouth.material_override = dark
+	mouth.position = Vector3(0, 2.12, -0.50)
+	add_child(mouth)
+	for i in range(3):
+		var tooth := MeshInstance3D.new()
+		var tm := BoxMesh.new()
+		tm.size = Vector3(0.05, 0.07, 0.03)
+		tooth.mesh = tm
+		tooth.material_override = bone
+		tooth.position = Vector3(-0.08 + i * 0.08, 2.145, -0.515)
+		add_child(tooth)
 	var eye_mat := StandardMaterial3D.new()
 	eye_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	eye_mat.albedo_color = Color(1.0, 0.85, 0.20)

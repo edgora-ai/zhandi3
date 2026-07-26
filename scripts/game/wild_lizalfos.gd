@@ -67,6 +67,37 @@ func _build_model() -> void:
 		add_child(fin)
 	_tail = _capsule_part(self, 0.12, 1.3, skin, Vector3(0, 0.62, 1.05))
 	_tail.rotation_degrees.x = 70.0
+	# 后掠双角、前肢与爪：蜥蜴战士的剪影与抓握感。
+	for sx in [-1.0, 1.0]:
+		var horn := MeshInstance3D.new()
+		var hm := CylinderMesh.new()
+		hm.top_radius = 0.012
+		hm.bottom_radius = 0.05
+		hm.height = 0.42
+		hm.radial_segments = 6
+		horn.mesh = hm
+		horn.material_override = belly
+		horn.position = Vector3(sx * 0.12, 1.10, -0.60)
+		horn.rotation_degrees = Vector3(-62.0, 0.0, sx * -14.0)
+		add_child(horn)
+		var arm := MeshInstance3D.new()
+		var am := CapsuleMesh.new()
+		am.radius = 0.065
+		am.height = 0.52
+		am.radial_segments = 7
+		am.rings = 4
+		arm.mesh = am
+		arm.material_override = skin
+		arm.position = Vector3(sx * 0.40, 0.66, -0.18)
+		arm.rotation_degrees = Vector3(24.0, 0.0, sx * 10.0)
+		add_child(arm)
+		var claw := MeshInstance3D.new()
+		var cm2 := BoxMesh.new()
+		cm2.size = Vector3(0.10, 0.06, 0.14)
+		claw.mesh = cm2
+		claw.material_override = dark
+		claw.position = Vector3(sx * 0.43, 0.40, -0.26)
+		add_child(claw)
 	for sx in [-0.28, 0.28]:
 		var leg := Node3D.new()
 		leg.position = Vector3(sx, 0.45, 0.15)

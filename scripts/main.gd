@@ -937,6 +937,21 @@ func _update_wild_test() -> void:
 			print("[wildtest] korok hit=%s seeds %d->%d" % [str(prop != null and prop.consumed), seed_before, seed_after])
 			print("[wildtest] stamina after_climb=%.0f regen_to=%.0f" % [_wild_test_stamina, player.stamina])
 			# 天气回归：强制下雨后雨强上升；守卫可被击杀并掉落补给。
+			# 盾牌回归：格挡减伤 75%，完美格挡无伤反震。
+			var test_enemy := get_tree().get_first_node_in_group("wild_enemy") as Node3D
+			if test_enemy:
+				test_enemy.global_position = player.global_position - player.global_transform.basis.z * 3.0
+				player.blocking = true
+				player._block_start = Time.get_ticks_msec() / 1000.0 - 1.0
+				var hp_before_block := player.hp
+				player.take_damage(20.0, test_enemy)
+				var dmg_blocked := hp_before_block - player.hp
+				hp_before_block = player.hp
+				player._block_start = Time.get_ticks_msec() / 1000.0
+				player.take_damage(20.0, test_enemy)
+				var dmg_parry := hp_before_block - player.hp
+				player.blocking = false
+				print("[wildtest] shield blocked=%.0f parry=%.0f" % [dmg_blocked, dmg_parry])
 			weather.force_rain(true)
 			for i in range(60):
 				weather._process(1.0 / 60.0)

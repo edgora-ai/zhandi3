@@ -439,6 +439,11 @@ handle_crash: Program crashed with signal 11
 - 踩坑：GDScript 缩进级别必须连续，dedent 后不能再出现更深缩进（`Expected statement, found Indent`）；混合组里 `get_first_node_in_group` 不等于“找到那个类型”，要遍历判别。
 - 回归断言：`weather rain>0 guardian dead=true loot_delta=2`。
 
+### 5.22 第十七轮：盾牌格挡
+
+- 空手右键举盾：正面伤害减到 1/4 并耗 10 精力（精力空则格挡失败），移动减半；举盾瞬间 0.18s 内为完美格挡，无伤并反震 12 伤害。判定用攻击者方向与面向点积（>0.25 才算“正面”）。
+- 回归断言：`shield blocked=5 parry=0`。
+
 ## 6. 音频生命周期
 
 - 背景音乐和环境音由脚本生成的 WAV 提供，运行时设置循环区间。

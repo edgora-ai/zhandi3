@@ -28,6 +28,10 @@ var hp := MAX_HP
 var armor := 0.0
 var stamina := 100.0
 var max_stamina := 100.0
+var blocking := false
+var _block_start := -1.0
+var _shield: MeshInstance3D
+var _shield_root: Node3D
 var _stamina_wait := 0.0
 var _stamina_used := false
 var alive := true
@@ -118,6 +122,7 @@ func _ready() -> void:
 	weapon.setup(self, true)
 	_build_glider()
 	_build_sword()
+	_build_shield()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -279,6 +284,8 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.55
 	if prone:
 		speed *= 0.35
+	if blocking:
+		speed *= 0.5
 
 	var accel := ACCEL if is_on_floor() else AIR_ACCEL
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
@@ -363,7 +370,19 @@ func _physics_process(delta: float) -> void:
 				weapon.hold_trigger()
 			elif _melee_cd <= 0.0:
 				_melee_swing()
-		weapon.set_ads(Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
+		var rmb := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+		weapon.set_ads(rmb and weapon.weapon_id != "")
+		# 空手举盾：右键格挡，举盾瞬间为完美格挡窗口。
+		if weapon.weapon_id == "":
+			if rmb and not blocking:
+				blocking = true
+				_block_start = Time.get_ticks_msec() / 1000.0
+			elif not rmb and blocking:
+				blocking = false
+		elif blocking:
+			blocking = false
+		if _shield_root:
+			_shield_root.visible = blocking
 	_scan_loot()
 	_melee_cd = maxf(0.0, _melee_cd - delta)
 	_update_sword(delta)
@@ -473,6 +492,23 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 	if not alive:
 		return
 	var dmg := amount
+	# 盾牌格挡：面向攻击者时伤害减到 1/4 并耗精力；举盾瞬间（0.18s 内）为完美格挡，无伤反震。
+	if blocking and from != null and from is Node3D:
+		var to_attacker: Vector3 = (from as Node3D).global_position - global_position
+		to_attacker.y = 0.0
+		if to_attacker.length_squared() > 0.01 and to_attacker.normalized().dot(-global_transform.basis.z) > 0.25:
+			if Time.get_ticks_msec() / 1000.0 - _block_start < 0.18:
+				if from.has_method("take_damage"):
+					from.take_damage(12.0, self, "body")
+				if hud:
+					hud.add_feed("完美格挡！")
+				damaged.emit(0.0)
+				return
+			if stamina > 0.0:
+				dmg *= 0.25
+				_drain_stamina(10.0)
+				if hud and dmg >= 8.0:
+					hud.add_feed("格挡住了攻击")
 	if armor > 0.0:
 		var absorbed := minf(armor, dmg * 0.6)
 		armor -= absorbed
@@ -542,6 +578,36 @@ func _build_sword() -> void:
 	grip.material_override = wood
 	grip.position = Vector3(0, -0.02, 0)
 	_sword.add_child(grip)
+
+
+func _build_shield() -> void:
+	# 木圆盾：空手举盾（右键）时显示在左侧镜头位。
+	var shield_root := Node3D.new()
+	shield_root.position = Vector3(-0.28, -0.26, -0.5)
+	shield_root.rotation_degrees = Vector3(-8, 18, 0)
+	camera.add_child(shield_root)
+	_shield = MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.26
+	disc.bottom_radius = 0.26
+	disc.height = 0.035
+	disc.radial_segments = 16
+	_shield.mesh = disc
+	_shield.material_override = Toon.make_material(Color(0.48, 0.32, 0.15), true, 0.010)
+	_shield.rotation_degrees.x = 90.0
+	shield_root.add_child(_shield)
+	var boss := MeshInstance3D.new()
+	var boss_mesh := SphereMesh.new()
+	boss_mesh.radius = 0.07
+	boss_mesh.height = 0.14
+	boss_mesh.radial_segments = 8
+	boss_mesh.rings = 5
+	boss.mesh = boss_mesh
+	boss.material_override = Toon.make_material(Color(0.60, 0.44, 0.16), true, 0.008)
+	boss.position = Vector3(0, 0, -0.04)
+	shield_root.add_child(boss)
+	_shield_root = shield_root
+	_shield_root.visible = false
 
 
 func _melee_swing() -> void:

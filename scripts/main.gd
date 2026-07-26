@@ -63,6 +63,9 @@ var _wild_test_moblin: WildMoblin = null
 var _wild_test_parry_hp := 0.0
 var quest_states := {"mushroom3": 0, "moblin2": 0, "scale1": 0, "escort": 0}
 var _escort_npc: WildNPC = null
+var _stasis_test_mob: WildMoblin = null
+var _stasis_test_pos := Vector3.ZERO
+var _stasis_test_hp := 0.0
 var _quest_mushroom_base := 0
 var _quest_moblin_kills := 0
 var _wild_test_hp := 0.0
@@ -223,6 +226,17 @@ func _ready() -> void:
 			player.pitch = -0.2
 			player.camera.rotation.x = -0.2
 			player._raise_ice()
+	if args.has("--magnesistest"):
+		var mtp := get_tree().get_first_node_in_group("metal_prop") as MetalProp
+		if mtp and terrain:
+			mtp.global_position = Vector3(-72, terrain.get_height(-72, 21) + 0.5, 21)
+			mtp.linear_velocity = Vector3.ZERO
+			player.global_position = mtp.global_position + Vector3(0, 0, 7.0)
+			var mdir2 := (mtp.global_position - player.camera.global_position).normalized()
+			player.rotation.y = atan2(mdir2.x, mdir2.z) + PI
+			player.pitch = -0.05
+			player.camera.rotation.x = -0.05
+			player._toggle_magnet()
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:
@@ -1071,26 +1085,37 @@ func _update_wild_test() -> void:
 				player._raise_ice()
 				player._raise_ice()
 				print("[wildtest] cryonis pillars=%d" % player._pillars.size())
-			# 时停回归：冻结莫布林期间位置不变，解除后恢复并结算冲击伤害。
-			var sm2: WildMoblin = null
+			# 时停回归：冻结莫布林（470 帧解除并结算冲击伤害）。
+			_stasis_test_mob = null
 			for e in get_tree().get_nodes_in_group("wild_enemy"):
 				if e is WildMoblin and e.alive:
-					sm2 = e as WildMoblin
+					_stasis_test_mob = e as WildMoblin
 					break
-			if sm2:
-				player.global_position = sm2.global_position + Vector3(0, 0, 8.0)
-				var sdir := (sm2.global_position - player.camera.global_position).normalized()
+			if _stasis_test_mob:
+				player.global_position = _stasis_test_mob.global_position + Vector3(0, 0, 8.0)
+				var sdir := (_stasis_test_mob.global_position - player.camera.global_position).normalized()
 				player.rotation.y = atan2(sdir.x, sdir.z) + PI
 				player.pitch = 0.0
 				player.camera.rotation.x = 0.0
 				player._toggle_stasis()
-				var spos: Vector3 = sm2.global_position
-				var shp: float = sm2.hp
-				await get_tree().create_timer(0.3).timeout
-				var frozen_moved: float = sm2.global_position.distance_to(spos)
-				player._stasis_dmg = 20.0
-				player._release_stasis()
-				print("[wildtest] stasis moved=%.2f hp %.0f->%.0f" % [frozen_moved, shp, sm2.hp])
+				_stasis_test_pos = _stasis_test_mob.global_position
+				_stasis_test_hp = _stasis_test_mob.hp
+			# 磁力回归：吸附判定、拉力与投掷冲量（速度赋值同步读取，无需跨帧）。
+			var mp := get_tree().get_first_node_in_group("metal_prop") as MetalProp
+			if mp:
+				mp.global_position = Vector3(-72, terrain.get_height(-72, 21) + 0.5, 21)
+				mp.linear_velocity = Vector3.ZERO
+				player.global_position = mp.global_position + Vector3(0, 0, 6.0)
+				var mdir := (mp.global_position - player.camera.global_position).normalized()
+				player.rotation.y = atan2(mdir.x, mdir.z) + PI
+				player.pitch = 0.0
+				player.camera.rotation.x = 0.0
+				player._toggle_magnet()
+				var grabbed := player._magnet_prop == mp
+				mp.magnet_hold(player.camera.global_position + player.get_aim_dir() * 5.0)
+				var pull_speed: float = mp.linear_velocity.length()
+				player._throw_magnet()
+				print("[wildtest] magnesis grab=%s pull=%.1f throw=%.1f" % [str(grabbed), pull_speed, mp.linear_velocity.length()])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)
@@ -1107,6 +1132,12 @@ func _update_wild_test() -> void:
 			if jeep:
 				_wild_test_jeep_peak_speed = jeep.speed
 				jeep.debug_forward = -1.0
+			# 时停回归（下半）：冻结跨帧零位移，解除结算冲击伤害。
+			if _stasis_test_mob:
+				player._stasis_dmg = 20.0
+				player._release_stasis()
+				print("[wildtest] stasis moved=%.2f hp %.0f->%.0f" % [_stasis_test_mob.global_position.distance_to(_stasis_test_pos), _stasis_test_hp, _stasis_test_mob.hp])
+				_stasis_test_mob = null
 		490:
 			var jeep := player.vehicle as Vehicle
 			if jeep:

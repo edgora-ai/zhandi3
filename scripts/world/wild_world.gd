@@ -75,6 +75,9 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		add_child(moblin)
 		moblin.global_position = _ground(mp, 0.05)
 	_spawn_npcs()
+	# 三块磁力金属块：压力板神庙、城堡门前、遗迹旁，供磁力搬运与投掷。
+	for mp in [Vector3(-136, 0, -104), Vector3(6, 0, -108), Vector3(30, 0, -84)]:
+		MetalProp.create(self, _ground(mp, 0.45))
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

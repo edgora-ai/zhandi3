@@ -528,6 +528,7 @@ handle_crash: Program crashed with signal 11
 - 接入模式：ResourceLoader.exists 探测 glb → 实例化 → find_child AnimationPlayer，缺失一律回退原程序化模型；换色按 Blender 材质名遍历 mesh surface 再 set_surface_override_material（村民 tunic 按 NPC coat 染色）；挂点件（三顶帽子）在 Blender 里 parent 到骨骼（parent_type='BONE'），Godot 侧按款式显隐。
 - 纪律：模型与动画只改生成脚本重跑 Blender，不手改 glb；新增剪辑先在 --xxxtest 调试参数下截图核对姿态再接状态机。
 - 循环地雷：Godot 导入 glTF 动画 loop_mode 默认为 0（不循环），AnimationPlayer 播完停在末帧——村民走一秒路就冻结滑行。所有 glb 角色的 _play 统一把持续状态剪辑设为 LOOP_LINEAR，一次性剪辑（windup/smash/hit/die/buck/dash/attack/death）排除在外。新角色接入时先用 --pilottest 之类打印 loop_mode 自检。
+- wildtest 帧序列里禁止 await：match 按帧号逐个执行，case 内 await 会让函数返回、帧号继续推进，后续 case 的传送/改状态全部插进等待窗口互相污染（曾把 castle_stairs 打成 climbed=-21.81）。跨帧验证必须用“N 帧挂载、N+K 帧测量”的既有模式（horse/jeep/raft 同款），或把速度赋值等可同步读取的量做成单帧断言。
 - 迁移收益：glb 蒙皮网格替换了每个角色几十上百个程序化零件节点，野图节点数从约 7700 降到约 6900、战场图从 5294 降到 4164，动画质量与帧率同时受益。
 
 ## 6. 音频生命周期

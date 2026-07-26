@@ -99,6 +99,8 @@ var _stasis_target: CharacterBody3D = null
 var _stasis_end_ms := 0
 var _stasis_dmg := 0.0
 var _stasis_shell: MeshInstance3D
+var _magnet_prop: MetalProp = null
+var _magnet_beam: MeshInstance3D
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
@@ -233,6 +235,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_raise_ice()
 			KEY_V:
 				_toggle_stasis()
+			KEY_Z:
+				_toggle_magnet()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
@@ -363,6 +367,73 @@ func _release_stasis() -> void:
 	_stasis_dmg = 0.0
 
 
+# 磁力：瞄准 16m 内金属块按 Z 吸附，视线搬运，Z 放下，左键投掷（高速撞敌有伤害）。
+func _toggle_magnet() -> void:
+	if _magnet_prop:
+		_release_magnet(get_aim_dir() * 4.0)
+		return
+	var fwd := get_aim_dir()
+	var best: MetalProp = null
+	var best_dot := 0.80
+	for prop in get_tree().get_nodes_in_group("metal_prop"):
+		var to_p: Vector3 = prop.global_position - camera.global_position
+		if to_p.length() > 16.0:
+			continue
+		var dt := to_p.normalized().dot(fwd)
+		if dt > best_dot:
+			best_dot = dt
+			best = prop as MetalProp
+	if best == null:
+		hud.add_feed("磁力需要瞄准 16m 内的金属块")
+		return
+	_magnet_prop = best
+	hud.add_feed("磁力吸附中：移动视线搬运，Z 放下，左键投掷")
+	_magnet_beam = MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.03
+	cm.bottom_radius = 0.03
+	cm.height = 1.0
+	cm.radial_segments = 6
+	_magnet_beam.mesh = cm
+	var bmat := StandardMaterial3D.new()
+	bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat.albedo_color = Color(0.10, 0.85, 0.80, 0.7)
+	bmat.emission_enabled = true
+	bmat.emission = Color(0.05, 0.90, 0.80)
+	bmat.emission_energy_multiplier = 2.0
+	bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_magnet_beam.material_override = bmat
+	get_tree().current_scene.add_child(_magnet_beam)
+
+
+func _release_magnet(impulse: Vector3) -> void:
+	if _magnet_prop and is_instance_valid(_magnet_prop):
+		_magnet_prop.magnet_release(impulse)
+	_magnet_prop = null
+	if is_instance_valid(_magnet_beam):
+		_magnet_beam.queue_free()
+	_magnet_beam = null
+
+
+func _throw_magnet() -> void:
+	_release_magnet(get_aim_dir() * 14.0 + Vector3(0, 5.0, 0))
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play("hit", -8.0)
+
+
+func _update_magnet_beam() -> void:
+	if _magnet_beam == null or _magnet_prop == null:
+		return
+	var from := camera.global_position - Vector3(0, 0.25, 0) + get_aim_dir() * 0.6
+	var to := _magnet_prop.global_position
+	var d := to - from
+	if d.length_squared() < 0.01:
+		return
+	_magnet_beam.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, d.normalized())), (from + to) * 0.5)
+	_magnet_beam.scale = Vector3(1.0, d.length(), 1.0)
+
+
 func _toggle_prone() -> void:
 	prone = not prone
 	if prone:
@@ -459,6 +530,13 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	# 趴下时相机压低
+	# 磁力持握：金属块软跟随视线前方 5m，超距自动脱手。
+	if _magnet_prop:
+		if not is_instance_valid(_magnet_prop) or _magnet_prop.global_position.distance_to(global_position) > 20.0:
+			_release_magnet(Vector3.ZERO)
+		else:
+			_magnet_prop.magnet_hold(camera.global_position + get_aim_dir() * 5.0)
+			_update_magnet_beam()
 	camera.position.y = lerpf(camera.position.y, 0.55 if prone else 1.58, delta * 8.0)
 	var f := float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
 	if debug_move != 0.0:
@@ -583,6 +661,10 @@ func _physics_process(delta: float) -> void:
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			if _magnet_prop:
+				_throw_magnet()
+			elif false:
+				pass
 			if weapon.weapon_id == "bow":
 				_bow_draw = minf(1.0, _bow_draw + delta * 1.3)
 				weapon.set_ads(_bow_draw > 0.15)

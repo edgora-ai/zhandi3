@@ -150,11 +150,18 @@ scripts/
   game/dive_ring.gd      # 呀哈哈跳水环：游进睡莲环心得种子
   game/fish_spot.gd      # 河鱼点：水中鱼影，E 抓鱼
   game/bed_spot.gd       # 床铺：睡到天亮，生命精力全满
+  game/korok.gd          # 呀哈哈小精灵：谜题解开时蹦出挥手、缩小消失
+  game/remote_bomb.gd    # 遥控炸弹：X 放置 B 引爆，范围伤害与炸弹跳
+  game/ice_pillar.gd     # 制冰冰柱：T 升起，水面站立渡河
+  game/metal_prop.gd     # 磁力金属块：Z 吸附搬运投掷，可压神庙压力板
+  game/chuchu.gd         # 丘丘果冻：蹦跳撞击，大只死亡分裂小只
+  game/keese.gd          # 夜行蝙蝠：夜间盘旋俯冲，白天蛰伏
+  game/stal.gd           # 骷髅夜袭：夜间破土，击碎后蹦跳头颅
   fx/fx.gd               # 曳光/命中特效
   fx/damage_number.gd    # 飘字伤害反馈：命中弹数字、上浮淡出
   fx/sfx_bank.gd         # 音效池（2D/3D）
 assets/
-  models/              # Blender 无头生成的 glb：村民/莫布林/蜥蜴/马/猪狼熊/龙/守卫/士兵（可再生产物）
+  models/              # Blender 无头生成的 glb：村民/莫布林/蜥蜴/马/猪狼熊/龙/守卫/士兵/蝙蝠/骷髅（可再生产物）
   shaders/ground.gdshader # 多尺度地表斑驳 + 岩层 + 积雪/湿润
   shaders/grass.gdshader # 草叶广告牌化 + 行进风场阵风 + 三段色带
   shaders/water.gdshader # 深度水色 + 岸线环 + 雨滴扩散 + 冬季冰裂

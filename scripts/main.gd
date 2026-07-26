@@ -222,6 +222,12 @@ func _ready() -> void:
 			if anim and not anim.get_animation_list().is_empty():
 				anim.play(anim.get_animation_list()[0])
 			print("[pilot] anims=%s" % str(anim.get_animation_list() if anim else []))
+	if args.has("--moblintest") and _map_id == "wild":
+		var mb := get_tree().get_first_node_in_group("wild_enemy") as WildMoblin
+		if mb:
+			player.global_position = mb.global_position + Vector3(0, 0, 4.0)
+			mb._windup = 0.0
+			mb._play(&"windup")
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
 		_ft_bot = Bot.new()
 		add_child(_ft_bot)

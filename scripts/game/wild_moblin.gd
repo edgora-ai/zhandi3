@@ -22,6 +22,10 @@ var _club_arm: Node3D
 var _club: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _flash := 0.0
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
+var _anim_hold := 0.0
 
 const WINDUP_TIME := 0.9
 const SMASH_RANGE := 2.8
@@ -47,7 +51,34 @@ func _ready() -> void:
 	col.shape = shape
 	col.position.y = 1.1
 	add_child(col)
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
+
+
+# glb 视觉：Blender 管线生成的蒙皮模型与战斗动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/moblin.glb"):
+		return false
+	var scene_res := load("res://assets/models/moblin.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_model() -> void:
@@ -173,6 +204,8 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		return
 	hp -= amount
 	_flash = 0.14
+	_play(&"hit")
+	_anim_hold = 0.30
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.8, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
 	if hp <= 0.0:
 		alive = false
@@ -200,21 +233,26 @@ func _physics_process(delta: float) -> void:
 	# 前摇：举棒定住、眼放红光，给玩家 0.9s 反应窗口。
 	if _windup >= 0.0:
 		_windup += delta
-		_club_arm.rotation.x = lerpf(_club_arm.rotation.x, -2.4, delta * 6.0)
-		_eye_l.scale = Vector3.ONE * (1.0 + sin(_anim * 20.0) * 0.3)
-		_eye_r.scale = _eye_l.scale
+		if _club_arm:
+			_club_arm.rotation.x = lerpf(_club_arm.rotation.x, -2.4, delta * 6.0)
+		if _eye_l:
+			_eye_l.scale = Vector3.ONE * (1.0 + sin(_anim * 20.0) * 0.3)
+			_eye_r.scale = _eye_l.scale
 		if _windup >= WINDUP_TIME:
 			_smash()
 			_windup = -1.0
 			_recover = 1.2
 	else:
-		_club_arm.rotation.x = lerpf(_club_arm.rotation.x, 0.2, delta * 4.0)
-		_eye_l.scale = Vector3.ONE
-		_eye_r.scale = Vector3.ONE
+		if _club_arm:
+			_club_arm.rotation.x = lerpf(_club_arm.rotation.x, 0.2, delta * 4.0)
+		if _eye_l:
+			_eye_l.scale = Vector3.ONE
+			_eye_r.scale = Vector3.ONE
 		_recover = maxf(0.0, _recover - delta)
 		if dist < SIGHT and player.alive:
 			if dist < SMASH_RANGE * 0.75 and _recover <= 0.0:
 				_windup = 0.0
+				_play(&"windup")
 			else:
 				var dir := to_player.normalized()
 				velocity.x = dir.x * 3.4
@@ -244,10 +282,21 @@ func _physics_process(delta: float) -> void:
 	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 3.4, 0.0, 1.0) * 0.4
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(_anim * 5.5 + i * PI) * stride
+	_anim_hold = maxf(0.0, _anim_hold - delta)
+	if _ap and _anim_hold <= 0.0:
+		if _windup >= 0.0:
+			pass
+		elif Vector2(velocity.x, velocity.z).length() > 0.3:
+			_play(&"walk")
+		else:
+			_play(&"idle")
 
 
 func _smash() -> void:
-	_club_arm.rotation.x = 0.8
+	if _club_arm:
+		_club_arm.rotation.x = 0.8
+	_play(&"smash")
+	_anim_hold = 0.45
 	# 猛击：范围内伤害+击退，可被格挡/闪避反制。
 	if player.global_position.distance_to(global_position) < SMASH_RANGE and player.alive:
 		player.take_damage(SMASH_DAMAGE, self)

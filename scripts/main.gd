@@ -714,6 +714,13 @@ func _process(delta: float) -> void:
 				hud.set_capture(ts[0], ts[1])
 				shown = true
 				break
+		# 巨龙血条：接近火山巨龙时显示（试炼条优先）。
+		if not shown:
+			for enemy in get_tree().get_nodes_in_group("wild_enemy"):
+				if enemy is WildDragon and enemy.alive and enemy.global_position.distance_to(player.global_position) < 110.0:
+					hud.set_capture("火山巨龙", enemy.hp / 260.0)
+					shown = true
+					break
 	for cp in capture_points:
 		var st: Array = cp.hud_status(player)
 		if st[1] >= 0.0:
@@ -1088,9 +1095,43 @@ func _update_wild_test() -> void:
 			rock.configure("rock", player.global_transform.basis.z * 12.0, 12.0, null)
 			rock.global_position = player.global_position - player.global_transform.basis.z * 3.0 + Vector3(0, 1.0, 0)
 			_wild_test_parry_hp = player.hp
+			# 守卫光束弹反回归：完美格挡窗口内受光束，守卫自毁。
+			player.debug_block = true
+			player._block_start = Time.get_ticks_msec() / 1000.0
+			player.alive = true
+			player.hp = player.max_hp
+			player.blocking = true
+			var g2: Guardian = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is Guardian:
+					g2 = e as Guardian
+					break
+			if g2:
+				player.take_damage(30.0, g2)
+				print("[wildtest] beam_parry guardian_alive=%s" % str(g2.alive))
+			# 木筏回归：上筏前行一段。
+			var raft: Raft = null
+			for v in get_tree().get_nodes_in_group("vehicle"):
+				if v is Raft:
+					raft = v as Raft
+					break
+			if raft:
+				player.global_position = raft.global_position + Vector3(1.0, 0, 0)
+				raft.enter(player)
+				raft.debug_forward = 1.0
+				_wild_test_surf_start = raft.global_position
 			_wild_test_frame = 757
 		790:
 			print("[wildtest] parry hp_delta=%.0f count=%d" % [_wild_test_parry_hp - player.hp, player.parry_count])
+			var raft: Raft = null
+			for v in get_tree().get_nodes_in_group("vehicle"):
+				if v is Raft:
+					raft = v as Raft
+					break
+			if raft:
+				print("[wildtest] raft moved=%.2f" % [_wild_test_surf_start.distance_to(raft.global_position)])
+				raft.debug_forward = 0.0
+				raft.exit()
 			if _wild_test_moblin:
 				print("[wildtest] bow_hit dmg=%.0f" % [_wild_test_hp - _wild_test_moblin.hp])
 			print("[wildtest] end nodes=%d" % Performance.get_monitor(Performance.OBJECT_NODE_COUNT))

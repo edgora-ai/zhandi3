@@ -69,6 +69,12 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		add_child(moblin)
 		moblin.global_position = _ground(mp, 0.05)
 	_spawn_npcs()
+	# 桥西码头木筏。
+	var raft := Raft.new()
+	add_child(raft)
+	var raft_z := 18.0
+	var raft_x := sin(raft_z * 0.021) * 24.0 - 8.0 + sin(raft_z * 0.049) * 7.0 - 12.0
+	raft.global_position = Vector3(raft_x, Terrain.WATER_LEVEL + 0.05, raft_z + 2.0)
 	# 两只蜥蜴战士：草原与河滩的高速袭扰者。
 	for lp in [Vector3(-30, 0, 75), Vector3(55, 0, -20)]:
 		var liz := WildLizalfos.new()

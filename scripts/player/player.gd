@@ -634,6 +634,14 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		to_attacker.y = 0.0
 		if to_attacker.length_squared() > 0.01 and to_attacker.normalized().dot(-global_transform.basis.z) > 0.25:
 			if Time.get_ticks_msec() / 1000.0 - _block_start < 0.18:
+				# 完美格挡守卫光束：直接弹回，守卫自毁。
+				if from is Guardian:
+					from.take_damage(150.0, self, "body")
+					parry_count += 1
+					if hud:
+						hud.add_feed("弹反光束！")
+					damaged.emit(0.0)
+					return
 				if from.has_method("take_damage"):
 					from.take_damage(12.0, self, "body")
 				if hud:

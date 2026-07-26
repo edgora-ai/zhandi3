@@ -228,6 +228,11 @@ func _ready() -> void:
 			player.global_position = mb.global_position + Vector3(0, 0, 4.0)
 			mb._windup = 0.0
 			mb._play(&"windup")
+	if args.has("--jeeptest"):
+		var rt_jeep := get_tree().get_first_node_in_group("vehicle") as Vehicle
+		if rt_jeep:
+			player.global_position = rt_jeep.global_position + Vector3(1.2, 0, 0)
+			rt_jeep.enter(player)
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
 		_ft_bot = Bot.new()
 		add_child(_ft_bot)

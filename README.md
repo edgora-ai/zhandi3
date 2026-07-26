@@ -154,7 +154,7 @@ scripts/
   fx/damage_number.gd    # 飘字伤害反馈：命中弹数字、上浮淡出
   fx/sfx_bank.gd         # 音效池（2D/3D）
 assets/
-  models/              # Blender 无头生成的 glb 角色/动画（可再生产物，源在 tools/blender_gen）
+  models/              # Blender 无头生成的 glb：村民/莫布林/蜥蜴/马/猪狼熊/龙/守卫/士兵（可再生产物）
   shaders/ground.gdshader # 多尺度地表斑驳 + 岩层 + 积雪/湿润
   shaders/grass.gdshader # 草叶广告牌化 + 行进风场阵风 + 三段色带
   shaders/water.gdshader # 深度水色 + 岸线环 + 雨滴扩散 + 冬季冰裂

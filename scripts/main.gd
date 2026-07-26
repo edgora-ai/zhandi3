@@ -674,6 +674,8 @@ func _process(delta: float) -> void:
 		hud.set_interact("按 F %s" % ride_text)
 	elif player.nearby_npc:
 		hud.set_interact("按 E 与%s交谈" % str(player.nearby_npc.get("npc_name")))
+	elif player.nearby_fish:
+		hud.set_interact("按 E 抓鱼")
 	else:
 		hud.set_interact("")
 	hud.set_weapon_name(player.weapon.label())
@@ -1005,6 +1007,22 @@ func _update_wild_test() -> void:
 			player.blocking = false
 			var surf_d := player.global_position - _wild_test_surf_start
 			print("[wildtest] shield_surf moved=%.2f speed=%.1f" % [Vector2(surf_d.x, surf_d.z).length(), Vector2(player.velocity.x, player.velocity.z).length()])
+			# 林克时间回归：闪避窗口内被击中触发慢动作且无伤。
+			player._dodge_iframe_end = Time.get_ticks_msec() / 1000.0 + 0.3
+			var hp_f := player.hp
+			player.take_damage(20.0, get_tree().get_first_node_in_group("wild_enemy"))
+			print("[wildtest] flurry active=%s dmg=%.0f timescale=%.2f" % [str(player.flurry), hp_f - player.hp, Engine.time_scale])
+			player._end_flurry()
+			# 抓鱼与石头阵回归。
+			var fish := get_tree().get_first_node_in_group("fish") as FishSpot
+			var meat_f := int(player.backpack_items["meat"])
+			if fish:
+				fish.catch(player)
+			var circle := get_tree().get_first_node_in_group("rock_circle") as RockCircle
+			if circle:
+				player.global_position = circle.global_position + circle._gap_pos
+				circle._process(1.1)
+			print("[wildtest] fish meat=%d circle=%s" % [int(player.backpack_items["meat"]) - meat_f, str(circle.completed if circle else false)])
 			_wild_test_frame = -1
 
 

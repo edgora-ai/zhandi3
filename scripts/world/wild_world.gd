@@ -64,6 +64,7 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		guardian.global_position = _ground(gp, 0.05)
 	_spawn_npcs()
 	_spawn_wild_loot()
+	_spawn_fish_and_circles()
 	_spawn_korok_props()
 	_build_monster_camp(Vector3(60, 0, 86), 0.6)
 	_build_monster_camp(Vector3(-128, 0, -58), -0.9)
@@ -919,6 +920,23 @@ func respawn_monsters() -> int:
 			creature.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	return respawned
+
+
+# 河鱼与石头阵呀哈哈。
+func _spawn_fish_and_circles() -> void:
+	for i in range(6):
+		var z := -120.0 + i * 48.0
+		var x := sin(z * 0.021) * 24.0 - 8.0 + sin(z * 0.049) * 7.0
+		var fish := FishSpot.new()
+		fish.player = player
+		add_child(fish)
+		fish.global_position = Vector3(x, Terrain.WATER_LEVEL - 0.5, z)
+	var circle_spots := [Vector3(-60, 0, 55), Vector3(95, 0, 15), Vector3(-20, 0, -88), Vector3(-135, 0, 35)]
+	for i in range(circle_spots.size()):
+		var circle := RockCircle.new()
+		add_child(circle)
+		circle.configure(player, float(i) * 1.7 + 0.4)
+		circle.global_position = _ground(circle_spots[i], 0.02)
 
 
 # 呀哈哈式小谜题：三座风车 + 四块可疑怪石，打中即出种子。

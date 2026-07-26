@@ -31,6 +31,10 @@ var max_stamina := 100.0
 var blocking := false
 var _block_start := -1.0
 var debug_block := false   # 自动化测试用：强制举盾
+var dodge_cd := 0.0
+var flurry := false
+var _dodge_iframe_end := -1.0
+var _flurry_end_ms := 0
 var _surf_notified := false
 var _shield: MeshInstance3D
 var _shield_root: Node3D
@@ -55,6 +59,7 @@ var reserves := {}
 var nearby_loot: Loot = null
 var nearby_vehicle: Node = null
 var nearby_npc: Node = null
+var nearby_fish: Node = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
 var debug_glide := false     # 自动化测试用：强制展开斗篷
@@ -199,6 +204,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toggle_vehicle()
 			KEY_H:
 				_whistle_horse()
+			KEY_Q:
+				_dodge()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
@@ -250,6 +257,38 @@ func _whistle_horse() -> void:
 			hud.add_feed("你吹了声口哨，%s 正在跑来" % "马儿")
 	elif hud:
 		hud.add_feed("你吹了声口哨，附近没有马回应")
+
+
+func _dodge() -> void:
+	if dodge_cd > 0.0 or not is_on_floor() or vehicle or backpack_open:
+		return
+	dodge_cd = 0.8
+	# 闪身：沿输入方向（无输入则向后）短促位移，0.3s 无敌帧。
+	var f := float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
+	var r := float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
+	var dir := global_transform.basis * Vector3(r, 0, -f)
+	if dir.length_squared() < 0.01:
+		dir = global_transform.basis.z
+	dir.y = 0.0
+	dir = dir.normalized()
+	velocity.x = dir.x * 11.0
+	velocity.z = dir.z * 11.0
+	_dodge_iframe_end = Time.get_ticks_msec() / 1000.0 + 0.30
+
+
+func _start_flurry() -> void:
+	flurry = true
+	Engine.time_scale = 0.22
+	_flurry_end_ms = Time.get_ticks_msec() + 1600
+	if hud:
+		hud.add_feed("完美闪避！林克时间")
+
+
+func _end_flurry() -> void:
+	if not flurry:
+		return
+	flurry = false
+	Engine.time_scale = 1.0
 
 
 func _physics_process(delta: float) -> void:
@@ -415,6 +454,9 @@ func _physics_process(delta: float) -> void:
 	_scan_loot()
 	_melee_cd = maxf(0.0, _melee_cd - delta)
 	_update_sword(delta)
+	dodge_cd = maxf(0.0, dodge_cd - delta)
+	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
+		_end_flurry()
 
 
 func _scan_loot() -> void:
@@ -446,6 +488,17 @@ func _scan_loot() -> void:
 		if d_n < best_n:
 			best_n = d_n
 			nearby_npc = n
+	nearby_fish = null
+	if is_swimming:
+		var best_f := 2.6
+		for candidate_f in get_tree().get_nodes_in_group("fish"):
+			var fs: Node = candidate_f
+			if not fs.available:
+				continue
+			var d_f := global_position.distance_to(fs.global_position)
+			if d_f < best_f:
+				best_f = d_f
+				nearby_fish = fs
 
 
 func _try_pickup() -> void:
@@ -453,6 +506,8 @@ func _try_pickup() -> void:
 		nearby_loot.apply_to(self)
 	elif nearby_npc:
 		nearby_npc.talk()
+	elif nearby_fish:
+		nearby_fish.catch(self)
 
 
 func give_weapon(id: String) -> void:
@@ -535,6 +590,11 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 	if not alive:
 		return
 	var dmg := amount
+	# 完美闪避：闪身窗口内被击中触发林克时间——无伤且时间变慢。
+	if Time.get_ticks_msec() / 1000.0 < _dodge_iframe_end:
+		_start_flurry()
+		damaged.emit(0.0)
+		return
 	# 盾牌格挡：面向攻击者时伤害减到 1/4 并耗精力；举盾瞬间（0.18s 内）为完美格挡，无伤反震。
 	if blocking and from != null and from is Node3D:
 		var to_attacker: Vector3 = (from as Node3D).global_position - global_position
@@ -566,6 +626,7 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 func die(from: Variant = null) -> void:
 	if not alive:
 		return
+	_end_flurry()
 	# 小精灵：死亡时自动消耗一只复活（30% 生命），金色爆闪。
 	if fairies > 0:
 		fairies -= 1
@@ -676,7 +737,7 @@ func _melee_swing() -> void:
 	if not result.is_empty():
 		var col: Object = result.collider
 		if col.has_method("take_damage"):
-			col.take_damage(melee_damage, self, "body")
+			col.take_damage(melee_damage * (2.0 if flurry else 1.0), self, "body")
 			hit_something = true
 	# 弧形范围：怪物、动物、AI 战士。
 	for group in ["wild_enemy", "wildlife", "combatant"]:
@@ -689,7 +750,7 @@ func _melee_swing() -> void:
 			if to_t.length() > 2.6 or to_t.normalized().dot(forward) < 0.5:
 				continue
 			if target.has_method("take_damage"):
-				target.take_damage(melee_damage, self, "body")
+				target.take_damage(melee_damage * (2.0 if flurry else 1.0), self, "body")
 				hit_something = true
 	if hit_something:
 		var sfx := get_tree().get_first_node_in_group("sfx_bank")

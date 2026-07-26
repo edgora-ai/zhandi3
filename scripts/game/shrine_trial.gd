@@ -14,15 +14,18 @@ var _window := 0.0
 var _hit_count := 0
 
 
-func setup(p_player: Player) -> void:
+func setup(p_player: Player, torch_mode: bool = false) -> void:
 	player = p_player
-	# 符文环绕神庙入口悬浮，高度错落，需要稍微找角度。
+	# 符文环绕神庙入口悬浮，高度错落，需要稍微找角度；火盆模式改为三座待点燃火盆。
 	var spots := [
 		Vector3(-2.6, 2.2, -4.6), Vector3(2.8, 3.4, -4.0),
 		Vector3(-3.4, 4.6, -1.0), Vector3(3.2, 2.6, 1.6),
 	]
+	if torch_mode:
+		spots = [Vector3(-2.6, 1.0, -4.6), Vector3(2.8, 1.0, -4.0), Vector3(0.0, 1.0, -1.0), Vector3(3.2, 1.0, 1.6)]
 	for spot in spots:
 		var rune := ShrineRune.new()
+		rune.torch_style = torch_mode
 		rune.trial = self
 		add_child(rune)
 		rune.position = spot

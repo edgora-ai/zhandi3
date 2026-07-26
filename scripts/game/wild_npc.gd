@@ -22,6 +22,7 @@ var _head: Node3D
 var patrol: Array[Vector3] = []
 var _patrol_i := 0
 var _cower_t := 0.0
+var _sleep_t := 0.0
 
 
 func setup(p_terrain: Terrain, p_player: Player, p_name: String, p_lines: Array[String], p_coat: Color, p_hat: int) -> void:
@@ -161,6 +162,22 @@ func talk() -> void:
 func _physics_process(delta: float) -> void:
 	_talk_cd = maxf(0.0, _talk_cd - delta)
 	_anim += delta
+	# 夜间作息：入夜后回到落脚点站着打盹，偶尔冒 Zzz。
+	var scene_dn := get_tree().current_scene
+	if scene_dn and scene_dn.get("daynight") != null and scene_dn.daynight.is_night() and patrol.is_empty():
+		velocity.x = 0.0
+		velocity.z = 0.0
+		velocity.y = -4.0
+		move_and_slide()
+		if terrain:
+			global_position.y = terrain.get_height(global_position.x, global_position.z)
+		_visual.rotation.x = lerpf(_visual.rotation.x, 0.16, delta * 2.0)
+		_sleep_t -= delta
+		if _sleep_t <= 0.0:
+			_sleep_t = 6.0
+			DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.1, 0), "Zzz", Color(0.75, 0.85, 1.0))
+		return
+	_visual.rotation.x = lerpf(_visual.rotation.x, 0.0, delta * 2.0)
 	# 受惊：附近开枪或怪物靠近时抱头蹲下，过几秒才恢复。
 	var scared := false
 	if player and player.weapon and Time.get_ticks_msec() - player.weapon.last_shot_msec < 300 and global_position.distance_to(player.global_position) < 10.0:

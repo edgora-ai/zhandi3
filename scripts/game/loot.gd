@@ -80,6 +80,8 @@ func _build_visual() -> void:
 			_build_seed()
 		"orb":
 			_build_orb()
+		"fairy":
+			_build_fairy()
 
 
 func _build_box(size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
@@ -216,6 +218,39 @@ func _build_orb() -> void:
 	_item.add_child(ring)
 
 
+func _build_fairy() -> void:
+	# 小精灵：粉色发光小球 + 四片透明翅翼。
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(1.0, 0.55, 0.75)
+	glow.emission_enabled = true
+	glow.emission = Color(1.0, 0.40, 0.65)
+	glow.emission_energy_multiplier = 2.4
+	var core := MeshInstance3D.new()
+	var core_mesh := SphereMesh.new()
+	core_mesh.radius = 0.14
+	core_mesh.height = 0.28
+	core_mesh.radial_segments = 10
+	core_mesh.rings = 6
+	core.mesh = core_mesh
+	core.material_override = glow
+	_item.add_child(core)
+	var wing_mat := StandardMaterial3D.new()
+	wing_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	wing_mat.albedo_color = Color(1.0, 0.9, 1.0, 0.5)
+	wing_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var wing := MeshInstance3D.new()
+			var wm := BoxMesh.new()
+			wm.size = Vector3(0.16, 0.02, 0.10)
+			wing.mesh = wm
+			wing.material_override = wing_mat
+			wing.position = Vector3(sx * 0.12, 0.06, sz * 0.06)
+			wing.rotation_degrees.z = sx * -25.0
+			_item.add_child(wing)
+
+
 func _process(delta: float) -> void:
 	if consumed:
 		return
@@ -246,6 +281,8 @@ func describe() -> String:
 			return "海拉鲁种子（闪光）"
 		"orb":
 			return "精灵宝珠（生命上限 +10）"
+		"fairy":
+			return "小精灵（死亡时复活一次）"
 	return ""
 
 
@@ -276,6 +313,11 @@ func apply_to(target: CharacterBody3D) -> void:
 		"orb":
 			if target.has_method("collect_orb"):
 				target.collect_orb()
+		"fairy":
+			if target.get("fairies") != null:
+				target.fairies += 1
+				if target.hud:
+					target.hud.add_feed("捉到一只小精灵（共 %d 只）" % int(target.fairies))
 	consumed = true
 	if target is Player:
 		var sfx := target.get_tree().get_first_node_in_group("sfx_bank")

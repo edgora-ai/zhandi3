@@ -67,6 +67,7 @@ var backpack_index := 0
 var backpack_weapons: Array[Dictionary] = []
 var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0, "roast_meat": 0, "roast_mushroom": 0}
 var seed_count := 0
+var fairies := 1
 var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
@@ -522,6 +523,16 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 
 func die(from: Variant = null) -> void:
 	if not alive:
+		return
+	# 小精灵：死亡时自动消耗一只复活（30% 生命），金色爆闪。
+	if fairies > 0:
+		fairies -= 1
+		hp = max_hp * 0.3
+		stamina = max_stamina
+		health_changed.emit(hp, armor)
+		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), "复活!", Color(1.0, 0.85, 0.40))
+		if hud:
+			hud.add_feed("小精灵把你从死亡边缘拉了回来（剩 %d 只）" % fairies)
 		return
 	alive = false
 	hp = 0.0

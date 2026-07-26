@@ -966,6 +966,16 @@ func _update_wild_test() -> void:
 				guardian.take_damage(999.0, player)
 				guardian_dead = not guardian.alive
 			print("[wildtest] weather rain=%.2f guardian dead=%s loot_delta=%d" % [weather.rain_strength, str(guardian_dead), get_tree().get_nodes_in_group("loot").size() - loot_before_g])
+			# 精灵复活回归：死亡消耗一只精灵复活；火盆试炼可完成。
+			player.fairies = 1
+			player.hp = 5.0
+			player.take_damage(999.0, null)
+			print("[wildtest] fairy alive=%s hp=%.0f fairies=%d" % [str(player.alive), player.hp, player.fairies])
+			var torch_trial: ShrineTrial = wild_world.trials[1]
+			player.global_position = torch_trial.global_position + Vector3(0, 0, -8)
+			for rune in torch_trial._runes:
+				rune.take_damage(10.0, player)
+			print("[wildtest] torch_trial completed=%s" % str(torch_trial.completed))
 			print("[wildtest] done nodes=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
 			_wild_test_frame = -1
 

@@ -237,6 +237,8 @@ func _ready() -> void:
 			player.pitch = -0.05
 			player.camera.rotation.x = -0.05
 			player._toggle_magnet()
+	if args.has("--keesetest") and daynight:
+		daynight.t = 0.8
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:
@@ -1132,6 +1134,21 @@ func _update_wild_test() -> void:
 				if e3 is Chuchu and e3.small:
 					e3.take_damage(999.0, player)
 			print("[wildtest] chuchu split %d->%d loot_delta=%d" % [small_before, small_after, get_tree().get_nodes_in_group("loot").size() - loot_before])
+			# 夜蝠回归：夜间强制俯冲应命中玩家，击杀死亡。
+			if daynight:
+				daynight.t = 0.8
+			var kb := Keese.new()
+			kb.setup(terrain, player, player.global_position + Vector3(0, 0.5, 0))
+			add_child(kb)
+			player.alive = true
+			var khp := player.hp
+			kb._dive_dir = Vector3.DOWN
+			kb._dive_t = 1.0
+			# 贴身起跳一次：接触判定（dist<0.9）应在首个物理调用即命中。
+			kb._physics_process(0.1)
+			var dove_hit := player.hp < khp
+			kb.take_damage(999.0, player)
+			print("[wildtest] keese dive_hit=%s dead=%s" % [str(dove_hit), str(not kb.alive)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

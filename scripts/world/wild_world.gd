@@ -81,6 +81,12 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	# 丘丘果冻群：河滩与林缘四只大只（死亡分裂）。
 	for cp in [Vector3(-40, 0, 45), Vector3(15, 0, 70), Vector3(-90, 0, -30), Vector3(60, 0, 40)]:
 		Chuchu.create(self, terrain, player, _ground(cp, 0.05))
+	# 夜行蝙蝠两窝：遗迹与北林（夜间盘旋俯冲，白天蛰伏）。
+	for kp in [Vector3(26, 0, -88), Vector3(-100, 0, -60)]:
+		for i in range(3):
+			var bat := Keese.new()
+			bat.setup(terrain, player, _ground(kp, 6.0) + Vector3(randf_range(-3, 3), randf_range(0, 2), randf_range(-3, 3)))
+			add_child(bat)
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

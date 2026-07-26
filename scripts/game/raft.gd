@@ -10,6 +10,7 @@ var ride_label := "乘木筏"
 var debug_forward := 0.0
 
 var _camera: Camera3D
+var _rider: Node3D
 
 
 func _ready() -> void:
@@ -77,6 +78,90 @@ func _build_model() -> void:
 	blade.position = Vector3(0.9, 0.25, 1.35)
 	blade.rotation_degrees = Vector3(20, 0, -14)
 	add_child(blade)
+	_build_rider()
+
+
+# 骑手：乘筏时显示的冒险者人偶，站在舵桨旁扶桨。
+func _build_rider() -> void:
+	_rider = Node3D.new()
+	_rider.name = "Rider"
+	_rider.visible = false
+	add_child(_rider)
+	var tunic := Toon.make_material(Color(0.16, 0.42, 0.22), true, 0.012)
+	var skin := Toon.make_material(Color(0.90, 0.70, 0.54), true, 0.010)
+	var hair := Toon.make_material(Color(0.55, 0.38, 0.16), true, 0.008)
+	var pants := Toon.make_material(Color(0.32, 0.26, 0.20), true, 0.010)
+	var boots := Toon.make_material(Color(0.22, 0.14, 0.08), true, 0.008)
+	var strap := Toon.make_material(Color(0.30, 0.20, 0.12), true, 0.006)
+	var dark := Toon.make_material(Color(0.12, 0.10, 0.10), false)
+	# 站立双腿与靴。
+	for sx in [-1.0, 1.0]:
+		_caps(_rider, 0.07, 0.52, pants, Vector3(sx * 0.13, 0.70, 0.85), Vector3.ZERO)
+		_box(_rider, Vector3(0.12, 0.10, 0.24), boots, Vector3(sx * 0.13, 0.45, 0.80), Vector3.ZERO)
+	# 躯干、腰带与斜挎肩带。
+	_caps(_rider, 0.21, 0.56, tunic, Vector3(0, 1.26, 0.85), Vector3(4, 0, 0))
+	_box(_rider, Vector3(0.34, 0.09, 0.26), strap, Vector3(0, 1.04, 0.85), Vector3.ZERO)
+	_box(_rider, Vector3(0.07, 0.48, 0.24), strap, Vector3(-0.06, 1.30, 0.85), Vector3(0, 0, 28))
+	# 头、双眼、发与后垂尖顶帽。
+	_sph(_rider, 0.155, skin, Vector3(0, 1.74, 0.83), Vector3(1.0, 1.08, 1.0))
+	for sx in [-1.0, 1.0]:
+		_sph(_rider, 0.026, dark, Vector3(sx * 0.058, 1.75, 0.685), Vector3.ONE)
+	_sph(_rider, 0.16, hair, Vector3(0, 1.80, 0.87), Vector3(1.02, 0.72, 1.02))
+	var cap := MeshInstance3D.new()
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = 0.012
+	cap_mesh.bottom_radius = 0.14
+	cap_mesh.height = 0.32
+	cap_mesh.radial_segments = 7
+	cap.mesh = cap_mesh
+	cap.material_override = tunic
+	cap.position = Vector3(0, 1.94, 0.91)
+	cap.rotation_degrees.x = 25.0
+	_rider.add_child(cap)
+	# 左臂自然下垂，右臂后伸扶舵桨。
+	_caps(_rider, 0.06, 0.50, tunic, Vector3(-0.26, 1.22, 0.85), Vector3(0, 0, -10))
+	_sph(_rider, 0.055, skin, Vector3(-0.30, 0.98, 0.85), Vector3.ONE)
+	_caps(_rider, 0.06, 0.52, tunic, Vector3(0.45, 1.24, 0.97), Vector3(24, 0, -42))
+	_sph(_rider, 0.06, skin, Vector3(0.72, 1.02, 1.12), Vector3.ONE)
+
+
+func _caps(parent: Node3D, radius: float, height: float, mat: Material, pos: Vector3, rot: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.rotation_degrees = rot
+	parent.add_child(mi)
+
+
+func _sph(parent: Node3D, radius: float, mat: Material, pos: Vector3, shape_scale: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	mesh.radial_segments = 9
+	mesh.rings = 5
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.scale = shape_scale
+	parent.add_child(mi)
+
+
+func _box(parent: Node3D, size: Vector3, mat: Material, pos: Vector3, rot: Vector3) -> void:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.rotation_degrees = rot
+	parent.add_child(mi)
 
 
 func enter(p: Player) -> void:
@@ -85,6 +170,7 @@ func enter(p: Player) -> void:
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
+	_rider.visible = true
 	driver.set_deferred("collision_layer", 0)
 	driver.set_deferred("collision_mask", 0)
 	_camera.make_current()
@@ -98,6 +184,7 @@ func exit() -> void:
 	velocity = Vector3.ZERO
 	p.global_position = global_position + global_transform.basis.x * 1.8 + Vector3(0, 0.5, 0)
 	p.visible = true
+	_rider.visible = false
 	p.set_deferred("collision_layer", 2)
 	p.set_deferred("collision_mask", 1 | 4)
 	p.vehicle = null

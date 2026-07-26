@@ -206,6 +206,22 @@ func _ready() -> void:
 		var kpos := player.global_position - player.global_transform.basis.z * 2.5
 		kpos.y = terrain.get_height(kpos.x, kpos.z)
 		Korok.spawn(self, kpos, player.global_position)
+	if args.has("--pilottest") and terrain:
+		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
+		if pilot_scene:
+			var pilot := pilot_scene.instantiate()
+			add_child(pilot)
+			var ppos := player.global_position - player.global_transform.basis.z * 3.0
+			ppos.y = terrain.get_height(ppos.x, ppos.z)
+			pilot.global_position = ppos
+			var look := player.global_position - ppos
+			look.y = 0.0
+			if look.length_squared() > 0.01:
+				pilot.rotation.y = atan2(look.normalized().x, look.normalized().z) + PI
+			var anim := pilot.find_child("AnimationPlayer", true, false) as AnimationPlayer
+			if anim and not anim.get_animation_list().is_empty():
+				anim.play(anim.get_animation_list()[0])
+			print("[pilot] anims=%s" % str(anim.get_animation_list() if anim else []))
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
 		_ft_bot = Bot.new()
 		add_child(_ft_bot)

@@ -1310,7 +1310,7 @@ func _update_wild_test() -> void:
 					npc0._physics_process(0.1)
 				var npc_to_p: Vector3 = (player.global_position - npc0.global_position).normalized()
 				var npc_fwd: Vector3 = -npc0.global_transform.basis.z
-				print("[wildtest] npc_facing dot=%.2f legs=%s" % [npc_fwd.dot(npc_to_p), str(npc0._leg_l != null)])
+				print("[wildtest] npc_facing dot=%.2f legs=%s" % [npc_fwd.dot(npc_to_p), str(npc0._leg_l != null or npc0._glb != null)])
 			# 龙鳞任务回归：交付龙鳞得精力上限。
 			var npc1: WildNPC = null
 			for n in get_tree().get_nodes_in_group("npc"):

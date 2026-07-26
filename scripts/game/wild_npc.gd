@@ -29,6 +29,9 @@ var _patrol_i := 0
 var _cower_t := 0.0
 var _sleep_t := 0.0
 var _gesture_t := 0.0
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
 
 
 func setup(p_terrain: Terrain, p_player: Player, p_name: String, p_lines: Array[String], p_coat: Color, p_hat: int) -> void:
@@ -53,7 +56,49 @@ func _ready() -> void:
 	add_child(col)
 	_home = global_position
 	_target = _home
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
+
+
+# glb 视觉：Blender 管线生成的蒙皮村民与动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/villager.glb"):
+		return false
+	var scene_res := load("res://assets/models/villager.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	# 帽子三选一：0 草帽 / 1 尖帽 / 2 头巾。
+	var hat_names := ["hat_straw", "hat_point", "hat_bandana"]
+	for i in range(hat_names.size()):
+		var hat_node := _glb.find_child(hat_names[i], true, false)
+		if hat_node:
+			hat_node.visible = (i == hat_style)
+	# 上衣按 NPC 配色上色（Blender 材质名 villager_tunic 的面）。
+	for mi in _glb.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		for s in range(mesh_inst.mesh.get_surface_count()):
+			var mat_res := mesh_inst.mesh.surface_get_material(s)
+			if mat_res and mat_res.resource_name == "villager_tunic":
+				mesh_inst.set_surface_override_material(s, Toon.make_material(coat, true, 0.014))
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_model() -> void:
@@ -256,13 +301,16 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		if terrain:
 			global_position.y = terrain.get_height(global_position.x, global_position.z)
-		_visual.rotation.x = lerpf(_visual.rotation.x, 0.16, delta * 2.0)
+		_play(&"sleep")
+		if _visual:
+			_visual.rotation.x = lerpf(_visual.rotation.x, 0.16, delta * 2.0)
 		_sleep_t -= delta
 		if _sleep_t <= 0.0:
 			_sleep_t = 6.0
 			DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.1, 0), "Zzz", Color(0.75, 0.85, 1.0))
 		return
-	_visual.rotation.x = lerpf(_visual.rotation.x, 0.0, delta * 2.0)
+	if _visual:
+		_visual.rotation.x = lerpf(_visual.rotation.x, 0.0, delta * 2.0)
 	# 受惊：附近开枪或怪物靠近时抱头蹲下，过几秒才恢复。
 	var scared := false
 	if player and player.weapon and Time.get_ticks_msec() - player.weapon.last_shot_msec < 300 and global_position.distance_to(player.global_position) < 10.0:
@@ -281,15 +329,18 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		if terrain:
 			global_position.y = terrain.get_height(global_position.x, global_position.z)
-		_visual.scale = _visual.scale.lerp(Vector3.ONE * 0.82, delta * 6.0)
-		_head.rotation.x = lerpf(_head.rotation.x, 0.45, delta * 6.0)
-		_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 2.2, delta * 6.0)
-		_arm_r.rotation.z = lerpf(_arm_r.rotation.z, -2.2, delta * 6.0)
+		_play(&"cower")
+		if _visual:
+			_visual.scale = _visual.scale.lerp(Vector3.ONE * 0.82, delta * 6.0)
+			_head.rotation.x = lerpf(_head.rotation.x, 0.45, delta * 6.0)
+			_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 2.2, delta * 6.0)
+			_arm_r.rotation.z = lerpf(_arm_r.rotation.z, -2.2, delta * 6.0)
 		return
-	_visual.scale = _visual.scale.lerp(Vector3.ONE, delta * 4.0)
-	_head.rotation.x = lerpf(_head.rotation.x, 0.0, delta * 4.0)
-	_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 0.0, delta * 4.0)
-	_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 0.0, delta * 4.0)
+	if _visual:
+		_visual.scale = _visual.scale.lerp(Vector3.ONE, delta * 4.0)
+		_head.rotation.x = lerpf(_head.rotation.x, 0.0, delta * 4.0)
+		_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 0.0, delta * 4.0)
+		_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 0.0, delta * 4.0)
 	var to_player := Vector3.ZERO
 	if player:
 		to_player = player.global_position - global_position
@@ -310,12 +361,14 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		if terrain:
 			global_position.y = terrain.get_height(global_position.x, global_position.z)
-		_visual.position.y = sin(_anim * 1.8) * 0.02
-		var p_swing := sin(_anim * 4.6) * 0.3
-		_arm_l.rotation.x = p_swing
-		_arm_r.rotation.x = -p_swing
-		_leg_l.rotation.x = sin(_anim * 4.6) * 0.5
-		_leg_r.rotation.x = -sin(_anim * 4.6) * 0.5
+		_play(&"walk")
+		if _visual:
+			_visual.position.y = sin(_anim * 1.8) * 0.02
+			var p_swing := sin(_anim * 4.6) * 0.3
+			_arm_l.rotation.x = p_swing
+			_arm_r.rotation.x = -p_swing
+			_leg_l.rotation.x = sin(_anim * 4.6) * 0.5
+			_leg_r.rotation.x = -sin(_anim * 4.6) * 0.5
 		return
 	# 玩家靠近时面向玩家；否则在落脚点 4m 内游走。
 	if to_player.length() < 7.0:
@@ -345,17 +398,27 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if terrain:
 		global_position.y = terrain.get_height(global_position.x, global_position.z)
-	# 呼吸感与四肢摆动。
-	_visual.position.y = sin(_anim * 1.8) * 0.02
+	# glb 路径由骨骼动画驱动：说话/行走/站立分别选剪辑。
 	var moving := Vector2(velocity.x, velocity.z).length() > 0.2
-	var swing := sin(_anim * 3.2) * (0.25 if moving else 0.05)
-	_arm_l.rotation.x = swing
-	_arm_r.rotation.x = -swing
-	var leg_target := sin(_anim * 4.6) * (0.5 if moving else 0.0)
-	_leg_l.rotation.x = lerpf(_leg_l.rotation.x, leg_target, delta * 10.0)
-	_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -leg_target, delta * 10.0)
+	if _ap:
+		if _gesture_t > 0.0:
+			_play(&"talk")
+		elif moving:
+			_play(&"walk")
+		else:
+			_play(&"idle")
+	# 呼吸感与四肢摆动（程序化回退路径）。
+	if _visual:
+		_visual.position.y = sin(_anim * 1.8) * 0.02
+		var swing := sin(_anim * 3.2) * (0.25 if moving else 0.05)
+		_arm_l.rotation.x = swing
+		_arm_r.rotation.x = -swing
+		var leg_target := sin(_anim * 4.6) * (0.5 if moving else 0.0)
+		_leg_l.rotation.x = lerpf(_leg_l.rotation.x, leg_target, delta * 10.0)
+		_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -leg_target, delta * 10.0)
 	# 交谈手势：说话时抬起右手比划、头随语气轻点。
 	if _gesture_t > 0.0:
 		_gesture_t -= delta
-		_arm_r.rotation.x = -1.15 + sin(_anim * 7.0) * 0.18
-		_head.rotation.x = sin(_anim * 3.5) * 0.06
+		if _visual:
+			_arm_r.rotation.x = -1.15 + sin(_anim * 7.0) * 0.18
+			_head.rotation.x = sin(_anim * 3.5) * 0.06

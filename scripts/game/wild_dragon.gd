@@ -34,7 +34,44 @@ func _ready() -> void:
 	col.shape = shape
 	col.rotation_degrees.x = 90.0
 	add_child(col)
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
+
+
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
+var _anim_hold := 0.0
+
+
+# glb 视觉：Blender 管线生成的蒙皮龙与动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/dragon.glb"):
+		return false
+	var scene_res := load("res://assets/models/dragon.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	_play(&"fly")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		# glTF 导入的动画默认不循环（loop_mode=0），持续状态剪辑手动开循环。
+		var anim_res := _ap.get_animation(clip)
+		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"smash", &"hit", &"die", &"buck", &"dash", &"attack"]):
+			anim_res.loop_mode = Animation.LOOP_LINEAR
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_model() -> void:
@@ -141,6 +178,8 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		return
 	hp -= amount
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.5, 0), str(int(amount)), Color(1.0, 0.80, 0.30))
+	_play(&"hit")
+	_anim_hold = 0.3
 	if hp <= 0.0:
 		alive = false
 		if from and from.get("kills") != null:
@@ -174,17 +213,26 @@ func _physics_process(delta: float) -> void:
 	global_position = global_position.lerp(next, minf(1.0, delta * chase))
 	if forward.length_squared() > 0.01:
 		look_at(global_position + forward, Vector3.UP)
-	_wing_left.rotation.z = sin(_time * 2.4) * 0.42 - 0.08
-	_wing_right.rotation.z = -sin(_time * 2.4) * 0.42 + 0.08
+	if _wing_left:
+		_wing_left.rotation.z = sin(_time * 2.4) * 0.42 - 0.08
+		_wing_right.rotation.z = -sin(_time * 2.4) * 0.42 + 0.08
 	for i in range(_tail_segments.size()):
 		_tail_segments[i].rotation.y = sin(_time * 1.8 - i * 0.42) * (0.10 + i * 0.018)
 	if global_position.distance_to(player.global_position) < 145.0 and _fire_cooldown <= 0.0:
 		_breathe_fire()
 		_fire_cooldown = 1.8 if _enraged else 3.4
+	_anim_hold = maxf(0.0, _anim_hold - delta)
+	if _ap and _anim_hold <= 0.0:
+		if forward.y < -0.25:
+			_play(&"dive")
+		else:
+			_play(&"fly")
 
 
 func _breathe_fire() -> void:
 	var mouth := global_position + -global_transform.basis.z * 7.1 + Vector3(0, 1.5, 0)
+	_play(&"fire")
+	_anim_hold = 0.8
 	var target := player.global_position + Vector3(0, 0.8, 0)
 	var count := 8 if _enraged else 5
 	for i in range(count):

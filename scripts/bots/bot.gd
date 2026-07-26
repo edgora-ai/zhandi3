@@ -53,6 +53,11 @@ var _look_phase := 0.0
 var _glance_yaw := 0.0
 
 
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
+
+
 func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3) -> void:
 	display_name = p_name
 	zone = p_zone
@@ -79,13 +84,60 @@ func _ready() -> void:
 	head_col.position.y = 1.56
 	add_child(head_col)
 	_head_index = head_col.get_index()
-	_build_visual()
+	if not _try_glb_visual():
+		_build_visual()
 
 	weapon = Weapon.new()
 	add_child(weapon)
 	weapon.setup(self, false)
 	weapon.set_weapon("")
 	_think = randf() * 0.3
+
+
+# glb 视觉：Blender 管线生成的蒙皮士兵与动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/soldier.glb"):
+		return false
+	var scene_res := load("res://assets/models/soldier.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	# 按阵营调色板给夹克/长裤/装具染色。
+	var palette := [Color(0.55, 0.35, 0.20), Color(0.40, 0.45, 0.30), Color(0.30, 0.35, 0.50), Color(0.50, 0.25, 0.25), Color(0.45, 0.40, 0.25), Color(0.35, 0.45, 0.48)]
+	var jacket: Color = palette[randi_range(0, palette.size() - 1)]
+	var tint := {
+		"soldier_jacket": jacket,
+		"soldier_pants": jacket.darkened(0.35),
+		"soldier_gear": jacket.darkened(0.45),
+	}
+	for mi in _glb.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		for s in range(mesh_inst.mesh.get_surface_count()):
+			var mat_res := mesh_inst.mesh.surface_get_material(s)
+			if mat_res and tint.has(mat_res.resource_name):
+				mesh_inst.set_surface_override_material(s, Toon.make_material(tint[mat_res.resource_name], true, 0.012))
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		# glTF 导入的动画默认不循环（loop_mode=0），持续状态剪辑手动开循环。
+		var anim_res := _ap.get_animation(clip)
+		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"smash", &"hit", &"die", &"buck", &"dash", &"attack", &"death"]):
+			anim_res.loop_mode = Animation.LOOP_LINEAR
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_visual() -> void:
@@ -459,6 +511,17 @@ func _physics_process(delta: float) -> void:
 	_anim_t += delta * (1.1 + h_speed * 2.3)
 	var amp := clampf(h_speed / RUN, 0.0, 1.0)
 	var swing := sin(_anim_t) * 0.62 * amp
+	if _visual == null:
+		# glb 路径由骨骼动画驱动：交战端枪 / 奔跑 / 走步 / 站立。
+		if state == State.FIGHT and aim_target:
+			_play(&"fight")
+		elif h_speed > (WALK + RUN) * 0.5:
+			_play(&"run")
+		elif h_speed > 0.5:
+			_play(&"walk")
+		else:
+			_play(&"idle")
+		return
 	_leg_l.rotation.x = swing
 	_leg_r.rotation.x = -swing
 	# 小腿在后摆→前迈时弯曲；手臂与腿反相，肘部带微弯。
@@ -580,6 +643,7 @@ func die(from: Variant = null) -> void:
 		return
 	alive = false
 	hp = 0.0
+	_play(&"death")
 	if from and from.get("kills") != null:
 		from.kills += 1
 	_corpse_t = 0.0
@@ -602,7 +666,7 @@ func _update_corpse(delta: float) -> void:
 	if _corpse_t < 0.0:
 		return
 	_corpse_t += delta
-	if _corpse_t < 0.4:
+	if _corpse_t < 0.4 and _ap == null:
 		rotation.z = lerp_angle(rotation.z, PI * 0.5, delta * 10.0)
 	elif _corpse_t > 6.0:
 		position.y -= delta * 0.4

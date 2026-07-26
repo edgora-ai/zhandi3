@@ -1,0 +1,171 @@
+class_name WildLizalfos
+extends CharacterBody3D
+## 蜥蜴战士：环绕游走的高速敌人，冷不丁突进扑咬，中距吐舌。
+
+var terrain: Terrain
+var player: Player
+var alive := true
+var hp := 70.0
+var display_name := "蜥蜴战士"
+var damage_mult := 1.0
+var kills := 0
+
+var _home := Vector3.ZERO
+var _think := 0.0
+var _dash_cd := 0.0
+var _dash_t := 0.0
+var _strafe_dir := 1.0
+var _anim := 0.0
+var _legs: Array[Node3D] = []
+var _tail: MeshInstance3D
+var _flash := 0.0
+
+const SIGHT := 30.0
+const DASH_CD := 3.2
+const DASH_TIME := 0.38
+
+
+func setup(p_terrain: Terrain, p_player: Player) -> void:
+	terrain = p_terrain
+	player = p_player
+
+
+func _ready() -> void:
+	add_to_group("wild_enemy")
+	collision_layer = 4
+	collision_mask = 1
+	_home = global_position
+	var col := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.42
+	shape.height = 1.5
+	col.shape = shape
+	col.position.y = 0.7
+	add_child(col)
+	_build_model()
+
+
+func _build_model() -> void:
+	var skin := Toon.make_material(Color(0.35, 0.62, 0.30), true, 0.016)
+	var belly := Toon.make_material(Color(0.82, 0.78, 0.50), true, 0.010)
+	var dark := Toon.make_material(Color(0.10, 0.12, 0.08), true, 0.008)
+	# 前伏的长身体、背鳍、长尾。
+	_sphere(self, 0.48, skin, Vector3(0, 0.72, 0.1), Vector3(0.9, 0.75, 1.5))
+	_sphere(self, 0.34, belly, Vector3(0, 0.62, -0.35), Vector3(0.8, 0.65, 1.1))
+	_sphere(self, 0.30, skin, Vector3(0, 0.92, -0.72), Vector3(0.9, 0.8, 1.15))
+	_sphere(self, 0.10, dark, Vector3(0, 0.86, -1.02), Vector3(1.2, 0.6, 0.9))
+	for sx in [-1.0, 1.0]:
+		_sphere(self, 0.045, dark, Vector3(sx * 0.14, 0.98, -0.90), Vector3.ONE)
+	for i in range(4):
+		var fin := MeshInstance3D.new()
+		var fm := BoxMesh.new()
+		fm.size = Vector3(0.06, 0.30 - i * 0.04, 0.14)
+		fin.mesh = fm
+		fin.material_override = dark
+		fin.position = Vector3(0, 1.06 - i * 0.06, -0.25 + i * 0.28)
+		fin.rotation_degrees.x = -18.0
+		add_child(fin)
+	_tail = _capsule_part(self, 0.12, 1.3, skin, Vector3(0, 0.62, 1.05))
+	_tail.rotation_degrees.x = 70.0
+	for sx in [-0.28, 0.28]:
+		var leg := Node3D.new()
+		leg.position = Vector3(sx, 0.45, 0.15)
+		add_child(leg)
+		_legs.append(leg)
+		_capsule_part(leg, 0.10, 0.6, skin, Vector3(0, -0.25, 0))
+
+
+func _sphere(parent: Node3D, radius: float, mat: Material, pos: Vector3, shape_scale: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	mesh.radial_segments = 9
+	mesh.rings = 5
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.scale = shape_scale
+	parent.add_child(mi)
+	return mi
+
+
+func _capsule_part(parent: Node3D, radius: float, height: float, mat: Material, pos: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
+
+
+func take_damage(amount: float, from: Variant = null, _part_name: String = "body") -> void:
+	if not alive:
+		return
+	hp -= amount
+	_flash = 0.14
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
+	if hp <= 0.0:
+		alive = false
+		if from and from.get("kills") != null:
+			from.kills += 1
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 2, 1)
+		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), "击破!", Color(1.0, 0.55, 0.20))
+		queue_free()
+
+
+func _physics_process(delta: float) -> void:
+	if not alive or player == null or terrain == null:
+		return
+	_anim += delta
+	_dash_cd = maxf(0.0, _dash_cd - delta)
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta)
+		scale = Vector3.ONE * (1.0 + _flash * 1.2)
+	var to_player := player.global_position - global_position
+	to_player.y = 0.0
+	var dist := to_player.length()
+	var dir := to_player.normalized()
+	if dist > SIGHT or not player.alive:
+		velocity.x = 0.0
+		velocity.z = 0.0
+	elif _dash_t > 0.0:
+		# 突进中：高速前扑。
+		_dash_t -= delta
+		velocity.x = dir.x * 11.0
+		velocity.z = dir.z * 11.0
+		if dist < 1.3:
+			player.take_damage(16.0, self)
+			_dash_t = 0.0
+	else:
+		# 环绕游走，冷却好了就突进。
+		var tangent := dir.cross(Vector3.UP).normalized() * _strafe_dir
+		_think -= delta
+		if _think <= 0.0:
+			_think = randf_range(1.0, 2.2)
+			if randf() < 0.3:
+				_strafe_dir = -_strafe_dir
+		var want := tangent * 5.5
+		if dist > 12.0:
+			want = dir * 7.5
+		elif dist < 6.0:
+			want = tangent * 5.5 - dir * 2.0
+		velocity.x = want.x
+		velocity.z = want.z
+		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z) + PI, delta * 8.0)
+		if _dash_cd <= 0.0 and dist < 9.0:
+			_dash_t = DASH_TIME
+			_dash_cd = DASH_CD
+	velocity.y = -4.0
+	move_and_slide()
+	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
+	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 8.0, 0.0, 1.0) * 0.7
+	for i in range(_legs.size()):
+		_legs[i].rotation.x = sin(_anim * 11.0 + i * PI) * stride
+	if _tail:
+		_tail.rotation.y = sin(_anim * 4.0) * 0.4

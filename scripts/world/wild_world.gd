@@ -69,8 +69,15 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		add_child(moblin)
 		moblin.global_position = _ground(mp, 0.05)
 	_spawn_npcs()
+	# 两只蜥蜴战士：草原与河滩的高速袭扰者。
+	for lp in [Vector3(-30, 0, 75), Vector3(55, 0, -20)]:
+		var liz := WildLizalfos.new()
+		liz.setup(terrain, player)
+		add_child(liz)
+		liz.global_position = _ground(lp, 0.05)
 	_spawn_wild_loot()
 	_spawn_fish_and_circles()
+	_build_home(_ground(Vector3(-122, 0, 98)))
 	_spawn_korok_props()
 	_build_monster_camp(Vector3(60, 0, 86), 0.6)
 	_build_monster_camp(Vector3(-128, 0, -58), -0.9)
@@ -943,6 +950,43 @@ func _spawn_fish_and_circles() -> void:
 		add_child(circle)
 		circle.configure(player, float(i) * 1.7 + 0.4)
 		circle.global_position = _ground(circle_spots[i], 0.02)
+
+
+# 林克之家：高原上的小屋与床铺，睡到天亮回满状态。
+func _build_home(world_pos: Vector3) -> void:
+	var home := Node3D.new()
+	home.name = "LinksHouse"
+	home.position = world_pos
+	home.rotation.y = 0.5
+	add_child(home)
+	var body := _body(home)
+	# 石基、三面墙与正面开口。
+	_part(Vector3(7.0, 0.4, 6.0), _stone_dark, Vector3(0, 0.2, 0), home)
+	_box_collision(body, Vector3(7.0, 0.4, 6.0), Vector3(0, 0.2, 0))
+	_part(Vector3(6.6, 2.6, 0.35), _plaster, Vector3(0, 1.5, 2.85), home)
+	_part(Vector3(0.35, 2.6, 5.6), _plaster, Vector3(-3.15, 1.5, 0), home)
+	_part(Vector3(0.35, 2.6, 5.6), _plaster, Vector3(3.15, 1.5, 0), home)
+	_box_collision(body, Vector3(6.6, 2.6, 0.35), Vector3(0, 1.5, 2.85))
+	_box_collision(body, Vector3(0.35, 2.6, 5.6), Vector3(-3.15, 1.5, 0))
+	_box_collision(body, Vector3(0.35, 2.6, 5.6), Vector3(3.15, 1.5, 0))
+	# 人字屋顶、屋脊与烟囱。
+	for sx in [-1.0, 1.0]:
+		_part(Vector3(4.0, 0.26, 6.6), _roof, Vector3(sx * 1.75, 3.55, 0), home, Vector3(0, 0, sx * 26.0))
+	_part(Vector3(0.4, 0.4, 6.8), _wood_dark, Vector3(0, 4.35, 0), home)
+	_part(Vector3(0.7, 1.8, 0.7), _stone_dark, Vector3(2.2, 4.2, 1.8), home)
+	# 床铺、木桌、灯笼与小菜圃。
+	_part(Vector3(2.2, 0.4, 1.2), _wood, Vector3(-1.9, 0.6, 1.9), home)
+	_part(Vector3(2.0, 0.18, 1.0), _cloth, Vector3(-1.9, 0.88, 1.9), home)
+	_part(Vector3(0.5, 0.22, 0.9), Toon.make_material(Color(0.95, 0.92, 0.82), true, 0.008), Vector3(-2.65, 0.92, 1.9), home)
+	var bed := BedSpot.new()
+	bed.add_to_group("bed")
+	add_child(bed)
+	bed.global_position = home.transform * Vector3(-1.9, 0.9, 1.9)
+	_part(Vector3(1.4, 0.8, 0.9), _wood_dark, Vector3(1.8, 0.6, 2.2), home)
+	var lantern := _sphere(0.20, _ancient, Vector3(0, 2.2, 1.2), home)
+	lantern.scale = Vector3(0.7, 1.2, 0.7)
+	for i in range(4):
+		_part(Vector3(0.3, 0.25, 0.3), Toon.make_material(Color(0.35, 0.60, 0.20), true, 0.006), Vector3(-3.9 + float(i % 2) * 0.5, 0.15, -1.5 + float(i / 2) * 0.5), home)
 
 
 # 呀哈哈式小谜题：三座风车 + 四块可疑怪石，打中即出种子。

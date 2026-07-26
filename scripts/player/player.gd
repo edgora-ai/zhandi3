@@ -62,6 +62,7 @@ var nearby_loot: Loot = null
 var nearby_vehicle: Node = null
 var nearby_npc: Node = null
 var nearby_fish: Node = null
+var nearby_bed: Node = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
 var debug_glide := false     # 自动化测试用：强制展开斗篷
@@ -517,6 +518,14 @@ func _scan_loot() -> void:
 			if d_f < best_f:
 				best_f = d_f
 				nearby_fish = fs
+	nearby_bed = null
+	var best_b := 2.6
+	for candidate_b in get_tree().get_nodes_in_group("bed"):
+		var b: Node = candidate_b
+		var d_b := global_position.distance_to(b.global_position)
+		if d_b < best_b:
+			best_b = d_b
+			nearby_bed = b
 
 
 func _try_pickup() -> void:
@@ -526,6 +535,8 @@ func _try_pickup() -> void:
 		nearby_npc.talk()
 	elif nearby_fish:
 		nearby_fish.catch(self)
+	elif nearby_bed:
+		nearby_bed.use(self)
 
 
 func give_weapon(id: String) -> void:

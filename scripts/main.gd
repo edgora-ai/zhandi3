@@ -678,6 +678,8 @@ func _process(delta: float) -> void:
 		hud.set_interact("按 E 与%s交谈" % str(player.nearby_npc.get("npc_name")))
 	elif player.nearby_fish:
 		hud.set_interact("按 E 抓鱼")
+	elif player.nearby_bed:
+		hud.set_interact("按 E 睡到天亮")
 	else:
 		hud.set_interact("")
 	hud.set_weapon_name(player.weapon.label())
@@ -1046,6 +1048,16 @@ func _update_wild_test() -> void:
 			player.backpack_index = player.backpack_weapons.size() + 1
 			player._use_backpack_selection()
 			print("[wildtest] skewer mult=%.2f t=%.0f" % [player.skewer_mult, player._skewer_t])
+			# 床铺回归：睡觉回满并进入清晨；蜥蜴战士存在。
+			var bed := get_tree().get_first_node_in_group("bed") as BedSpot
+			player.hp = 40.0
+			if bed:
+				bed.use(player)
+			var liz_count := 0
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildLizalfos:
+					liz_count += 1
+			print("[wildtest] bed hp=%.0f phase=%s lizalfos=%d" % [player.hp, daynight.phase_name(), liz_count])
 			# 弓箭回归：满拉弓射出箭矢，稍后检查命中。
 			if _wild_test_moblin:
 				player.weapon.set_weapon("bow")

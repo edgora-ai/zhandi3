@@ -208,6 +208,8 @@ func _ready() -> void:
 		Korok.spawn(self, kpos, player.global_position)
 	if args.has("--melleetest"):
 		player._melee_swing()
+	if args.has("--bombtest"):
+		player._place_bomb()
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:
@@ -1024,6 +1026,21 @@ func _update_wild_test() -> void:
 				var dbg_dot: float = ((m2.global_position + Vector3(0, 0.8, 0)) - player.camera.global_position).normalized().dot(player.get_aim_dir())
 				print("[wildtest] melee monster_hp %.0f->%.0f dot=%.2f dist=%.2f" % [m2_hp, m2.hp, dbg_dot, player.global_position.distance_to(m2.global_position)])
 			# 临时生成吉普，覆盖加速、转弯和制动；测试完成后立即从树中移除。
+			# 遥控炸弹回归：引爆对怪物造成衰减伤害，近距玩家被击退（炸弹跳）。
+			var bm2: WildMonster = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildMonster and e.alive:
+					bm2 = e as WildMonster
+					break
+			if bm2:
+				var bp := bm2.global_position + Vector3(1.5, 0.3, 0)
+				var bomb := RemoteBomb.place(self, bp, Vector3.ZERO)
+				var bm_hp: float = bm2.hp
+				player.alive = true
+				player.global_position = bp + Vector3(2.0, 0, 0)
+				var pv: Vector3 = player.velocity
+				bomb.detonate()
+				print("[wildtest] bomb monster_hp %.0f->%.0f knock=%.1f" % [bm_hp, bm2.hp, (player.velocity - pv).length()])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

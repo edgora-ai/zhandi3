@@ -205,4 +205,11 @@ for i in range(f):
 amb = amb[:-f]
 write_wav("ambience.wav", amb)
 
+# 爆炸：低频轰击 + 爆破噪声 + 碎裂尾音
+boom = sweep(0.55, 95, 34, 0.30, 0.9)
+blast = noise_burst(0.65, 0.16, 1.0, 0.22)
+crackle = [0.0] * int(SR * 0.06) + noise_burst(0.4, 0.045, 0.38)
+expl = mix(mix(boom, blast), crackle)
+write_wav("explosion.wav", expl)
+
 print("done")

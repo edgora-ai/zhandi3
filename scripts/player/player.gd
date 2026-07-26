@@ -92,6 +92,8 @@ var _combo_i := 0
 var _combo_reset_t := 0.0
 var _swing_hit_done := false
 var _hitstop_end_ms := 0
+var _bombs: Array[RemoteBomb] = []
+var _bomb_hint_done := false
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
@@ -218,10 +220,36 @@ func _unhandled_input(event: InputEvent) -> void:
 				_whistle_horse()
 			KEY_Q:
 				_dodge()
+			KEY_X:
+				_place_bomb()
+			KEY_B:
+				_detonate_bombs()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
 				switch_slot(1)
+
+
+# 遥控炸弹：X 放置（至多 2 枚，放第三枚时引爆最旧的一枚），B 全部引爆。
+func _place_bomb() -> void:
+	_bombs = _bombs.filter(func(b: RemoteBomb) -> bool: return is_instance_valid(b))
+	if _bombs.size() >= 2:
+		_bombs[0].detonate()
+		_bombs.remove_at(0)
+	var fwd := get_aim_dir()
+	var pos := camera.global_position + fwd * 1.1 + Vector3(0, -0.2, 0)
+	var b := RemoteBomb.place(get_tree().current_scene, pos, fwd * 3.0 + Vector3(0, 2.0, 0))
+	_bombs.append(b)
+	if not _bomb_hint_done:
+		_bomb_hint_done = true
+		hud.add_feed("遥控炸弹：X 放置（至多 2 枚），B 引爆")
+
+
+func _detonate_bombs() -> void:
+	_bombs = _bombs.filter(func(b: RemoteBomb) -> bool: return is_instance_valid(b))
+	for b in _bombs:
+		b.detonate()
+	_bombs.clear()
 
 
 func _toggle_prone() -> void:

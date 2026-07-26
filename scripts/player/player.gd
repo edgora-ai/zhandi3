@@ -95,6 +95,10 @@ var _hitstop_end_ms := 0
 var _bombs: Array[RemoteBomb] = []
 var _bomb_hint_done := false
 var _pillars: Array[IcePillar] = []
+var _stasis_target: CharacterBody3D = null
+var _stasis_end_ms := 0
+var _stasis_dmg := 0.0
+var _stasis_shell: MeshInstance3D
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
@@ -227,6 +231,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_detonate_bombs()
 			KEY_T:
 				_raise_ice()
+			KEY_V:
+				_toggle_stasis()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
@@ -287,6 +293,74 @@ func _raise_ice() -> void:
 	var sfx := get_tree().get_first_node_in_group("sfx_bank")
 	if sfx:
 		sfx.play_at("freeze", spot, -6.0)
+
+
+# 时停：瞄准 20m 内敌人按 V 冻结 5 秒（金色时停壳），期间近战伤害累积，解除时一半转为冲击伤害并击飞。
+func _toggle_stasis() -> void:
+	if _stasis_target:
+		_release_stasis()
+		return
+	var fwd := get_aim_dir()
+	var best: CharacterBody3D = null
+	var best_dot := 0.82
+	for group in ["wild_enemy", "wildlife", "combatant"]:
+		for target in get_tree().get_nodes_in_group(group):
+			if not (target is CharacterBody3D) or not target.alive:
+				continue
+			var to_t: Vector3 = target.global_position + Vector3(0, 1.0, 0) - camera.global_position
+			if to_t.length() > 20.0:
+				continue
+			var dt := to_t.normalized().dot(fwd)
+			if dt > best_dot:
+				best_dot = dt
+				best = target
+	if best == null:
+		hud.add_feed("时停需要瞄准 20m 内的敌人")
+		return
+	_stasis_target = best
+	_stasis_dmg = 0.0
+	_stasis_end_ms = Time.get_ticks_msec() + 5000
+	best.set_process_mode(Node.PROCESS_MODE_DISABLED)
+	_stasis_shell = MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 1.3
+	sm.height = 2.6
+	sm.radial_segments = 12
+	sm.rings = 7
+	_stasis_shell.mesh = sm
+	var smat := StandardMaterial3D.new()
+	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smat.albedo_color = Color(1.0, 0.85, 0.25, 0.22)
+	smat.emission_enabled = true
+	smat.emission = Color(1.0, 0.80, 0.15)
+	smat.emission_energy_multiplier = 1.2
+	smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_stasis_shell.material_override = smat
+	best.add_child(_stasis_shell)
+	_stasis_shell.position.y = 1.0
+	DamageNumber.spawn_at(get_tree().current_scene, best.global_position + Vector3(0, 2.2, 0), "时停!", Color(1.0, 0.85, 0.30))
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play_at("stasis", best.global_position, -5.0)
+
+
+func _release_stasis() -> void:
+	var t := _stasis_target
+	_stasis_target = null
+	_stasis_end_ms = 0
+	if is_instance_valid(_stasis_shell):
+		_stasis_shell.queue_free()
+	_stasis_shell = null
+	if t == null or not is_instance_valid(t):
+		return
+	t.set_process_mode(Node.PROCESS_MODE_INHERIT)
+	if t.alive and _stasis_dmg > 0.0:
+		var dir := t.global_position - global_position
+		dir.y = 0.0
+		dir = dir.normalized() if dir.length_squared() > 0.01 else Vector3.FORWARD
+		t.velocity += dir * 4.0 + Vector3(0, 3.5, 0)
+		t.take_damage(_stasis_dmg * 0.5, self, "body")
+	_stasis_dmg = 0.0
 
 
 func _toggle_prone() -> void:
@@ -540,6 +614,8 @@ func _physics_process(delta: float) -> void:
 		_hitstop_end_ms = 0
 		if not flurry:
 			Engine.time_scale = 1.0
+	if _stasis_end_ms > 0 and Time.get_ticks_msec() >= _stasis_end_ms:
+		_release_stasis()
 	_update_sword(delta)
 	dodge_cd = maxf(0.0, dodge_cd - delta)
 	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
@@ -944,7 +1020,9 @@ func _apply_melee_hit() -> void:
 		if col.has_method("take_damage"):
 			col.take_damage(melee_damage * mult, self, "body")
 			hit_something = true
-			hit_pos = result.position
+		hit_pos = result.position
+		if col == _stasis_target:
+			_stasis_dmg += melee_damage * mult
 	# 弧形范围：怪物、动物、AI 战士。
 	for group in ["wild_enemy", "wildlife", "combatant"]:
 		for target in get_tree().get_nodes_in_group(group):
@@ -959,6 +1037,8 @@ func _apply_melee_hit() -> void:
 				target.take_damage(melee_damage * mult, self, "body")
 				hit_something = true
 				hit_pos = target.global_position + Vector3(0, 0.8, 0)
+				if target == _stasis_target:
+					_stasis_dmg += melee_damage * mult
 	if hit_something:
 		var sfx := get_tree().get_first_node_in_group("sfx_bank")
 		if sfx:

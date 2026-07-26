@@ -217,4 +217,9 @@ chime = mix(tone(0.5, 880, 0.30, 0.35), tone(0.6, 1320, 0.36, 0.28))
 frost = noise_burst(0.5, 0.22, 0.25, 0.35)
 write_wav("freeze.wav", mix(chime, frost))
 
+# 时停：时间凝结下行滑音 + 金铃
+stasis_s = sweep(0.55, 1200, 180, 0.34, 0.42)
+stasis_b = mix(tone(0.4, 660, 0.28, 0.30), tone(0.5, 990, 0.34, 0.22))
+write_wav("stasis.wav", mix(stasis_s, stasis_b))
+
 print("done")

@@ -1071,6 +1071,26 @@ func _update_wild_test() -> void:
 				player._raise_ice()
 				player._raise_ice()
 				print("[wildtest] cryonis pillars=%d" % player._pillars.size())
+			# 时停回归：冻结莫布林期间位置不变，解除后恢复并结算冲击伤害。
+			var sm2: WildMoblin = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildMoblin and e.alive:
+					sm2 = e as WildMoblin
+					break
+			if sm2:
+				player.global_position = sm2.global_position + Vector3(0, 0, 8.0)
+				var sdir := (sm2.global_position - player.camera.global_position).normalized()
+				player.rotation.y = atan2(sdir.x, sdir.z) + PI
+				player.pitch = 0.0
+				player.camera.rotation.x = 0.0
+				player._toggle_stasis()
+				var spos: Vector3 = sm2.global_position
+				var shp: float = sm2.hp
+				await get_tree().create_timer(0.3).timeout
+				var frozen_moved: float = sm2.global_position.distance_to(spos)
+				player._stasis_dmg = 20.0
+				player._release_stasis()
+				print("[wildtest] stasis moved=%.2f hp %.0f->%.0f" % [frozen_moved, shp, sm2.hp])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

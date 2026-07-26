@@ -91,7 +91,13 @@ func _build_boar() -> void:
 	for i in range(7):
 		var bristle := _part(Vector3(0.07, 0.26, 0.15), mane, Vector3(0, 1.24, -0.35 + i * 0.15), self)
 		bristle.rotation_degrees.x = float(i - 3) * 3.0
-	_add_four_legs(fur, 0.58, 0.36, 0.52)
+	# 眼睛与卷曲小尾：近景才不会读成“无眼兽”。
+	for sx in [-1.0, 1.0]:
+		_sphere(self, 0.05, mane, Vector3(sx * 0.19, 0.86, -1.06), Vector3.ONE)
+	var tail := _capsule(self, 0.05, 0.34, fur, Vector3(0, 0.90, 0.82))
+	tail.rotation_degrees.x = -42.0
+	_sphere(self, 0.07, mane, Vector3(0, 1.04, 0.94), Vector3.ONE)
+	_add_four_legs(fur, mane, 0.58, 0.36, 0.52)
 
 
 func _build_wolf() -> void:
@@ -107,7 +113,7 @@ func _build_wolf() -> void:
 		var ear := _part(Vector3(0.16, 0.42, 0.10), fur, Vector3(sx * 0.22, 1.59, -0.83), self)
 		ear.rotation_degrees.z = sx * -10.0
 		_sphere(self, 0.035, dark, Vector3(sx * 0.12, 1.31, -1.08), Vector3.ONE)
-	_add_four_legs(fur, 0.64, 0.28, 0.58)
+	_add_four_legs(fur, dark, 0.64, 0.28, 0.58)
 	var tail := _capsule(self, 0.13, 1.0, fur, Vector3(0, 0.96, 0.96))
 	tail.rotation_degrees.x = -58.0
 
@@ -123,7 +129,8 @@ func _build_bear() -> void:
 	for sx in [-1.0, 1.0]:
 		_sphere(self, 0.20, fur, Vector3(sx * 0.45, 2.04, -0.67), Vector3.ONE)
 		_sphere(self, 0.045, dark, Vector3(sx * 0.20, 1.73, -1.12), Vector3.ONE)
-	_add_four_legs(fur, 0.78, 0.44, 0.72)
+	_sphere(self, 0.16, fur, Vector3(0, 1.30, 1.22), Vector3.ONE)  # 圆尾
+	_add_four_legs(fur, dark, 0.78, 0.44, 0.72)
 
 
 func _build_bird() -> void:
@@ -147,14 +154,18 @@ func _build_bird() -> void:
 		tail.rotation_degrees.x = -8.0
 
 
-func _add_four_legs(mat: Material, y: float, x: float, z: float) -> void:
+func _add_four_legs(mat: Material, hoof: Material, y: float, x: float, z: float) -> void:
 	for sx in [-x, x]:
 		for sz in [-z, z]:
 			var leg := Node3D.new()
 			leg.position = Vector3(sx, y, sz)
 			add_child(leg)
 			_legs.append(leg)
-			_capsule(leg, 0.105 if species != "bear" else 0.17, 0.62 if species != "bear" else 0.82, mat, Vector3(0, -0.30, 0))
+			var leg_h := 0.62 if species != "bear" else 0.82
+			_capsule(leg, 0.105 if species != "bear" else 0.17, leg_h, mat, Vector3(0, -0.30, 0))
+			# 蹄/掌：腿底深色足块，挂在腿枢轴上跟随摆动。
+			var hoof_size := Vector3(0.17, 0.10, 0.19) if species != "bear" else Vector3(0.26, 0.13, 0.28)
+			_part(hoof_size, hoof, Vector3(0, -0.25 - leg_h * 0.5, -0.03), leg)
 
 
 func _part(size: Vector3, mat: Material, pos: Vector3, parent: Node3D) -> MeshInstance3D:

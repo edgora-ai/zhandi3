@@ -888,6 +888,7 @@ func _update_wild_test() -> void:
 			player.debug_glide = false
 			var horse := get_tree().get_first_node_in_group("vehicle") as Horse
 			if horse:
+				horse.bonded = true
 				player.global_position = horse.global_position + Vector3(1, 0, 0)
 				horse.enter(player)
 				horse.debug_forward = 1.0
@@ -1258,6 +1259,14 @@ func _update_wild_test() -> void:
 				player.give_item("mushroom", 3)
 				npc0.talk()
 			print("[wildtest] quest state=%d armor=%.0f->%.0f" % [quest_states["mushroom3"], armor_before, player.armor])
+			# NPC 面向回归：脸朝 -Z 的模型必须正对玩家（防背身 bug），新模型应带腿枢轴。
+			if npc0:
+				player.global_position = npc0.global_position + Vector3(0, 0, 3.0)
+				for i in range(40):
+					npc0._physics_process(0.1)
+				var npc_to_p: Vector3 = (player.global_position - npc0.global_position).normalized()
+				var npc_fwd: Vector3 = -npc0.global_transform.basis.z
+				print("[wildtest] npc_facing dot=%.2f legs=%s" % [npc_fwd.dot(npc_to_p), str(npc0._leg_l != null)])
 			# 龙鳞任务回归：交付龙鳞得精力上限。
 			var npc1: WildNPC = null
 			for n in get_tree().get_nodes_in_group("npc"):

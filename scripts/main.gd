@@ -11,6 +11,8 @@ var props: Props
 var buildings: Buildings
 var wild_world: WildWorld
 var seasons: SeasonSystem
+var daynight: DayNight
+var weather: Weather
 var player: Player
 var hud: HUD
 var zone: Zone
@@ -36,6 +38,11 @@ var _focus_pause_owned := false
 var _focus_recovery_timer: Timer
 var _focus_recovery_test_frame := -1
 var _focus_recovery_test_pending := false
+var _env: Environment
+var _sky_mat: ProceduralSkyMaterial
+var _sun: DirectionalLight3D
+var _fill: DirectionalLight3D
+var _rim: DirectionalLight3D
 var _season_test_frame := -1
 var _map_id := "battlefield"
 var _map_menu_open := false
@@ -50,6 +57,7 @@ var _wild_test_jeep_start := Vector3.ZERO
 var _wild_test_jeep_yaw := 0.0
 var _wild_test_jeep_peak_speed := 0.0
 var _wild_test_loot_before := 0
+var _wild_test_stamina := 0.0
 var _wild_test_hp := 0.0
 
 
@@ -114,6 +122,24 @@ func _ready() -> void:
 	if season_i >= 0 and season_i + 1 < args.size():
 		initial_season = args[season_i + 1]
 	seasons.setup(terrain, props, buildings, player, initial_season)
+	daynight = DayNight.new()
+	daynight.name = "DayNight"
+	add_child(daynight)
+	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
+	daynight.blood_moon_started.connect(_on_blood_moon)
+	weather = Weather.new()
+	weather.name = "Weather"
+	add_child(weather)
+	weather.setup(terrain, player, _env)
+	if args.has("--rain"):
+		weather.force_rain(true)
+	if args.has("--night"):
+		daynight.t = 0.8
+		daynight._apply()
+	if args.has("--bloodmoon"):
+		daynight._night_index = 2
+		daynight.t = 0.799
+		daynight.advance(0.02)
 	if not args.has("--noworld") and _map_id == "battlefield":
 		_spawn_bots(rng)
 		_spawn_capture_points(rng)
@@ -268,7 +294,7 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	player.weapon.hit_landed.connect(func() -> void: sfx.play("hit", -8.0))
 	player.grenade_thrown.connect(func(left: int) -> void: hud.add_feed("掷出烟雾弹（剩 %d）" % left))
 	hud.set_health(player.hp, player.armor)
-	hud.set_weapon_name("徒手")
+	hud.set_weapon_name("波克剑")
 	hud.set_ammo_text("--")
 	hud.set_alive(total_combatants)
 	hud.set_kills(0)
@@ -413,6 +439,14 @@ func _on_capture_changed(point: CapturePoint, new_owner: Variant) -> void:
 		sfx.play("capture", -3.0)
 
 
+func _on_blood_moon() -> void:
+	hud.add_feed("血月升起……怪物苏醒了")
+	sfx.play("zone_alarm", -2.0)
+	if wild_world:
+		var count := wild_world.respawn_monsters()
+		print("[bloodmoon] respawned=%d" % count)
+
+
 func _recompute_buffs() -> void:
 	for c in get_tree().get_nodes_in_group("combatant"):
 		if c.alive:
@@ -435,6 +469,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_map("battlefield")
 			elif event.physical_keycode == KEY_2:
 				_select_map("wild")
+			get_viewport().set_input_as_handled()
+			return
+		if event.physical_keycode == KEY_T and daynight:
+			daynight.advance(1.0)
+			hud.add_feed("时间流转：%s" % daynight.phase_name())
 			get_viewport().set_input_as_handled()
 			return
 	if match_over and event is InputEventKey and event.pressed and event.physical_keycode == KEY_R:
@@ -621,6 +660,7 @@ func _process(delta: float) -> void:
 
 	if not player.alive:
 		return
+	hud.set_stamina(player.stamina / player.max_stamina)
 	hud.set_spread(6.0 + player.weapon.current_spread() * 9.0)
 	hud.set_crosshair_visible(player.weapon.weapon_id != "")
 	if player.nearby_loot:
@@ -651,7 +691,7 @@ func _process(delta: float) -> void:
 		elif not player.is_on_floor() and player.velocity.y < -0.55:
 			state = " · 按住 Space 展开滑翔伞"
 		hud.set_zone_text(wild_world.get_region_name(player.global_position))
-		hud.set_world_state("海拉鲁阔野%s\nM 地图  ·  B 背包  ·  F 骑乘" % state)
+		hud.set_world_state("海拉鲁阔野 · %s%s\nM 地图  ·  B 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
 	else:
 		hud.set_zone_text(zone.status_text())
 		hud.set_world_state("群岛战场\nM 地图选择")
@@ -659,6 +699,13 @@ func _process(delta: float) -> void:
 			hud.set_danger(true)
 	# 占点提示
 	var shown := false
+	if _map_id == "wild" and wild_world:
+		for trial in wild_world.trials:
+			var ts: Array = trial.hud_status(player.global_position)
+			if ts[1] >= 0.0:
+				hud.set_capture(ts[0], ts[1])
+				shown = true
+				break
 	for cp in capture_points:
 		var st: Array = cp.hud_status(player)
 		if st[1] >= 0.0:
@@ -764,6 +811,19 @@ func _update_wild_test() -> void:
 				bike.debug_forward = 0.0
 				bike.exit()
 			print("[wildtest] tree_wood loot_delta=%d" % [get_tree().get_nodes_in_group("loot").size() - _wild_test_loot_before])
+		431:
+			# 近战回归：空手挥剑应命中 2.6m 内怪物。
+			var m2 := get_tree().get_first_node_in_group("wild_enemy") as WildMonster
+			if m2 and m2.alive:
+				player.global_position = m2.global_position + Vector3(0, 0.1, 2.0)
+				var to_m: Vector3 = m2.global_position - player.global_position
+				player.rotation.y = atan2(to_m.x, to_m.z) + PI
+				player.pitch = 0.0
+				player.camera.rotation.x = 0.0
+				var m2_hp := m2.hp
+				player._melee_swing()
+				var dbg_dot: float = ((m2.global_position + Vector3(0, 0.8, 0)) - player.camera.global_position).normalized().dot(player.get_aim_dir())
+				print("[wildtest] melee monster_hp %.0f->%.0f dot=%.2f dist=%.2f" % [m2_hp, m2.hp, dbg_dot, player.global_position.distance_to(m2.global_position)])
 			# 临时生成吉普，覆盖加速、转弯和制动；测试完成后立即从树中移除。
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
@@ -808,6 +868,7 @@ func _update_wild_test() -> void:
 		680:
 			player.debug_move = 0.0
 			print("[wildtest] tower_climb start_y=%.2f end_y=%.2f climbing=%s rose=%.2f" % [_wild_test_height, player.global_position.y, str(player.is_climbing), player.global_position.y - _wild_test_height])
+			_wild_test_stamina = player.stamina
 			# 自动上台阶回归：走向驿站 0.37m 石基，应直接迈上去。
 			player.global_position = Vector3(-87.0, terrain.get_height(-87.0, 21) + 0.1, 21)
 			player.rotation.y = -PI * 0.5
@@ -825,6 +886,71 @@ func _update_wild_test() -> void:
 				elif item.kind == "ammo":
 					ammo_loot += 1
 			print("[wildtest] wild_loot weapons=%d ammo=%d npcs=%d" % [weapon_loot, ammo_loot, get_tree().get_nodes_in_group("npc").size()])
+			# 烹饪回归：火堆旁使用生兽肉应烤成烤兽肉；种子数量检查。
+			player.give_item("meat", 1)
+			var camp: Vector3 = wild_world._camp_positions[0]
+			player.global_position = camp + Vector3(1.5, 0, 0)
+			player.backpack_index = player.backpack_weapons.size() + 1
+			player._use_backpack_selection()
+			var seed_loot := 0
+			for item in get_tree().get_nodes_in_group("loot"):
+				if item.kind == "seed":
+					seed_loot += 1
+			print("[wildtest] cooking roast_meat=%d seeds=%d" % [int(player.backpack_items["roast_meat"]), seed_loot])
+			# 神庙试炼回归：射中全部符文应完成并产出精灵宝珠，拾取后生命上限 +10。
+			var trial: ShrineTrial = wild_world.trials[0]
+			player.global_position = trial.global_position + Vector3(0, 0, -8)
+			var max_hp_before := player.max_hp
+			for rune in trial._runes:
+				rune.take_damage(10.0, player)
+			var orb: Loot = null
+			for item in get_tree().get_nodes_in_group("loot"):
+				if item.kind == "orb":
+					orb = item
+					break
+			if orb:
+				orb.apply_to(player)
+			print("[wildtest] shrine_trial completed=%s orb=%s max_hp %.0f->%.0f" % [str(trial.completed), str(orb != null), max_hp_before, player.max_hp])
+			# 昼夜回归：推进时间应改变光照与阶段名。
+			var energy_before := _sun.light_energy
+			daynight.advance(13.0)
+			print("[wildtest] daynight phase=%s night=%s sun_energy %.2f->%.2f" % [daynight.phase_name(), str(daynight.is_night()), energy_before, _sun.light_energy])
+			# 血月回归：第三夜入夜触发血月并补齐怪物。
+			daynight._night_index = 2
+			daynight.t = 0.799
+			var enemy_before := get_tree().get_nodes_in_group("wild_enemy").size()
+			daynight.advance(0.05)
+			var enemy_after := get_tree().get_nodes_in_group("wild_enemy").size()
+			print("[wildtest] bloodmoon active=%s enemies %d->%d" % [str(daynight.blood_moon), enemy_before, enemy_after])
+			# 呀哈哈谜题回归：风车命中产出种子。
+			var prop := get_tree().get_first_node_in_group("korok") as KorokProp
+			var seed_before := 0
+			for item in get_tree().get_nodes_in_group("loot"):
+				if item.kind == "seed":
+					seed_before += 1
+			if prop:
+				prop.take_damage(5.0, player)
+			var seed_after := 0
+			for item in get_tree().get_nodes_in_group("loot"):
+				if item.kind == "seed":
+					seed_after += 1
+			print("[wildtest] korok hit=%s seeds %d->%d" % [str(prop != null and prop.consumed), seed_before, seed_after])
+			print("[wildtest] stamina after_climb=%.0f regen_to=%.0f" % [_wild_test_stamina, player.stamina])
+			# 天气回归：强制下雨后雨强上升；守卫可被击杀并掉落补给。
+			weather.force_rain(true)
+			for i in range(60):
+				weather._process(1.0 / 60.0)
+			var guardian: Guardian = null
+			for candidate in get_tree().get_nodes_in_group("wild_enemy"):
+				if candidate is Guardian:
+					guardian = candidate as Guardian
+					break
+			var loot_before_g := get_tree().get_nodes_in_group("loot").size()
+			var guardian_dead := false
+			if guardian:
+				guardian.take_damage(999.0, player)
+				guardian_dead = not guardian.alive
+			print("[wildtest] weather rain=%.2f guardian dead=%s loot_delta=%d" % [weather.rain_strength, str(guardian_dead), get_tree().get_nodes_in_group("loot").size() - loot_before_g])
 			print("[wildtest] done nodes=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
 			_wild_test_frame = -1
 
@@ -842,6 +968,7 @@ func _find_choppable() -> ChoppableTree:
 
 func _setup_environment() -> void:
 	var env := Environment.new()
+	_env = env
 	if OS.get_cmdline_user_args().has("--flatsky"):
 		env.background_mode = Environment.BG_CLEAR_COLOR
 		var we0 := WorldEnvironment.new()
@@ -850,6 +977,7 @@ func _setup_environment() -> void:
 		return
 	var sky := Sky.new()
 	var psm := ProceduralSkyMaterial.new()
+	_sky_mat = psm
 	psm.sky_top_color = Color(0.24, 0.56, 0.95)
 	psm.sky_horizon_color = Color(0.78, 0.89, 0.96)
 	psm.ground_bottom_color = Color(0.32, 0.42, 0.30)
@@ -881,6 +1009,7 @@ func _setup_environment() -> void:
 
 	# 三灯架设（参考 Elemental-Serenity）：暖色主光 + 天蓝补光 + 暖橙轮廓光
 	var sun := DirectionalLight3D.new()
+	_sun = sun
 	sun.name = "Sun"
 	sun.light_color = Color(1.0, 0.957, 0.902)
 	sun.light_energy = 1.15
@@ -891,6 +1020,7 @@ func _setup_environment() -> void:
 	add_child(sun)
 
 	var fill := DirectionalLight3D.new()
+	_fill = fill
 	fill.name = "FillLight"
 	fill.light_color = Color(0.53, 0.81, 0.92)
 	fill.light_energy = 0.42
@@ -900,6 +1030,7 @@ func _setup_environment() -> void:
 	add_child(fill)
 
 	var rim := DirectionalLight3D.new()
+	_rim = rim
 	rim.name = "RimLight"
 	rim.light_color = Color(1.0, 0.84, 0.64)
 	rim.light_energy = 0.35

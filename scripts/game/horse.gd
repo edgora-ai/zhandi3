@@ -36,6 +36,19 @@ var _steer := 0.0
 var _camera_yaw := 0.0
 var _camera_pitch := -0.22
 var _camera_idle := 0.0
+var _head_node: Node3D
+var bonded := false
+var _buck_t := 0.0
+var _graze_t := 0.0
+var _call_target: Player = null
+var _call_t := 0.0
+
+
+func whistle_call(p: Player) -> void:
+	if driver:
+		return
+	_call_target = p
+	_call_t = 25.0
 
 
 func _ready() -> void:
@@ -86,6 +99,7 @@ func _build_model() -> void:
 	head.position = Vector3(0, 3.12, -2.00)
 	head.rotation_degrees.x = -12.0
 	_visual.add_child(head)
+	_head_node = head
 	_wedge(head, 0.21, 0.27, 0.105, 0.16, 1.32, coat_light)
 	# 额前流星、双眼、短耳与鼻孔。
 	_part(Vector3(0.09, 0.30, 0.045), marking, Vector3(0, 0.16, -0.62), head, Vector3(18, 0, 0))
@@ -255,6 +269,16 @@ func _wedge(parent: Node3D, half_w: float, half_h: float, front_w: float, front_
 func enter(p: Player) -> void:
 	if driver:
 		return
+	# 驯服：未亲近的马第一次被骑可能尥蹶子把人甩下来；安抚一次后永久温顺。
+	if not bonded and randf() < 0.45:
+		bonded = true
+		_buck_t = 0.9
+		p.velocity = global_transform.basis.z * 3.0 + Vector3(0, 2.5, 0)
+		var scene := get_tree().current_scene
+		if scene and scene.get("hud") != null:
+			scene.hud.add_feed("马匹受惊把你甩了下来！再靠近试试")
+		return
+	bonded = true
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
@@ -292,6 +316,32 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# 尥蹶子：后仰抖动，期间不能骑。
+	if _buck_t > 0.0:
+		_buck_t -= delta
+		_visual.rotation.x = lerpf(_visual.rotation.x, -0.55 if _buck_t > 0.35 else 0.0, delta * 8.0)
+		_visual.rotation.z = sin(_buck_t * 30.0) * 0.05
+		speed = 0.0
+		velocity = Vector3.ZERO
+		move_and_slide()
+		return
+	# 口哨召唤：无人骑乘时朝玩家小跑过来，靠近后停下。
+	if driver == null and _call_target != null:
+		_call_t -= delta
+		var to_p := _call_target.global_position - global_position
+		to_p.y = 0.0
+		if to_p.length() < 4.0 or _call_t <= 0.0:
+			_call_target = null
+		else:
+			var dir := to_p.normalized()
+			speed = move_toward(speed, 4.5, ACCEL * delta)
+			rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), delta * 4.0)
+			velocity = dir * speed
+			move_and_slide()
+			if terrain:
+				global_position.y = lerpf(global_position.y, terrain.get_height(global_position.x, global_position.z) + 0.06, minf(1.0, delta * 13.0))
+			_animate_gait(delta, clampf(speed / GALLOP_SPEED, 0.0, 1.0))
+			return
 	var input_forward := 0.0
 	var input_side := 0.0
 	var galloping := false
@@ -342,6 +392,14 @@ func _physics_process(delta: float) -> void:
 	var forward := -global_transform.basis.z
 	forward.y = 0.0
 	forward = forward.normalized()
+	# 道路自动跟随：松手骑行时贴近道路中线（旷野之息式的“马会看路”）。
+	if driver and absf(input_forward) <= 0.05 and absf(input_side) <= 0.05 and speed > 2.0:
+		var follow := _nearest_road()
+		if follow["dist"] < 7.0:
+			var road_dir: Vector3 = follow["dir"]
+			if road_dir.dot(forward) < 0.0:
+				road_dir = -road_dir
+			rotation.y = lerp_angle(rotation.y, atan2(-road_dir.x, -road_dir.z), minf(1.0, delta * 1.1))
 	var next := global_position + forward * speed * delta * 1.8
 	if terrain:
 		var next_normal := terrain.get_normal(next.x, next.z, 1.2)
@@ -375,6 +433,23 @@ func _physics_process(delta: float) -> void:
 	_animate_gait(delta, speed_ratio)
 
 
+func _nearest_road() -> Dictionary:
+	var best_d := 9999.0
+	var best_dir := Vector3.ZERO
+	var p := Vector2(global_position.x, global_position.z)
+	for segment in Terrain.WILD_ROADS:
+		var a: Vector2 = segment[0]
+		var b: Vector2 = segment[1]
+		var ab := b - a
+		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+		var d := p.distance_to(a + ab * t)
+		if d < best_d:
+			best_d = d
+			var abn := ab.normalized()
+			best_dir = Vector3(abn.x, 0, abn.y)
+	return {"dir": best_dir, "dist": best_d}
+
+
 func _hit_wall() -> bool:
 	for i in range(get_slide_collision_count()):
 		var collision := get_slide_collision(i)
@@ -397,14 +472,31 @@ func _update_camera(delta: float, speed_ratio: float) -> void:
 
 func _animate_gait(delta: float, speed_ratio: float) -> void:
 	var actual_speed := Vector2(velocity.x, velocity.z).length()
+	# 步态分级：慢步低频小摆 / 快步弹震 / 疾驰大步悬浮，频率随档位跳变。
+	var freq := 5.0
+	var amp_mul := 0.6
+	if speed_ratio > 0.75:
+		freq = 11.0
+		amp_mul = 1.0
+	elif speed_ratio > 0.4:
+		freq = 8.0
+		amp_mul = 0.8
 	if actual_speed > 0.08:
-		_anim_time += delta * lerpf(5.0, 14.5, speed_ratio)
-	var amount := smoothstep(0.02, 0.35, speed_ratio) * lerpf(0.38, 0.82, speed_ratio)
+		_anim_time += delta * freq
+	var amount := smoothstep(0.02, 0.35, speed_ratio) * 0.72 * amp_mul
 	for i in range(_leg_roots.size()):
 		var wave := sin(_anim_time + _leg_phases[i])
 		_leg_roots[i].rotation.x = wave * amount
 		_lower_legs[i].rotation.x = maxf(0.0, -wave) * 0.58 * speed_ratio
-	var bob := absf(sin(_anim_time * 2.0)) * 0.055 * speed_ratio
+	var bob := absf(sin(_anim_time)) * 0.10 * speed_ratio * amp_mul
 	_visual.position.y = lerpf(_visual.position.y, bob, minf(1.0, delta * 10.0))
+	# 头部随步态点头；无人骑乘且静置时周期性低头吃草。
+	if _head_node:
+		if driver or actual_speed > 0.5:
+			_head_node.rotation.x = -0.21 + sin(_anim_time) * (0.05 + speed_ratio * 0.09)
 	if _tail_root:
 		_tail_root.rotation.y = sin(_anim_time * 0.47) * (0.10 + speed_ratio * 0.16)
+	_graze_t += delta
+	if driver == null and actual_speed < 0.2 and _head_node:
+		var grazing := fmod(_graze_t, 9.0) > 6.2
+		_head_node.rotation.x = lerpf(_head_node.rotation.x, 0.85 if grazing else -0.21, delta * 2.0)

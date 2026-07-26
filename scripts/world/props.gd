@@ -241,9 +241,57 @@ func _make_tree() -> Node3D:
 	var roll := _rng.randf()
 	if roll < 0.08:
 		return _make_bigtree()
-	if roll < 0.58:
+	if roll < 0.20:
+		return _make_birch()
+	if roll < 0.62:
 		return _make_broadleaf()
 	return _make_pine()
+
+
+# 白桦：白色横纹细干 + 高处疏冠，林地里的颜色对比树种。
+func _make_birch() -> Node3D:
+	var t := Node3D.new()
+	t.name = "TreeBirch"
+	var bark := Toon.make_material(Color(0.88, 0.87, 0.82), true, 0.014)
+	var band := Toon.make_material(Color(0.15, 0.14, 0.13), true, 0.006)
+	var trunk := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.10
+	cm.bottom_radius = 0.16
+	cm.height = 4.6
+	cm.radial_segments = 7
+	trunk.mesh = cm
+	trunk.material_override = bark
+	trunk.position.y = 2.3
+	t.add_child(trunk)
+	for i in range(3):
+		var ring := MeshInstance3D.new()
+		var rm := CylinderMesh.new()
+		rm.top_radius = 0.115
+		rm.bottom_radius = 0.125
+		rm.height = 0.09
+		rm.radial_segments = 7
+		ring.mesh = rm
+		ring.material_override = band
+		ring.position.y = 0.9 + float(i) * 1.15 + _rng.randf_range(-0.2, 0.2)
+		t.add_child(ring)
+	# 顶端一根斜枝与稀疏长冠。
+	var branch := MeshInstance3D.new()
+	var bm := CylinderMesh.new()
+	bm.top_radius = 0.05
+	bm.bottom_radius = 0.08
+	bm.height = 1.4
+	bm.radial_segments = 5
+	branch.mesh = bm
+	branch.material_override = bark
+	branch.position = Vector3(0.4, 3.6, 0)
+	branch.rotation.z = -0.6
+	t.add_child(branch)
+	_queue_leaf_cards(t, Vector3(0, 5.1, 0), _rng.randf_range(0.9, 1.2))
+	_queue_leaf_cards(t, Vector3(0.9, 4.4, 0.3), _rng.randf_range(0.6, 0.85))
+	_queue_leaf_cards(t, Vector3(-0.6, 4.5, -0.3), _rng.randf_range(0.55, 0.8))
+	_add_trunk_collision(t, 0.28, 4.2)
+	return t
 
 
 func _make_broadleaf() -> Node3D:

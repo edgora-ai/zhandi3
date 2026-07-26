@@ -23,8 +23,13 @@ const GLIDE_SPEED := 8.2
 const GLIDE_FALL_SPEED := 3.1
 const CLIMB_SPEED := 2.6
 
+var max_hp := MAX_HP
 var hp := MAX_HP
 var armor := 0.0
+var stamina := 100.0
+var max_stamina := 100.0
+var _stamina_wait := 0.0
+var _stamina_used := false
 var alive := true
 var damage_mult := 1.0
 var regen_rate := 0.0
@@ -56,12 +61,16 @@ var is_climbing := false
 var backpack_open := false
 var backpack_index := 0
 var backpack_weapons: Array[Dictionary] = []
-var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0}
+var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0, "roast_meat": 0, "roast_mushroom": 0}
+var seed_count := 0
 var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
 var _airborne_time := 0.0
 var _glider_open := 0.0
+var _melee_cd := 0.0
+var _swing_t := -1.0
+var _sword: Node3D
 
 
 func _ready() -> void:
@@ -108,6 +117,7 @@ func _ready() -> void:
 	camera.add_child(weapon)
 	weapon.setup(self, true)
 	_build_glider()
+	_build_sword()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -177,6 +187,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_throw_smoke()
 			KEY_F:
 				_toggle_vehicle()
+			KEY_H:
+				_whistle_horse()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
@@ -212,6 +224,24 @@ func _toggle_vehicle() -> void:
 		nearby_vehicle.enter(self)
 
 
+func _whistle_horse() -> void:
+	var best: Horse = null
+	var best_d := 45.0
+	for candidate in get_tree().get_nodes_in_group("vehicle"):
+		if candidate is Horse:
+			var h := candidate as Horse
+			var d := global_position.distance_to(h.global_position)
+			if d < best_d and h.driver == null:
+				best_d = d
+				best = h
+	if best:
+		best.whistle_call(self)
+		if hud:
+			hud.add_feed("你吹了声口哨，%s 正在跑来" % "马儿")
+	elif hud:
+		hud.add_feed("你吹了声口哨，附近没有马回应")
+
+
 func _physics_process(delta: float) -> void:
 	if not alive:
 		return
@@ -242,8 +272,9 @@ func _physics_process(delta: float) -> void:
 		is_swimming = false
 
 	var speed := WALK_SPEED
-	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads and not prone:
+	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads and not prone and stamina > 0.0:
 		speed = SPRINT_SPEED
+		_drain_stamina(9.0 * delta)
 	if weapon.is_ads:
 		speed *= 0.55
 	if prone:
@@ -280,6 +311,9 @@ func _physics_process(delta: float) -> void:
 		var wants_glide := can_deploy and (Input.is_key_pressed(KEY_SPACE) or debug_glide) and velocity.y < -0.55
 		_set_gliding(wants_glide)
 		if is_gliding:
+			_drain_stamina(5.0 * delta)
+			if stamina <= 0.0:
+				_set_gliding(false)
 			# 旷野式滑翔：始终向前飘；W 俯冲提速但下降更快，S 减速缓降，A/D 转向。
 			var glide_forward := -global_transform.basis.z
 			glide_forward.y = 0.0
@@ -313,16 +347,26 @@ func _physics_process(delta: float) -> void:
 		_try_step_up()
 
 	# 占领点回血
-	if regen_rate > 0.0 and hp < MAX_HP:
-		hp = minf(MAX_HP, hp + regen_rate * delta)
+	if regen_rate > 0.0 and hp < max_hp:
+		hp = minf(max_hp, hp + regen_rate * delta)
 		health_changed.emit(hp, armor)
+	# 精力回复：本帧无消耗且过了短暂延迟后快速回满。
+	_stamina_wait = maxf(0.0, _stamina_wait - delta)
+	if not _stamina_used and _stamina_wait <= 0.0:
+		stamina = minf(max_stamina, stamina + 26.0 * delta)
+	_stamina_used = false
 
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			weapon.hold_trigger()
+			if weapon.weapon_id != "":
+				weapon.hold_trigger()
+			elif _melee_cd <= 0.0:
+				_melee_swing()
 		weapon.set_ads(Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 	_scan_loot()
+	_melee_cd = maxf(0.0, _melee_cd - delta)
+	_update_sword(delta)
 
 
 func _scan_loot() -> void:
@@ -395,7 +439,23 @@ func give_item(kind: String, amount: int) -> void:
 		backpack_items[kind] = 0
 	backpack_items[kind] = int(backpack_items[kind]) + amount
 	backpack_changed.emit()
+
+
+func collect_seed() -> void:
+	seed_count += 1
+	armor = minf(100.0, armor + 5.0)
+	health_changed.emit(hp, armor)
+	if hud:
+		hud.add_feed("找到一颗海拉鲁种子！（第 %d 颗，护甲 +5）" % seed_count)
 	_refresh_backpack()
+
+
+func collect_orb() -> void:
+	max_hp += 10.0
+	hp = max_hp
+	health_changed.emit(hp, armor)
+	if hud:
+		hud.add_feed("精灵宝珠融入身体：生命上限 +10（当前 %d）" % int(max_hp))
 
 
 func switch_slot(i: int) -> void:
@@ -436,6 +496,104 @@ func die(from: Variant = null) -> void:
 
 # ---------- 游泳 / 滑翔 ----------
 
+# ---------- 近战挥剑（空手时左键） ----------
+
+var _sword_base_pos := Vector3(0.30, -0.28, -0.55)
+var _sword_base_rot := Vector3.ZERO
+
+func _build_sword() -> void:
+	_sword = Node3D.new()
+	_sword.name = "Sword"
+	_sword.position = _sword_base_pos
+	_sword_base_rot = Vector3(-0.15, 0.0, -0.35)
+	_sword.rotation = _sword_base_rot
+	camera.add_child(_sword)
+	var steel := Toon.make_material(Color(0.78, 0.82, 0.88), true, 0.008)
+	var dark := Toon.make_material(Color(0.14, 0.13, 0.15), true, 0.006)
+	var wood := Toon.make_material(Color(0.35, 0.22, 0.10), true, 0.008)
+	var blade := MeshInstance3D.new()
+	var blade_mesh := BoxMesh.new()
+	blade_mesh.size = Vector3(0.035, 0.62, 0.085)
+	blade.mesh = blade_mesh
+	blade.material_override = steel
+	blade.position = Vector3(0, 0.42, 0)
+	_sword.add_child(blade)
+	var tip := MeshInstance3D.new()
+	var tip_mesh := PrismMesh.new()
+	tip_mesh.size = Vector3(0.035, 0.12, 0.085)
+	tip.mesh = tip_mesh
+	tip.material_override = steel
+	tip.position = Vector3(0, 0.79, 0)
+	_sword.add_child(tip)
+	var guard := MeshInstance3D.new()
+	var guard_mesh := BoxMesh.new()
+	guard_mesh.size = Vector3(0.16, 0.035, 0.12)
+	guard.mesh = guard_mesh
+	guard.material_override = dark
+	guard.position = Vector3(0, 0.10, 0)
+	_sword.add_child(guard)
+	var grip := MeshInstance3D.new()
+	var grip_mesh := CylinderMesh.new()
+	grip_mesh.top_radius = 0.022
+	grip_mesh.bottom_radius = 0.026
+	grip_mesh.height = 0.20
+	grip_mesh.radial_segments = 7
+	grip.mesh = grip_mesh
+	grip.material_override = wood
+	grip.position = Vector3(0, -0.02, 0)
+	_sword.add_child(grip)
+
+
+func _melee_swing() -> void:
+	_melee_cd = 0.5
+	_swing_t = 0.0
+	var hit_something := false
+	var forward := get_aim_dir()
+	# 中心射线：砍树、点符文等静态可伤害物。
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(camera.global_position, camera.global_position + forward * 2.6, 1 | 4, [get_rid()])
+	var result := space.intersect_ray(query)
+	if not result.is_empty():
+		var col: Object = result.collider
+		if col.has_method("take_damage"):
+			col.take_damage(26.0, self, "body")
+			hit_something = true
+	# 弧形范围：怪物、动物、AI 战士。
+	for group in ["wild_enemy", "wildlife", "combatant"]:
+		for target in get_tree().get_nodes_in_group(group):
+			if target == self or not (target is CharacterBody3D):
+				continue
+			if not target.alive:
+				continue
+			var to_t: Vector3 = target.global_position + Vector3(0, 0.8, 0) - camera.global_position
+			if to_t.length() > 2.6 or to_t.normalized().dot(forward) < 0.5:
+				continue
+			if target.has_method("take_damage"):
+				target.take_damage(26.0, self, "body")
+				hit_something = true
+	if hit_something:
+		var sfx := get_tree().get_first_node_in_group("sfx_bank")
+		if sfx:
+			sfx.play("hit", -6.0)
+
+
+func _update_sword(delta: float) -> void:
+	if _sword == null:
+		return
+	_sword.visible = weapon.weapon_id == "" and not is_gliding
+	if _swing_t < 0.0:
+		return
+	_swing_t += delta
+	var k := _swing_t / 0.30
+	if k >= 1.0:
+		_swing_t = -1.0
+		_sword.position = _sword_base_pos
+		_sword.rotation = _sword_base_rot
+	else:
+		var sweep := sin(k * PI)
+		_sword.rotation = _sword_base_rot + Vector3(-0.4 * sweep, 0, -1.6 * sweep)
+		_sword.position = _sword_base_pos + Vector3(-0.30 * sweep, 0.06 * sweep, -0.12 * sweep)
+
 # ---------- 攀爬（树干 / 塔身 / 悬崖，一切陡面） ----------
 
 func _update_climbing(_delta: float, f: float, r: float) -> bool:
@@ -465,6 +623,14 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 		if Input.is_key_pressed(KEY_SPACE):
 			velocity = n * 4.2 + Vector3.UP * 3.0
 			is_climbing = false
+			return false
+		# 攀爬耗精力：静止缓耗、移动快耗，耗尽后滑落。
+		_drain_stamina((5.0 + 7.0 * (absf(f) + absf(r))) * _delta)
+		if stamina <= 0.0:
+			velocity = n * 1.5 + Vector3(0, -3.0, 0)
+			is_climbing = false
+			if hud:
+				hud.add_feed("精力耗尽，滑下来了！")
 			return false
 		var side := n.cross(Vector3.UP).normalized()
 		velocity = Vector3.UP * f * CLIMB_SPEED + side * r * CLIMB_SPEED * 0.75 - n * 0.8
@@ -546,6 +712,12 @@ func _set_gliding(enabled: bool) -> void:
 		_glider.visible = enabled
 	if weapon:
 		weapon.visible = not enabled
+
+
+func _drain_stamina(amount: float) -> void:
+	stamina = maxf(0.0, stamina - amount)
+	_stamina_used = true
+	_stamina_wait = 0.45
 
 
 func _update_glider_visual(delta: float) -> void:
@@ -641,7 +813,7 @@ func _toggle_backpack() -> void:
 
 
 func _backpack_entry_count() -> int:
-	return backpack_weapons.size() + 4
+	return backpack_weapons.size() + 6
 
 
 func _refresh_backpack() -> void:
@@ -658,6 +830,8 @@ func get_backpack_lines() -> Array[String]:
 	lines.append("食材 · 兽肉 × %d（回血 30）" % int(backpack_items["meat"]))
 	lines.append("珍品 · 龙鳞 × %d（护甲 35）" % int(backpack_items["dragon_scale"]))
 	lines.append("材料 · 木材 × %d（护甲 8）" % int(backpack_items["wood"]))
+	lines.append("料理 · 烤兽肉 × %d（回血 55）" % int(backpack_items["roast_meat"]))
+	lines.append("料理 · 烤蘑菇 × %d（回血 28+护甲 4）" % int(backpack_items["roast_mushroom"]))
 	return lines
 
 
@@ -666,17 +840,40 @@ func _use_backpack_selection() -> void:
 		_retrieve_weapon(backpack_index)
 		return
 	var item_index := backpack_index - backpack_weapons.size()
-	var key: String = ["mushroom", "meat", "dragon_scale", "wood"][item_index]
+	var key: String = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom"][item_index]
 	var count := int(backpack_items[key])
 	if count <= 0:
+		return
+	# 篝火烹饪：站在火堆旁使用生食材会烤成料理（回复更强）。
+	var scene := get_tree().current_scene
+	var near_fire := false
+	if scene and scene.get("wild_world") != null:
+		near_fire = scene.wild_world.is_near_campfire(global_position, 4.0)
+	if key in ["meat", "mushroom"] and near_fire:
+		backpack_items[key] = count - 1
+		var cooked := "roast_meat" if key == "meat" else "roast_mushroom"
+		backpack_items[cooked] = int(backpack_items[cooked]) + 1
+		if hud:
+			hud.add_feed("烤制成功：%s" % ("烤兽肉" if key == "meat" else "烤蘑菇"))
+		backpack_changed.emit()
+		_refresh_backpack()
 		return
 	backpack_items[key] = count - 1
 	if key == "dragon_scale":
 		armor = minf(100.0, armor + 35.0)
 	elif key == "wood":
 		armor = minf(100.0, armor + 8.0)
+	elif key == "roast_meat":
+		hp = minf(max_hp, hp + 55.0)
+		stamina = max_stamina
+	elif key == "roast_mushroom":
+		hp = minf(max_hp, hp + 28.0)
+		armor = minf(100.0, armor + 4.0)
+		stamina = minf(max_stamina, stamina + 40.0)
 	else:
-		hp = minf(MAX_HP, hp + (18.0 if key == "mushroom" else 30.0))
+		hp = minf(max_hp, hp + (18.0 if key == "mushroom" else 30.0))
+		if key == "mushroom":
+			stamina = minf(max_stamina, stamina + 25.0)
 	health_changed.emit(hp, armor)
 	backpack_changed.emit()
 	_refresh_backpack()

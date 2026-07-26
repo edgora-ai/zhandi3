@@ -20,7 +20,10 @@ var _fire: StandardMaterial3D
 var _lava: StandardMaterial3D
 var _flames: Array[MeshInstance3D] = []
 var _camp_positions: Array[Vector3] = []
+var trials: Array[ShrineTrial] = []
 var _time := 0.0
+var _monster_points: Array = []
+var _animal_specs: Array = []
 
 
 func generate(p_terrain: Terrain, p_player: Player) -> void:
@@ -52,8 +55,20 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	_spawn_animals()
 	_spawn_dragon()
 	_spawn_flying_attackers()
+	# 两台古代守卫：遗迹与城堡各一台。
+	for gp in [Vector3(26, 0, -88), Vector3(-6, 0, -116)]:
+		var guardian := Guardian.new()
+		guardian.setup(terrain, player)
+		add_child(guardian)
+		guardian.global_position = _ground(gp, 0.05)
 	_spawn_npcs()
 	_spawn_wild_loot()
+	_spawn_korok_props()
+	_build_monster_camp(Vector3(60, 0, 86), 0.6)
+	_build_monster_camp(Vector3(-128, 0, -58), -0.9)
+	_build_forest_floor()
+	_build_volcano_basalt()
+	_build_snow_rocks()
 	print("[wild] shrines=2 stable=1 bridge=1 towers=3 castle=1 monsters=8 wildlife=19 horses=4 npcs=4 dragon=1 flyers=3")
 
 
@@ -213,6 +228,11 @@ func _build_shrine(world_pos: Vector3, yaw: float) -> void:
 	for sx in [-1.0, 1.0]:
 		_part(Vector3(0.26, 3.6, 0.38), _stone_dark, Vector3(sx * 1.15, 2.15, -3.35), shrine)
 	_part(Vector3(2.6, 0.28, 0.40), _stone_dark, Vector3(0, 3.88, -3.35), shrine)
+	# 神庙试炼：限时射符文的解谜入口。
+	var trial := ShrineTrial.new()
+	trial.setup(player)
+	shrine.add_child(trial)
+	trials.append(trial)
 	# 顶部同心圆盘和四根弯角用圆柱与斜梁组合。
 	_cylinder(2.25, 0.28, _stone_dark, Vector3(0, 6.42, 0.3), shrine)
 	_cylinder(1.72, 0.16, _ancient, Vector3(0, 6.59, 0.3), shrine)
@@ -353,6 +373,18 @@ func _build_temple_ruins(world_pos: Vector3) -> void:
 	for i in range(5):
 		var rubble := _part(Vector3(1.2 + i * 0.15, 0.65, 0.9), _stone, Vector3(-5 + i * 2.4, 0.28, -12 + sin(i) * 1.5), temple)
 		rubble.rotation_degrees = Vector3(randf_range(-12, 12), randf_range(0, 180), randf_range(-10, 10))
+	# 废墟藤蔓：断墙与柱面上爬回的绿色植物，让废墟“被时间占领”。
+	var ivy := Toon.make_material(Color(0.22, 0.48, 0.12), true, 0.006)
+	var ivy_spots := [
+		Vector3(-6.5, 1.6, -9.5), Vector3(-6.4, 3.4, -5.8), Vector3(6.5, 2.2, -2.1),
+		Vector3(6.5, 4.0, 1.6), Vector3(-6.5, 1.2, 5.3), Vector3(-3.4, 2.8, 11.2),
+		Vector3(7.15, 3.1, 7.05), Vector3(-7.15, 5.2, 7.05),
+	]
+	for spot in ivy_spots:
+		var patch := _sphere(randf_range(0.45, 0.8), ivy, spot, temple, Vector3(1.0, randf_range(1.2, 1.9), 0.35))
+		patch.rotation_degrees.y = randf_range(0, 180)
+		var drip := _part(Vector3(0.10, randf_range(0.8, 1.5), 0.08), ivy, spot + Vector3(0, -0.9, 0.05), temple)
+		drip.rotation_degrees.z = randf_range(-8, 8)
 
 
 func _build_river_bridge(z: float) -> void:
@@ -795,6 +827,13 @@ func _build_campfire(world_pos: Vector3) -> void:
 		log.rotation.y = i * PI / 3.0
 	var flame := _sphere(0.48, _fire, Vector3(0, 0.78, 0), camp, Vector3(0.65, 1.35, 0.65))
 	_flames.append(flame)
+	# 三脚架炊锅：每个火堆都是一处可以想象的“做饭点”。
+	for i in range(3):
+		var a := float(i) * TAU / 3.0
+		var stick := _cylinder(0.045, 1.5, _wood_dark, Vector3(cos(a) * 0.42, 0.72, sin(a) * 0.42), camp, Vector3(0, 0, 0), 6)
+		stick.rotation_degrees = Vector3(sin(a) * 22.0, 0, -cos(a) * 22.0)
+	_cylinder(0.02, 0.35, _wood_dark, Vector3(0, 1.28, 0), camp, Vector3.ZERO, 6)
+	_sphere(0.30, _stone_dark, Vector3(0, 1.02, 0), camp, Vector3(1.0, 0.82, 1.0))
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.48, 0.14)
 	light.light_energy = 2.1
@@ -837,12 +876,228 @@ func _spawn_mushrooms() -> void:
 
 func _spawn_monsters() -> void:
 	var points := [Vector3(-42, 0, 48), Vector3(48, 0, 93), Vector3(118, 0, -74), Vector3(135, 0, -102), Vector3(-138, 0, -72), Vector3(-150, 0, -64), Vector3(45, 0, -70), Vector3(28, 0, -82)]
+	_monster_points = points
 	for p in points:
 		var monster := WildMonster.new()
 		monster.setup(terrain, player)
 		add_child(monster)
 		monster.global_position = _ground(p, 0.05)
 		monster.rotation.y = randf_range(0, TAU)
+
+
+# 血月苏醒：按原刷新点补齐已被击杀的怪物与动物（12m 内已有活口则跳过）。
+func respawn_monsters() -> int:
+	var respawned := 0
+	for p in _monster_points:
+		var occupied := false
+		for e in get_tree().get_nodes_in_group("wild_enemy"):
+			if e.alive and e.global_position.distance_to(_ground(p, 0.05)) < 12.0:
+				occupied = true
+				break
+		if not occupied:
+			var monster := WildMonster.new()
+			monster.setup(terrain, player)
+			add_child(monster)
+			monster.global_position = _ground(p, 0.05)
+			monster.rotation.y = randf_range(0, TAU)
+			respawned += 1
+	for entry in _animal_specs:
+		var kind: String = entry[0]
+		var p2: Vector3 = entry[1]
+		var occupied2 := false
+		for c in get_tree().get_nodes_in_group("wildlife"):
+			if c.alive and c.global_position.distance_to(_ground(p2, 0.05)) < 12.0:
+				occupied2 = true
+				break
+		if not occupied2:
+			var creature := WildCreature.new()
+			creature.setup(kind, terrain, player)
+			add_child(creature)
+			var altitude := 8.0 if kind == "bird" else 0.05
+			creature.global_position = _ground(p2, altitude)
+			creature.rotation.y = randf_range(0, TAU)
+			respawned += 1
+	return respawned
+
+
+# 呀哈哈式小谜题：三座风车 + 四块可疑怪石，打中即出种子。
+func _spawn_korok_props() -> void:
+	var pinwheels := [Vector3(-95, 0, 60), Vector3(40, 0, 55), Vector3(20, 0, -60)]
+	var rocks := [Vector3(-120, 0, 45), Vector3(75, 0, 95), Vector3(-30, 0, -50), Vector3(150, 0, -60)]
+	for p in pinwheels:
+		var prop := KorokProp.new()
+		add_child(prop)
+		prop.configure("pinwheel")
+		prop.global_position = _ground(p, 0.02)
+	for p in rocks:
+		var prop := KorokProp.new()
+		add_child(prop)
+		prop.configure("rock")
+		prop.global_position = _ground(p, 0.02)
+
+
+# 怪物营地：帐篷、火堆、木箱、尖桩围栏与守军，内有值钱补给。
+func _build_monster_camp(p: Vector3, yaw: float) -> void:
+	var camp := Node3D.new()
+	camp.name = "MonsterCamp"
+	camp.position = _ground(p)
+	camp.rotation.y = yaw
+	add_child(camp)
+	var body := _body(camp)
+	# 两座布帐篷。
+	for sx in [-3.4, 3.4]:
+		var tent := Node3D.new()
+		tent.position = Vector3(sx, 0, -2.2)
+		tent.rotation.y = sx * 0.2
+		camp.add_child(tent)
+		_frustum(0.06, 1.9, 2.4, _cloth, Vector3(0, 1.2, 0), tent, 6)
+		_cylinder(0.05, 2.6, _wood_dark, Vector3(0, 1.3, 0), tent, Vector3.ZERO, 6)
+		_box_collision(body, Vector3(2.8, 2.2, 2.8), tent.position)
+	# 中央火堆与木箱堆。
+	_build_campfire(camp.transform * Vector3(0, 0, 1.2))
+	for i in range(3):
+		_part(Vector3(0.8, 0.8, 0.8), _wood_dark, Vector3(1.8 + i * 0.9, 0.4, 2.8 - float(i % 2) * 0.7), camp, Vector3(0, float(i) * 12.0, 0))
+	# 尖桩围栏（留入口）。
+	for i in range(10):
+		var a := float(i) * TAU / 10.0
+		if i in [0, 1]:
+			continue
+		var post := _cylinder(0.09, 2.0, _wood_dark, Vector3(cos(a) * 6.0, 0.85, sin(a) * 6.0), camp, Vector3(0, 0, cos(a) * 24.0), 6)
+		post.rotation_degrees.z = cos(a) * 24.0
+		post.rotation_degrees.x = -sin(a) * 24.0
+	# 守军与补给箱。
+	for off in [Vector3(-1.5, 0, 0.5), Vector3(2.0, 0, -0.5)]:
+		var monster := WildMonster.new()
+		monster.setup(terrain, player)
+		add_child(monster)
+		monster.global_position = camp.transform * off
+		monster.rotation.y = randf_range(0, TAU)
+	Loot.spawn(get_tree().current_scene, camp.transform * Vector3(0.5, 0.3, 3.4), "armor", "", 50, 2)
+	Loot.spawn(get_tree().current_scene, camp.transform * Vector3(-0.5, 0.3, 3.4), "ammo", "", 90, 2)
+
+
+# 林地地面：倒木、蘑菇圈与蕨类丛，让森林从“树+草”变成有地面叙事的林子。
+func _build_forest_floor() -> void:
+	var bark := Toon.make_material(Color(0.35, 0.24, 0.13), true, 0.012)
+	var moss := Toon.make_material(Color(0.30, 0.50, 0.16), true, 0.008)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9021
+	# 倒木：横躺的带苔树干，端口有年轮。
+	for i in range(10):
+		var p := Vector3(rng.randf_range(-140, 120), 0, rng.randf_range(-60, 120))
+		p = _ground(p, 0.3)
+		if p.y < Terrain.WATER_LEVEL + 0.6 or p.y > 18.0 or terrain.get_normal(p.x, p.z).y < 0.8:
+			continue
+		var log := Node3D.new()
+		log.position = p
+		log.rotation.y = rng.randf_range(0, TAU)
+		add_child(log)
+		var body := _body(log)
+		var length := rng.randf_range(2.6, 4.5)
+		_cylinder(rng.randf_range(0.24, 0.34), length, bark, Vector3(0, 0, 0), log, Vector3(0, 0, 90), 8)
+		_cylinder_collision(body, 0.32, length, Vector3.ZERO)
+		_sphere(0.26, moss, Vector3(0, 0.24, 0), log, Vector3(1.4, 0.4, 0.9))
+		var ring := _cylinder(0.20, 0.05, Toon.make_material(Color(0.62, 0.48, 0.28), true, 0.006), Vector3(length * 0.5, 0, 0), log, Vector3(0, 0, 90), 8)
+		ring.rotation_degrees.z = 90.0
+	# 蘑菇圈：一圈小蘑菇，中心微光，是“仙女环”式的林地彩蛋。
+	for c in range(6):
+		var center := Vector3(rng.randf_range(-120, 100), 0, rng.randf_range(-40, 100))
+		center = _ground(center, 0.05)
+		if center.y < Terrain.WATER_LEVEL + 0.6 or center.y > 16.0:
+			continue
+		var fairy := Node3D.new()
+		fairy.position = center
+		add_child(fairy)
+		for i in range(9):
+			var a := float(i) * TAU / 9.0
+			var mp := Vector3(cos(a) * 1.5, 0, sin(a) * 1.5)
+			_cylinder(0.05, 0.18, _cloth, mp + Vector3(0, 0.09, 0), fairy, Vector3.ZERO, 6)
+			_sphere(0.13, _roof_trim, mp + Vector3(0, 0.22, 0), fairy, Vector3(1.0, 0.6, 1.0))
+		var glow := _sphere(0.10, _ancient, Vector3(0, 0.15, 0), fairy, Vector3.ONE)
+		glow.scale = Vector3.ONE * 0.8
+	# 蕨类：三片交叉薄面一丛，MultiMesh 一次渲染。
+	var fern_mesh := _make_fern_mesh()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = fern_mesh
+	mm.instance_count = 320
+	var fern_mat := Toon.make_material(Color(0.24, 0.46, 0.15), false)
+	for i in range(mm.instance_count):
+		var p2 := Vector3(rng.randf_range(-150, 130), 0, rng.randf_range(-90, 130))
+		p2 = _ground(p2, 0.02)
+		if p2.y < Terrain.WATER_LEVEL + 0.5 or p2.y > 17.0:
+			p2.y = Terrain.WATER_LEVEL + 1.0
+		var basis := Basis(Vector3.UP, rng.randf_range(0, TAU)).scaled(Vector3.ONE * rng.randf_range(0.7, 1.3))
+		mm.set_instance_transform(i, Transform3D(basis, p2))
+	var ferns := MultiMeshInstance3D.new()
+	ferns.name = "Ferns"
+	ferns.multimesh = mm
+	ferns.material_override = fern_mat
+	ferns.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ferns)
+
+
+func _make_fern_mesh() -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	for i in range(3):
+		var a := float(i) * PI / 3.0
+		var dir := Vector3(cos(a), 0, sin(a))
+		var side := Vector3(-dir.z, 0, dir.x) * 0.45
+		var base := Vector3.ZERO
+		var tip := dir * 0.9 + Vector3(0, 0.55, 0)
+		# 每片是一个弯曲感的三角叶片（两面可见）。
+		verts.append_array([base - side * 0.15, base + side * 0.15, tip, base + side * 0.15, base - side * 0.15, tip])
+		for j in range(6):
+			normals.append(Vector3.UP)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+# 火山口外圈的玄武岩六棱柱群，高低错落。
+func _build_volcano_basalt() -> void:
+	var basalt := Toon.make_material(Color(0.16, 0.13, 0.12), true, 0.016)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6604
+	for i in range(16):
+		var a := float(i) * TAU / 16.0 + rng.randf_range(-0.1, 0.1)
+		var r := rng.randf_range(20.0, 30.0)
+		var p := Vector3(164 + cos(a) * r, 0, -145 + sin(a) * r)
+		p = _ground(p, -0.4)
+		var height := rng.randf_range(2.5, 7.0)
+		var col := Node3D.new()
+		col.position = p
+		col.rotation.y = a
+		add_child(col)
+		var body := _body(col)
+		_frustum(rng.randf_range(0.5, 0.7), rng.randf_range(0.7, 0.9), height, basalt, Vector3(0, height * 0.5, 0), col, 6)
+		_cylinder_collision(body, 0.7, height, Vector3(0, height * 0.5, 0))
+
+
+# 雪线上的白顶岩石。
+func _build_snow_rocks() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3317
+	var snow_mat := Toon.make_material(Color(0.85, 0.90, 0.94), true, 0.010)
+	for i in range(8):
+		var p := Vector3(-166 + rng.randf_range(-45, 45), 0, -142 + rng.randf_range(-40, 45))
+		p = _ground(p, 0.1)
+		if p.y < 14.0:
+			continue
+		var rock := Node3D.new()
+		rock.position = p
+		rock.rotation.y = rng.randf_range(0, TAU)
+		add_child(rock)
+		var body := _body(rock)
+		var r := rng.randf_range(0.9, 1.8)
+		_sphere(r, _stone_dark, Vector3(0, r * 0.3, 0), rock, Vector3(1.0, 0.75, 0.9))
+		_cylinder_collision(body, r * 0.85, r * 1.2, Vector3(0, r * 0.5, 0))
+		_sphere(r * 0.85, snow_mat, Vector3(0, r * 0.72, 0), rock, Vector3(1.05, 0.32, 0.95))
 
 
 func _spawn_animals() -> void:
@@ -852,6 +1107,7 @@ func _spawn_animals() -> void:
 		["bear", Vector3(-174, 0, -110)], ["bear", Vector3(176, 0, -28)],
 		["bird", Vector3(-88, 0, 54)], ["bird", Vector3(-12, 0, 24)], ["bird", Vector3(74, 0, 96)], ["bird", Vector3(132, 0, 32)], ["bird", Vector3(-142, 0, -48)], ["bird", Vector3(42, 0, -114)], ["bird", Vector3(166, 0, -92)], ["bird", Vector3(-35, 0, -128)],
 	]
+	_animal_specs = specs
 	for entry in specs:
 		var kind: String = entry[0]
 		var p: Vector3 = entry[1]
@@ -895,6 +1151,12 @@ func _spawn_npcs() -> void:
 		add_child(npc)
 		npc.global_position = _ground(spec[0], 0.02)
 		npc.rotation.y = randf_range(0.0, TAU)
+	# 行商：沿道路在驿站与海利亚大桥之间往返（旷野之息式的流动商人）。
+	var merchant := WildNPC.new()
+	merchant.setup(terrain, player, "行商多戈", ["这条商路我走了十年，桥修好后好走多了。", "驿站收兽肉，蘑菇在河滩芦苇边最多。", "马上了路会自己认路，你尽管看风景。"], Color(0.60, 0.42, 0.20), 0)
+	add_child(merchant)
+	merchant.global_position = _ground(Vector3(-40, 0, 20), 0.02)
+	merchant.patrol = [Vector3(-70, 0, 21.5), Vector3(-40, 0, 20), Vector3(-15.5, 0, 18.5), Vector3(6, 0, 18), Vector3(-15.5, 0, 18.5), Vector3(-40, 0, 20)]
 
 
 func _spawn_wild_loot() -> void:
@@ -920,9 +1182,31 @@ func _spawn_wild_loot() -> void:
 	Loot.spawn(scene, _ground(Vector3(5, 0, -123), 32.35 - terrain.get_height(5, -123)), "armor", "", 50, 2)
 	Loot.spawn(scene, _ground(Vector3(-132, 0, -78), 18.6), "armor", "", 50, 2)
 	Loot.spawn(scene, _ground(Vector3(20, 0, -91), 0.6), "armor", "", 25, 1)
+	# 呀哈哈式探索种子：藏在峰顶、遗迹、雪线、火山口等“专门走过去”的位置。
+	var seed_spots := [
+		Vector3(63, 0, 72), Vector3(-140, 0, 120), Vector3(18, 0, -100), Vector3(-150, 0, -128),
+		Vector3(150, 0, -132), Vector3(-50, 0, 62), Vector3(58, 0, 52), Vector3(-20, 0, 8),
+		Vector3(105, 0, 40), Vector3(-95, 0, -30),
+	]
+	for spot in seed_spots:
+		var p := _ground(spot, 0.5)
+		if spot == Vector3(58, 0, 52):
+			p.y += 12.4   # 岩石尖峰顶
+		Loot.spawn(scene, p, "seed", "", 1, 3)
 
 
 func get_region_name(pos: Vector3) -> String:
+	return _region_name_impl(pos)
+
+
+func is_near_campfire(pos: Vector3, radius: float = 4.0) -> bool:
+	for p in _camp_positions:
+		if pos.distance_to(p) < radius:
+			return true
+	return false
+
+
+func _region_name_impl(pos: Vector3) -> String:
 	if Vector2(pos.x, pos.z).distance_to(Vector2(4, -124)) < 42.0:
 		return "海拉鲁城堡"
 	if Vector2(pos.x, pos.z).distance_to(Vector2(164, -145)) < 80.0:
@@ -948,8 +1232,8 @@ func _process(delta: float) -> void:
 			flame.scale = Vector3(0.58 + sin(_time * 8.0 + i) * 0.10, 1.2 + sin(_time * 11.0 + i * 2.1) * 0.18, 0.58 + cos(_time * 7.0 + i) * 0.08)
 	if player and player.alive:
 		for p in _camp_positions:
-			if player.global_position.distance_to(p) < 3.2 and player.hp < Player.MAX_HP:
-				player.hp = minf(Player.MAX_HP, player.hp + delta * 4.0)
+			if player.global_position.distance_to(p) < 3.2 and player.hp < player.max_hp:
+				player.hp = minf(player.max_hp, player.hp + delta * 4.0)
 				player.health_changed.emit(player.hp, player.armor)
 	for i in range(_butterflies.size()):
 		var b := _butterflies[i]

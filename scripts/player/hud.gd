@@ -21,6 +21,8 @@ var _interact_label: Label
 var _capture_bar: ColorRect
 var _capture_wrap: Control
 var _capture_label: Label
+var _stamina_segs: Array[ColorRect] = []
+var _stamina_wrap: Control
 var _vignette: TextureRect
 var _end_panel: Control
 var _pause_panel: Control
@@ -45,6 +47,7 @@ func _ready() -> void:
 		_ui.theme = theme
 	add_child(_ui)
 	_build_crosshair()
+	_build_stamina_wheel()
 	_build_bars()
 	_build_top()
 	_build_feed()
@@ -83,6 +86,35 @@ func _mk_rect(parent: Control, pos: Vector2, size: Vector2, color: Color) -> Col
 	r.size = size
 	parent.add_child(r)
 	return r
+
+
+# ---------- 精力轮（16 段环形，只在消耗后显示） ----------
+
+func _build_stamina_wheel() -> void:
+	_stamina_wrap = Control.new()
+	_stamina_wrap.name = "StaminaWheel"
+	_stamina_wrap.set_anchors_preset(Control.PRESET_CENTER)
+	_stamina_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stamina_wrap.visible = false
+	_ui.add_child(_stamina_wrap)
+	for i in range(16):
+		var angle := -PI * 0.5 + float(i) * TAU / 16.0
+		var seg := ColorRect.new()
+		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		seg.size = Vector2(5, 12)
+		seg.pivot_offset = Vector2(2.5, 6)
+		seg.position = Vector2(58 + cos(angle) * 24.0, sin(angle) * 24.0)
+		seg.rotation = angle + PI * 0.5
+		_stamina_wrap.add_child(seg)
+		_stamina_segs.append(seg)
+
+
+func set_stamina(frac: float) -> void:
+	_stamina_wrap.visible = frac < 0.999
+	var lit := int(ceil(frac * 16.0))
+	var color := Color(0.35, 0.90, 0.45) if frac > 0.5 else Color(0.95, 0.80, 0.25) if frac > 0.22 else Color(0.95, 0.30, 0.20)
+	for i in range(_stamina_segs.size()):
+		_stamina_segs[i].color = color if i < lit else Color(1, 1, 1, 0.15)
 
 
 # ---------- 准星 ----------

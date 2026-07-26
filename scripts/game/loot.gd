@@ -76,6 +76,10 @@ func _build_visual() -> void:
 			_build_scale()
 		"wood":
 			_build_log()
+		"seed":
+			_build_seed()
+		"orb":
+			_build_orb()
 
 
 func _build_box(size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
@@ -155,6 +159,63 @@ func _build_log() -> void:
 	_item.add_child(ring)
 
 
+func _build_seed() -> void:
+	# 呀哈哈式金种子：自发光小金球 + 两片小叶。
+	var gold := StandardMaterial3D.new()
+	gold.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gold.albedo_color = Color(1.0, 0.85, 0.25)
+	gold.emission_enabled = true
+	gold.emission = Color(1.0, 0.75, 0.15)
+	gold.emission_energy_multiplier = 1.6
+	var core := MeshInstance3D.new()
+	var core_mesh := SphereMesh.new()
+	core_mesh.radius = 0.16
+	core_mesh.height = 0.32
+	core_mesh.radial_segments = 10
+	core_mesh.rings = 6
+	core.mesh = core_mesh
+	core.material_override = gold
+	_item.add_child(core)
+	for sx in [-1.0, 1.0]:
+		var leaf := MeshInstance3D.new()
+		var leaf_mesh := BoxMesh.new()
+		leaf_mesh.size = Vector3(0.05, 0.02, 0.22)
+		leaf.mesh = leaf_mesh
+		leaf.material_override = Toon.make_material(Color(0.35, 0.65, 0.2), false)
+		leaf.position = Vector3(sx * 0.1, 0.16, 0)
+		leaf.rotation_degrees = Vector3(-25, 0, sx * -30)
+		_item.add_child(leaf)
+
+
+func _build_orb() -> void:
+	# 精灵宝珠：青色自发光小球 + 环绕光带。
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(0.30, 0.90, 0.80)
+	glow.emission_enabled = true
+	glow.emission = Color(0.15, 0.95, 0.80)
+	glow.emission_energy_multiplier = 2.2
+	var core := MeshInstance3D.new()
+	var core_mesh := SphereMesh.new()
+	core_mesh.radius = 0.22
+	core_mesh.height = 0.44
+	core_mesh.radial_segments = 12
+	core_mesh.rings = 7
+	core.mesh = core_mesh
+	core.material_override = glow
+	_item.add_child(core)
+	var ring := MeshInstance3D.new()
+	var ring_mesh := TorusMesh.new()
+	ring_mesh.inner_radius = 0.03
+	ring_mesh.outer_radius = 0.36
+	ring_mesh.rings = 16
+	ring_mesh.ring_segments = 6
+	ring.mesh = ring_mesh
+	ring.material_override = glow
+	ring.rotation_degrees.x = 70.0
+	_item.add_child(ring)
+
+
 func _process(delta: float) -> void:
 	if consumed:
 		return
@@ -181,6 +242,10 @@ func describe() -> String:
 			return "龙鳞 ×%d（收入背包）" % amount
 		"wood":
 			return "木材 ×%d（收入背包）" % amount
+		"seed":
+			return "海拉鲁种子（闪光）"
+		"orb":
+			return "精灵宝珠（生命上限 +10）"
 	return ""
 
 
@@ -205,6 +270,12 @@ func apply_to(target: CharacterBody3D) -> void:
 		"mushroom", "meat", "dragon_scale", "wood":
 			if target.has_method("give_item"):
 				target.give_item(kind, amount)
+		"seed":
+			if target.has_method("collect_seed"):
+				target.collect_seed()
+		"orb":
+			if target.has_method("collect_orb"):
+				target.collect_orb()
 	consumed = true
 	if target is Player:
 		var sfx := target.get_tree().get_first_node_in_group("sfx_bank")

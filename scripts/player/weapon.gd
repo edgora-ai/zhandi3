@@ -34,6 +34,7 @@ var weapon_id := ""
 var data := {}
 var mag_left := 0
 var reserve := 0
+var last_shot_msec := 0   # NPC 受惊反应：记录最近一次开火时间
 var is_ads := false
 var reloading := false
 
@@ -75,7 +76,7 @@ func set_weapon(id: String, p_mag: int = -1, p_reserve: int = -1) -> void:
 
 
 func label() -> String:
-	return data.get("label", "徒手")
+	return data.get("label", "波克剑")
 
 
 func hold_trigger() -> void:
@@ -123,6 +124,7 @@ func _try_fire() -> void:
 	_cool = 60.0 / data.rpm
 	mag_left -= 1
 	_fire_ray()
+	last_shot_msec = Time.get_ticks_msec()
 	_kick = 0.06
 	if is_player:
 		owner_body.add_recoil(data.recoil * (0.6 if is_ads else 1.0))

@@ -18,6 +18,8 @@ var _anim_time := 0.0
 var _legs: Array[Node3D] = []
 var _wings: Array[Node3D] = []
 var _home := Vector3.ZERO
+var _alert_left := -1.0   # >0 表示正处于警觉冻结中
+var _alerted := false     # 本轮接近已警觉过，离开 26m 后重置
 
 
 func setup(p_species: String, p_terrain: Terrain, p_player: Player) -> void:
@@ -229,7 +231,43 @@ func _physics_process(delta: float) -> void:
 		return
 	_think_time -= delta
 	var distance := global_position.distance_to(player.global_position)
-	var aggressive := species in ["wolf", "bear"] and distance < (24.0 if species == "wolf" else 18.0)
+	# 狼群规则：孤狼保持距离，成群（18m 内有同伴）或贴脸才进攻。
+	var pack_near := false
+	if species == "wolf":
+		for other in get_tree().get_nodes_in_group("wildlife"):
+			if other != self and other.alive and other.species == "wolf" and other.global_position.distance_to(global_position) < 18.0:
+				pack_near = true
+				break
+	# 夜晚狼更凶：即使没有同伴，18m 内也会主动出击。
+	var night := false
+	var scene := get_tree().current_scene
+	if scene and scene.get("daynight") != null:
+		night = scene.daynight.is_night()
+	var aggressive := (species == "bear" and distance < 18.0) or (species == "wolf" and ((pack_near and distance < 24.0) or distance < 10.0 or (night and distance < 18.0)))
+	# 警觉中间态：发现玩家先定格注视（头顶 !），再决定进攻或逃跑——“被注意到”是动物活起来的关键。
+	var notice_radius := 12.0 if species == "boar" else 18.0 if species == "wolf" else 14.0
+	if distance > 26.0:
+		_alerted = false
+	if not _alerted and not aggressive and distance < notice_radius and _alert_left < 0.0:
+		_alert_left = randf_range(0.9, 1.4)
+		_alerted = true
+		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.6 if species != "bear" else 2.4, 0), "!", Color(1.0, 1.0, 1.0))
+	if _alert_left >= 0.0:
+		_alert_left -= delta
+		var to_player := (player.global_position - global_position)
+		to_player.y = 0.0
+		if to_player.length_squared() > 0.01:
+			rotation.y = lerp_angle(rotation.y, atan2(to_player.normalized().x, to_player.normalized().z) + PI, delta * 10.0)
+		velocity.x = 0.0
+		velocity.z = 0.0
+		velocity.y = -4.0
+		move_and_slide()
+		global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
+		rotation.x = lerpf(rotation.x, -0.14, delta * 8.0)   # 竖耳抬头的警觉 pose
+		if _alert_left < 0.0 and aggressive:
+			_move_target = player.global_position
+		return
+	rotation.x = lerpf(rotation.x, 0.0, delta * 6.0)
 	if _think_time <= 0.0:
 		_think_time = randf_range(1.2, 2.8)
 		if aggressive:

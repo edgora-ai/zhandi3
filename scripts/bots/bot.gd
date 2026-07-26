@@ -43,6 +43,14 @@ var _arm_l: Node3D
 var _arm_r: Node3D
 var _leg_l: Node3D
 var _leg_r: Node3D
+var _elbow_l: Node3D
+var _elbow_r: Node3D
+var _knee_l: Node3D
+var _knee_r: Node3D
+var _visual: Node3D
+var _head: Node3D
+var _look_phase := 0.0
+var _glance_yaw := 0.0
 
 
 func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3) -> void:
@@ -86,29 +94,41 @@ func _build_visual() -> void:
 	var pants := jacket.darkened(0.35)
 	var skin := Color(0.87, 0.70, 0.55)
 
-	# 骨盆 + 躯干
-	_bp(Vector3(0.34, 0.24, 0.27), pants, Vector3(0, 0.76, 0))
-	_caps(self, 0.29, 0.92, jacket, Vector3(0, 1.10, 0))
-	# 战术背心 + 胸前弹匣袋
-	_bp(Vector3(0.42, 0.42, 0.33), jacket.darkened(0.40), Vector3(0, 1.16, 0), null, 0.010)
-	for i in range(3):
-		_bp(Vector3(0.09, 0.13, 0.06), jacket.darkened(0.58), Vector3(-0.11 + i * 0.11, 1.13, -0.19), null, 0.006)
-	# 背包 + 包盖 + 侧袋
-	_bp(Vector3(0.36, 0.44, 0.18), jacket.darkened(0.45), Vector3(0, 1.18, 0.28), null, 0.010)
-	_bp(Vector3(0.30, 0.10, 0.16), jacket.darkened(0.58), Vector3(0, 1.43, 0.28), null, 0.006)
-	_bp(Vector3(0.10, 0.20, 0.12), jacket.darkened(0.52), Vector3(0.22, 1.10, 0.24), null, 0.006)
-	# 腰带 + 腿挂包
-	_bp(Vector3(0.40, 0.09, 0.32), pants.darkened(0.35), Vector3(0, 0.86, 0), null, 0.006)
-	_bp(Vector3(0.12, 0.16, 0.10), pants.darkened(0.25), Vector3(0.20, 0.70, -0.06), null, 0.006)
+	_visual = Node3D.new()
+	_visual.name = "Visual"
+	add_child(_visual)
 
-	# 头 + 眼睛 + 鼻子
-	_sph(self, 0.21, 0.40, skin, Vector3(0, 1.58, 0))
+	# 骨盆 + 躯干（全部挂在 _visual 下，整体做起伏/前倾/呼吸）
+	_bp(Vector3(0.34, 0.24, 0.27), pants, Vector3(0, 0.76, 0), _visual)
+	_caps(_visual, 0.29, 0.92, jacket, Vector3(0, 1.10, 0))
+	# 战术背心 + 胸前弹匣袋
+	_bp(Vector3(0.42, 0.42, 0.33), jacket.darkened(0.40), Vector3(0, 1.16, 0), _visual, 0.010)
+	for i in range(3):
+		_bp(Vector3(0.09, 0.13, 0.06), jacket.darkened(0.58), Vector3(-0.11 + i * 0.11, 1.13, -0.19), _visual, 0.006)
+	# 背包 + 包盖 + 侧袋
+	_bp(Vector3(0.36, 0.44, 0.18), jacket.darkened(0.45), Vector3(0, 1.18, 0.28), _visual, 0.010)
+	_bp(Vector3(0.30, 0.10, 0.16), jacket.darkened(0.58), Vector3(0, 1.43, 0.28), _visual, 0.006)
+	_bp(Vector3(0.10, 0.20, 0.12), jacket.darkened(0.52), Vector3(0.22, 1.10, 0.24), _visual, 0.006)
+	# 腰带 + 腿挂包
+	_bp(Vector3(0.40, 0.09, 0.32), pants.darkened(0.35), Vector3(0, 0.86, 0), _visual, 0.006)
+	_bp(Vector3(0.12, 0.16, 0.10), pants.darkened(0.25), Vector3(0.20, 0.70, -0.06), _visual, 0.006)
+
+	# 头部独立枢轴：脸、头盔都挂在 _head 上，能转头看人。
+	_head = Node3D.new()
+	_head.position = Vector3(0, 1.50, 0)
+	_visual.add_child(_head)
+	_sph(_head, 0.21, 0.40, skin, Vector3(0, 0.08, 0))
+	# 眼白 + 瞳孔：大比例眼睛是卡通角色“有脸”的关键。
 	for sx in [-1.0, 1.0]:
-		var eye := _sph(self, 0.030, 0.05, Color(0.10, 0.08, 0.08), Vector3(sx * 0.075, 1.60, -0.175), 0.0)
-		eye.scale = Vector3(1.0, 1.4, 0.6)
-	_bp(Vector3(0.05, 0.07, 0.05), skin.darkened(0.08), Vector3(0, 1.53, -0.20), null, 0.0)
+		var white := _sph(_head, 0.052, 0.09, Color(0.96, 0.96, 0.94), Vector3(sx * 0.078, 0.10, -0.155), 0.0)
+		white.scale = Vector3(1.0, 1.35, 0.55)
+		var pupil := _sph(_head, 0.026, 0.05, Color(0.10, 0.09, 0.10), Vector3(sx * 0.078, 0.095, -0.195), 0.0)
+		pupil.scale = Vector3(1.0, 1.35, 0.45)
+		var brow := _bp(Vector3(0.075, 0.018, 0.02), Color(0.16, 0.12, 0.10), Vector3(sx * 0.078, 0.185, -0.175), _head, 0.0)
+		brow.rotation_degrees.z = sx * -8.0
+	_bp(Vector3(0.05, 0.07, 0.05), skin.darkened(0.08), Vector3(0, 0.03, -0.20), _head, 0.0)
 	# 头盔：盔体 + 帽檐 + 盔带
-	_sph(self, 0.25, 0.32, jacket.darkened(0.35), Vector3(0, 1.67, 0))
+	_sph(_head, 0.25, 0.32, jacket.darkened(0.35), Vector3(0, 0.17, 0))
 	var brim := MeshInstance3D.new()
 	var bm := CylinderMesh.new()
 	bm.top_radius = 0.265
@@ -117,16 +137,24 @@ func _build_visual() -> void:
 	bm.radial_segments = 10
 	brim.mesh = bm
 	brim.material_override = Toon.make_material(jacket.darkened(0.42), true, 0.008)
-	brim.position.y = 1.615
-	add_child(brim)
-	_bp(Vector3(0.05, 0.12, 0.03), jacket.darkened(0.55), Vector3(0.20, 1.55, 0), null, 0.0)
-	_bp(Vector3(0.05, 0.12, 0.03), jacket.darkened(0.55), Vector3(-0.20, 1.55, 0), null, 0.0)
+	brim.position.y = 0.115
+	_head.add_child(brim)
+	_bp(Vector3(0.05, 0.12, 0.03), jacket.darkened(0.55), Vector3(0.20, 0.05, 0), _head, 0.0)
+	_bp(Vector3(0.05, 0.12, 0.03), jacket.darkened(0.55), Vector3(-0.20, 0.05, 0), _head, 0.0)
 
-	# 四肢：肩/髋为枢轴，行走时绕 X 摆动
-	_arm_l = _make_arm(Vector3(-0.43, 1.38, 0), jacket, skin)
-	_arm_r = _make_arm(Vector3(0.43, 1.38, 0), jacket, skin)
-	_leg_l = _make_leg(Vector3(-0.15, 0.74, 0), pants)
-	_leg_r = _make_leg(Vector3(0.15, 0.74, 0), pants)
+	# 四肢：肩/肘、髋/膝两级枢轴，行走时带关节弯曲。
+	var arms := _make_arm(Vector3(-0.43, 1.38, 0), jacket, skin)
+	_arm_l = arms[0]
+	_elbow_l = arms[1]
+	var arms_r := _make_arm(Vector3(0.43, 1.38, 0), jacket, skin)
+	_arm_r = arms_r[0]
+	_elbow_r = arms_r[1]
+	var legs := _make_leg(Vector3(-0.15, 0.74, 0), pants)
+	_leg_l = legs[0]
+	_knee_l = legs[1]
+	var legs_r := _make_leg(Vector3(0.15, 0.74, 0), pants)
+	_leg_r = legs_r[0]
+	_knee_r = legs_r[1]
 
 	# 步枪挂在右手：机匣 + 枪管 + 弹匣 + 枪托
 	var gun := Node3D.new()
@@ -186,27 +214,35 @@ func _sph(parent: Node3D, radius: float, height: float, color: Color, pos: Vecto
 	return mi
 
 
-func _make_arm(pivot: Vector3, jacket: Color, skin: Color) -> Node3D:
-	var j := Node3D.new()
-	j.position = pivot
-	add_child(j)
-	_bp(Vector3(0.17, 0.12, 0.17), jacket.darkened(0.30), Vector3(0, 0.02, 0), j)  # 肩甲
-	_caps(j, 0.080, 0.30, jacket, Vector3(0, -0.16, 0))                              # 上臂
-	_caps(j, 0.068, 0.28, jacket.darkened(0.10), Vector3(0, -0.44, 0))               # 前臂
-	_bp(Vector3(0.10, 0.08, 0.10), jacket.darkened(0.35), Vector3(0, -0.31, 0), j, 0.0)  # 肘部
-	_sph(j, 0.062, 0.11, skin, Vector3(0, -0.60, 0))                                 # 手
-	return j
+# 手臂 = 肩枢轴（上臂）+ 肘枢轴（前臂+手），返回 [肩, 肘]。
+func _make_arm(pivot: Vector3, jacket: Color, skin: Color) -> Array:
+	var shoulder := Node3D.new()
+	shoulder.position = pivot
+	_visual.add_child(shoulder)
+	_bp(Vector3(0.17, 0.12, 0.17), jacket.darkened(0.30), Vector3(0, 0.02, 0), shoulder)  # 肩甲
+	_caps(shoulder, 0.080, 0.32, jacket, Vector3(0, -0.17, 0))                            # 上臂
+	var elbow := Node3D.new()
+	elbow.position = Vector3(0, -0.33, 0)
+	shoulder.add_child(elbow)
+	_bp(Vector3(0.10, 0.09, 0.10), jacket.darkened(0.35), Vector3.ZERO, elbow, 0.0)       # 肘部
+	_caps(elbow, 0.068, 0.30, jacket.darkened(0.10), Vector3(0, -0.16, 0))                # 前臂
+	_sph(elbow, 0.062, 0.11, skin, Vector3(0, -0.33, 0))                                  # 手
+	return [shoulder, elbow]
 
 
-func _make_leg(pivot: Vector3, pants: Color) -> Node3D:
-	var j := Node3D.new()
-	j.position = pivot
-	add_child(j)
-	_caps(j, 0.105, 0.34, pants, Vector3(0, -0.18, 0))                               # 大腿
-	_bp(Vector3(0.14, 0.12, 0.08), pants.darkened(0.30), Vector3(0, -0.36, -0.08), j, 0.0)  # 护膝
-	_caps(j, 0.082, 0.32, pants.darkened(0.10), Vector3(0, -0.50, 0))                # 小腿
-	_bp(Vector3(0.15, 0.10, 0.28), Color(0.16, 0.14, 0.12), Vector3(0, -0.68, -0.04), j, 0.008)  # 军靴
-	return j
+# 腿 = 髋枢轴（大腿）+ 膝枢轴（小腿+军靴），返回 [髋, 膝]。
+func _make_leg(pivot: Vector3, pants: Color) -> Array:
+	var hip := Node3D.new()
+	hip.position = pivot
+	_visual.add_child(hip)
+	_caps(hip, 0.105, 0.36, pants, Vector3(0, -0.19, 0))                                  # 大腿
+	var knee := Node3D.new()
+	knee.position = Vector3(0, -0.38, 0)
+	hip.add_child(knee)
+	_bp(Vector3(0.14, 0.12, 0.08), pants.darkened(0.30), Vector3(0, 0.01, -0.07), knee, 0.0)  # 护膝
+	_caps(knee, 0.082, 0.32, pants.darkened(0.10), Vector3(0, -0.14, 0))                  # 小腿
+	_bp(Vector3(0.15, 0.10, 0.28), Color(0.16, 0.14, 0.12), Vector3(0, -0.32, -0.04), knee, 0.008)  # 军靴
+	return [hip, knee]
 
 
 func get_aim_origin() -> Vector3:
@@ -418,18 +454,37 @@ func _physics_process(delta: float) -> void:
 	if regen_rate > 0.0 and hp < MAX_HP:
 		hp = minf(MAX_HP, hp + regen_rate * delta)
 
-	# 四肢程序动画：移动摆臂摆腿，交战时右臂端枪
+	# 程序动画：两级关节步态 + 身体起伏/前倾 + 呼吸 + 头部注视；交战端枪。
 	var h_speed := Vector2(velocity.x, velocity.z).length()
-	_anim_t += delta * h_speed * 2.4
-	var amp := clampf(h_speed / RUN, 0.0, 1.0) * 0.6
-	var swing := sin(_anim_t) * amp
+	_anim_t += delta * (1.1 + h_speed * 2.3)
+	var amp := clampf(h_speed / RUN, 0.0, 1.0)
+	var swing := sin(_anim_t) * 0.62 * amp
 	_leg_l.rotation.x = swing
 	_leg_r.rotation.x = -swing
-	_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -swing * 0.8, delta * 12.0)
+	# 小腿在后摆→前迈时弯曲；手臂与腿反相，肘部带微弯。
+	_knee_l.rotation.x = maxf(0.0, sin(_anim_t)) * 0.85 * amp
+	_knee_r.rotation.x = maxf(0.0, -sin(_anim_t)) * 0.85 * amp
+	# 身体：两倍频起伏 + 速度前倾；站立时只剩呼吸。
+	_visual.position.y = abs(cos(_anim_t)) * 0.055 * amp + sin(_anim_t * 0.9) * 0.012 * (1.0 - amp)
+	_visual.rotation.x = lerpf(_visual.rotation.x, amp * 0.13, delta * 6.0)
 	if state == State.FIGHT and aim_target:
-		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -1.3, delta * 10.0)
+		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -1.35, delta * 10.0)
+		_elbow_r.rotation.x = lerpf(_elbow_r.rotation.x, -0.06, delta * 10.0)
+		_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -0.95, delta * 10.0)
+		_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 0.55, delta * 10.0)
+		_elbow_l.rotation.x = lerpf(_elbow_l.rotation.x, -0.85, delta * 10.0)
 	else:
-		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, swing * 0.8, delta * 12.0)
+		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, swing * 0.75, delta * 12.0)
+		_elbow_r.rotation.x = lerpf(_elbow_r.rotation.x, -0.22 - maxf(0.0, -sin(_anim_t)) * 0.35 * amp, delta * 12.0)
+		_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -swing * 0.75, delta * 12.0)
+		_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 0.0, delta * 10.0)
+		_elbow_l.rotation.x = lerpf(_elbow_l.rotation.x, -0.22 - maxf(0.0, sin(_anim_t)) * 0.35 * amp, delta * 12.0)
+	# 头部：平时偶尔环顾一下（交战时身体已面向目标）。
+	_look_phase -= delta
+	if _look_phase <= 0.0:
+		_look_phase = randf_range(2.5, 5.0)
+		_glance_yaw = randf_range(-0.55, 0.55)
+	_head.rotation.y = lerp_angle(_head.rotation.y, _glance_yaw if _look_phase < 1.2 else 0.0, delta * 3.0)
 
 
 func _seek(target: Vector3) -> Vector3:

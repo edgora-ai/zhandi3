@@ -28,6 +28,7 @@ const WILD_ROADS := [
 	[Vector2(-28, -34), Vector2(12, -78)],
 	[Vector2(12, -78), Vector2(4, -112)],
 	[Vector2(-112, 92), Vector2(-105, 82)],
+	[Vector2(-72, 21), Vector2(-70.7, 16.2)],
 ]
 
 var noise := FastNoiseLite.new()
@@ -271,6 +272,14 @@ func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, 
 		_water_material.set_shader_parameter("color_deep", water_deep)
 		_water_material.set_shader_parameter("rain_amount", rain_amount)
 		_water_material.set_shader_parameter("ice_amount", ice_amount)
+
+
+# 天气系统专用：只改湿润与雨量，不动季节色调。
+func set_weather(wetness: float, rain_amount: float) -> void:
+	if _ground_material:
+		_ground_material.set_shader_parameter("wetness", wetness)
+	if _water_material:
+		_water_material.set_shader_parameter("rain_amount", rain_amount)
 
 
 # 水面 shader 用：把解析高度烘成单通道纹理（R = 高度，米）

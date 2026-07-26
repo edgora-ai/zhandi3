@@ -39,6 +39,9 @@ var _camera_idle := 0.0
 var _head_node: Node3D
 var bonded := false
 var _rider: Node3D
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
 var _buck_t := 0.0
 var _graze_t := 0.0
 var _call_target: Player = null
@@ -57,7 +60,8 @@ func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 1
 	_build_collision()
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
 	_build_camera()
 
 
@@ -68,6 +72,54 @@ func _build_collision() -> void:
 	col.shape = box
 	col.position = Vector3(0, 1.35, -0.08)
 	add_child(col)
+
+
+# glb 视觉：Blender 管线生成的蒙皮马与步态动画；缺失时回退到程序化模型。
+# _visual 仍作为包装节点存在（坡面压倾、骑手脚本都挂在它上面）。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/horse.glb"):
+		return false
+	var scene_res := load("res://assets/models/horse.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_visual = Node3D.new()
+	_visual.name = "HorseVisual"
+	add_child(_visual)
+	_glb = scene_res.instantiate()
+	_visual.add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		_visual.queue_free()
+		_visual = null
+		return false
+	# 毛色按本马配色重染（Blender 材质名 → 当前个体的颜色）。
+	var tint := {
+		"horse_coat": coat_color,
+		"horse_coat_light": coat_light_color,
+		"horse_mane": mane_color,
+		"horse_marking": marking_color,
+	}
+	for mi in _glb.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		for s in range(mesh_inst.mesh.get_surface_count()):
+			var mat_res := mesh_inst.mesh.surface_get_material(s)
+			if mat_res and tint.has(mat_res.resource_name):
+				mesh_inst.set_surface_override_material(s, Toon.make_material(tint[mat_res.resource_name], true, 0.018))
+	_build_rider()
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		_cur_anim = clip
+		_ap.play(clip)
 
 
 func _build_model() -> void:
@@ -527,7 +579,22 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 		_leg_roots[i].rotation.x = wave * amount
 		_lower_legs[i].rotation.x = maxf(0.0, -wave) * 0.58 * speed_ratio
 	var bob := absf(sin(_anim_time)) * 0.10 * speed_ratio * amp_mul
-	_visual.position.y = lerpf(_visual.position.y, bob, minf(1.0, delta * 10.0))
+	if _ap == null:
+		_visual.position.y = lerpf(_visual.position.y, bob, minf(1.0, delta * 10.0))
+	# glb 步态：按速度档位与吃草/尥蹶子状态选剪辑。
+	if _ap:
+		if _buck_t > 0.0:
+			_play(&"buck")
+		elif driver == null and actual_speed < 0.2 and fmod(_graze_t, 9.0) > 6.2:
+			_play(&"graze")
+		elif speed_ratio > 0.75:
+			_play(&"gallop")
+		elif speed_ratio > 0.4:
+			_play(&"trot")
+		elif actual_speed > 0.15:
+			_play(&"walk")
+		else:
+			_play(&"idle")
 	# 头部随步态点头；无人骑乘且静置时周期性低头吃草。
 	if _head_node:
 		if driver or actual_speed > 0.5:

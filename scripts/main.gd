@@ -210,6 +210,19 @@ func _ready() -> void:
 		player._melee_swing()
 	if args.has("--bombtest"):
 		player._place_bomb()
+	if args.has("--cryonistest") and terrain:
+		var wspot := Vector3.ZERO
+		for xi in range(-60, 61, 2):
+			if terrain.is_in_water(float(xi), 50.0):
+				wspot = Vector3(float(xi), Terrain.WATER_LEVEL, 50.0)
+				break
+		if wspot != Vector3.ZERO:
+			player.global_position = wspot + Vector3(0, 1.5, 5.0)
+			var wdir2 := (wspot - player.camera.global_position).normalized()
+			player.rotation.y = atan2(wdir2.x, wdir2.z) + PI
+			player.pitch = -0.2
+			player.camera.rotation.x = -0.2
+			player._raise_ice()
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:
@@ -1041,6 +1054,23 @@ func _update_wild_test() -> void:
 				var pv: Vector3 = player.velocity
 				bomb.detonate()
 				print("[wildtest] bomb monster_hp %.0f->%.0f knock=%.1f" % [bm_hp, bm2.hp, (player.velocity - pv).length()])
+			# 制冰回归：对水面连升四根冰柱，最多保留三根。
+			var water_spot := Vector3.ZERO
+			for xi in range(-60, 61, 2):
+				if terrain.is_in_water(float(xi), 50.0):
+					water_spot = Vector3(float(xi), Terrain.WATER_LEVEL, 50.0)
+					break
+			if water_spot != Vector3.ZERO:
+				player.global_position = water_spot + Vector3(0, 1.5, 4.0)
+				var wdir := (water_spot - player.camera.global_position).normalized()
+				player.rotation.y = atan2(wdir.x, wdir.z) + PI
+				player.pitch = -0.25
+				player.camera.rotation.x = -0.25
+				player._raise_ice()
+				player._raise_ice()
+				player._raise_ice()
+				player._raise_ice()
+				print("[wildtest] cryonis pillars=%d" % player._pillars.size())
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

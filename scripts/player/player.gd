@@ -94,6 +94,7 @@ var _swing_hit_done := false
 var _hitstop_end_ms := 0
 var _bombs: Array[RemoteBomb] = []
 var _bomb_hint_done := false
+var _pillars: Array[IcePillar] = []
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
@@ -224,6 +225,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_place_bomb()
 			KEY_B:
 				_detonate_bombs()
+			KEY_T:
+				_raise_ice()
 			KEY_1:
 				switch_slot(0)
 			KEY_2:
@@ -250,6 +253,40 @@ func _detonate_bombs() -> void:
 	for b in _bombs:
 		b.detonate()
 	_bombs.clear()
+
+
+# 制冰：瞄准水面按 T 升起冰柱（至多 3 根，超出顶替最旧），可站立渡河。
+func _raise_ice() -> void:
+	if terrain == null:
+		return
+	_pillars = _pillars.filter(func(p: IcePillar) -> bool: return is_instance_valid(p))
+	var origin := camera.global_position
+	var fwd := get_aim_dir()
+	var spot := Vector3.ZERO
+	var bed_y := 0.0
+	var found := false
+	for i in range(48):
+		var p := origin + fwd * (0.5 * i)
+		if terrain.is_in_water(p.x, p.z) and p.y <= Terrain.WATER_LEVEL + 0.35:
+			spot = Vector3(p.x, Terrain.WATER_LEVEL, p.z)
+			bed_y = terrain.get_height(p.x, p.z)
+			found = true
+			break
+	if not found:
+		hud.add_feed("制冰需要瞄准水面")
+		return
+	var h := Terrain.WATER_LEVEL + 1.0 - bed_y
+	if h > 4.5:
+		hud.add_feed("水太深，冰柱够不到底")
+		return
+	if _pillars.size() >= 3:
+		_pillars[0].shatter()
+		_pillars.remove_at(0)
+	var pillar := IcePillar.create(get_tree().current_scene, Vector3(spot.x, bed_y, spot.z), h)
+	_pillars.append(pillar)
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play_at("freeze", spot, -6.0)
 
 
 func _toggle_prone() -> void:

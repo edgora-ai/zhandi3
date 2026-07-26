@@ -212,4 +212,9 @@ crackle = [0.0] * int(SR * 0.06) + noise_burst(0.4, 0.045, 0.38)
 expl = mix(mix(boom, blast), crackle)
 write_wav("explosion.wav", expl)
 
+# 制冰：结晶风铃 + 寒气白噪
+chime = mix(tone(0.5, 880, 0.30, 0.35), tone(0.6, 1320, 0.36, 0.28))
+frost = noise_burst(0.5, 0.22, 0.25, 0.35)
+write_wav("freeze.wav", mix(chime, frost))
+
 print("done")

@@ -26,6 +26,14 @@ const CHARGE_TIME := 2.2
 const BEAM_DAMAGE := 30.0
 
 
+var _glb: Node3D
+var _ap: AnimationPlayer
+var _cur_anim := ""
+var _anim_hold := 0.0
+var _eye_mesh: MeshInstance3D
+var _eye_surface := -1
+
+
 func setup(p_terrain: Terrain, p_player: Player) -> void:
 	terrain = p_terrain
 	player = p_player
@@ -43,7 +51,79 @@ func _ready() -> void:
 	col.shape = shape
 	col.position.y = 1.0
 	add_child(col)
-	_build_model()
+	if not _try_glb_visual():
+		_build_model()
+
+
+# glb 视觉：Blender 管线生成的蒙皮守卫与动画；缺失时回退到程序化模型。
+func _try_glb_visual() -> bool:
+	if not ResourceLoader.exists("res://assets/models/guardian.glb"):
+		return false
+	var scene_res := load("res://assets/models/guardian.glb") as PackedScene
+	if scene_res == null:
+		return false
+	_glb = scene_res.instantiate()
+	add_child(_glb)
+	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap == null:
+		_glb.queue_free()
+		_glb = null
+		return false
+	# 找到独眼材质面（Blender 材质名 guardian_eye），供瞄准换色。
+	for mi in _glb.find_children("*", "MeshInstance3D", true, false):
+		var mesh_inst := mi as MeshInstance3D
+		if mesh_inst == null or mesh_inst.mesh == null:
+			continue
+		for s in range(mesh_inst.mesh.get_surface_count()):
+			var mat_res := mesh_inst.mesh.surface_get_material(s)
+			if mat_res and mat_res.resource_name == "guardian_eye":
+				_eye_mesh = mesh_inst
+				_eye_surface = s
+	# 瞄准激光束（与程序化路径同款）。
+	_laser = MeshInstance3D.new()
+	var laser_mesh := CylinderMesh.new()
+	laser_mesh.top_radius = 0.015
+	laser_mesh.bottom_radius = 0.015
+	laser_mesh.height = 1.0
+	laser_mesh.radial_segments = 5
+	_laser.mesh = laser_mesh
+	var laser_mat := StandardMaterial3D.new()
+	laser_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	laser_mat.albedo_color = Color(1.0, 0.12, 0.10, 0.85)
+	laser_mat.emission_enabled = true
+	laser_mat.emission = Color(1.0, 0.08, 0.06)
+	laser_mat.emission_energy_multiplier = 2.5
+	laser_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_laser.material_override = laser_mat
+	_laser.visible = false
+	add_child(_laser)
+	_play(&"idle")
+	return true
+
+
+func _play(clip: StringName) -> void:
+	if _ap == null or _cur_anim == clip:
+		return
+	if _ap.has_animation(clip):
+		# glTF 导入的动画默认不循环（loop_mode=0），持续状态剪辑手动开循环。
+		var anim_res := _ap.get_animation(clip)
+		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"smash", &"hit", &"die", &"buck", &"dash", &"attack"]):
+			anim_res.loop_mode = Animation.LOOP_LINEAR
+		_cur_anim = clip
+		_ap.play(clip)
+
+
+# 独眼换色：平时青色，瞄准时变红（glb 路径）。
+func _set_eye(c: Color) -> void:
+	if _eye_mesh == null or _eye_surface < 0:
+		return
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = c
+	m.emission_enabled = true
+	m.emission = c
+	m.emission_energy_multiplier = 2.4
+	_eye_mesh.set_surface_override_material(_eye_surface, m)
 
 
 func _build_model() -> void:
@@ -147,6 +227,8 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		return
 	hp -= amount
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.0, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
+	_play(&"hit")
+	_anim_hold = 0.25
 	if hp <= 0.0:
 		alive = false
 		if from and from.get("kills") != null:
@@ -154,6 +236,11 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		Loot.spawn(get_tree().current_scene, global_position, "armor", "", 50, 2)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.8, 0, 0.5), "ammo", "", 90, 2)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), "击破!", Color(1.0, 0.55, 0.20))
+		if _ap:
+			_play(&"die")
+			collision_layer = 0
+			collision_mask = 0
+			await get_tree().create_timer(0.8).timeout
 		queue_free()
 
 
@@ -174,13 +261,18 @@ func _physics_process(delta: float) -> void:
 		_charge = -1.0
 		_cooldown = 4.0
 		_laser.visible = false
-		_eye_mat.emission = Color(0.05, 0.95, 0.85)
-		_eye_mat.albedo_color = Color(0.10, 0.90, 0.85)
+		if _eye_mat:
+			_eye_mat.emission = Color(0.05, 0.95, 0.85)
+			_eye_mat.albedo_color = Color(0.10, 0.90, 0.85)
+		_set_eye(Color(0.10, 0.90, 0.85))
 	elif dist < SIGHT and _cooldown <= 0.0 and player.alive:
 		_charge = 0.0
 		_laser.visible = true
-		_eye_mat.emission = Color(1.0, 0.10, 0.08)
-		_eye_mat.albedo_color = Color(1.0, 0.15, 0.12)
+		if _eye_mat:
+			_eye_mat.emission = Color(1.0, 0.10, 0.08)
+			_eye_mat.albedo_color = Color(1.0, 0.15, 0.12)
+		_set_eye(Color(1.0, 0.14, 0.10))
+		_play(&"aim")
 	# 巡逻：充能时定住。
 	if _charge < 0.0:
 		_think -= delta
@@ -207,6 +299,14 @@ func _physics_process(delta: float) -> void:
 	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 2.0, 0.0, 1.0) * 0.3
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(_anim * 6.0 + float(i) * PI * 0.67) * stride
+	_anim_hold = maxf(0.0, _anim_hold - delta)
+	if _ap and _anim_hold <= 0.0:
+		if _charge >= 0.0:
+			pass
+		elif Vector2(velocity.x, velocity.z).length() > 0.2:
+			_play(&"walk")
+		else:
+			_play(&"idle")
 
 
 func _aim_laser() -> void:

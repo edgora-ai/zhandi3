@@ -47,6 +47,7 @@ func _process(delta: float) -> void:
 		if _next >= _flowers.size():
 			completed = true
 			Loot.spawn(get_tree().current_scene, global_position + _flowers[_flowers.size() - 1].position + Vector3(0, 0.6, 0), "seed", "", 1, 3)
+			Korok.spawn(get_tree().current_scene, global_position + _flowers[_flowers.size() - 1].position, player.global_position)
 			var scene := get_tree().current_scene
 			if scene and scene.get("hud") != null:
 				scene.hud.add_feed("花径走到了尽头！")

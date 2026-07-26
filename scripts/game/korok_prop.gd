@@ -103,6 +103,10 @@ func take_damage(_amount: float, from: Variant = null, _part_name: String = "bod
 		if scene and scene.get("hud") != null:
 			scene.hud.add_feed("怪石翻倒，下面藏着什么！")
 	Loot.spawn(scene, global_position + Vector3(0, 0.8, 0), "seed", "", 1, 3)
+	var face := global_position
+	if from is Node3D:
+		face = (from as Node3D).global_position
+	Korok.spawn(scene, global_position, face)
 
 
 func _process(delta: float) -> void:

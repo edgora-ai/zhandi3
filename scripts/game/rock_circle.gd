@@ -55,6 +55,7 @@ func _process(delta: float) -> void:
 		if _hold >= 1.0:
 			completed = true
 			Loot.spawn(get_tree().current_scene, global_position + _gap_pos + Vector3(0, 0.5, 0), "seed", "", 1, 3)
+			Korok.spawn(get_tree().current_scene, global_position + _gap_pos, player.global_position)
 			var scene := get_tree().current_scene
 			if scene and scene.get("hud") != null:
 				scene.hud.add_feed("石头阵补全了！")

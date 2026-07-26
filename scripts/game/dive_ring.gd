@@ -31,6 +31,7 @@ func _process(_delta: float) -> void:
 	if player.global_position.distance_to(global_position) < 1.4:
 		completed = true
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.4, 0), "seed", "", 1, 3)
+		Korok.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), player.global_position)
 		var scene := get_tree().current_scene
 		if scene and scene.get("hud") != null:
 			scene.hud.add_feed("从睡莲环里钻出来一颗种子！")

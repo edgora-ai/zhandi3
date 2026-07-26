@@ -202,6 +202,10 @@ func _ready() -> void:
 			player.global_position = rt_bike.global_position + Vector3(1.2, 0, 0)
 			rt_bike.enter(player)
 			rt_bike.debug_forward = 0.5
+	if args.has("--koroktest") and terrain:
+		var kpos := player.global_position - player.global_transform.basis.z * 2.5
+		kpos.y = terrain.get_height(kpos.x, kpos.z)
+		Korok.spawn(self, kpos, player.global_position)
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
 		_ft_bot = Bot.new()
 		add_child(_ft_bot)

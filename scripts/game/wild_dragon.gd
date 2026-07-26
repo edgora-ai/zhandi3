@@ -51,6 +51,15 @@ func _build_model() -> void:
 		_sphere(self, 0.11, horn, Vector3(sx * 0.48, 1.96, -7.18), Vector3.ONE)
 		var head_horn := _capsule(self, 0.12, 1.3, horn, Vector3(sx * 0.52, 2.48, -6.35), Vector3(-20, 0, sx * -22), Vector3.ONE)
 		head_horn.rotation_degrees.z = sx * -22.0
+	# 发光龙眼：火山巨龙的脸面（旧模型无眼）。
+	var eye_mat := StandardMaterial3D.new()
+	eye_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	eye_mat.albedo_color = Color(1.0, 0.80, 0.15)
+	eye_mat.emission_enabled = true
+	eye_mat.emission = Color(1.0, 0.65, 0.08)
+	eye_mat.emission_energy_multiplier = 2.2
+	for sx in [-1.0, 1.0]:
+		_sphere(self, 0.13, eye_mat, Vector3(sx * 0.44, 1.98, -7.02), Vector3.ONE)
 	# 背刺贯穿颈背和尾根。
 	for i in range(11):
 		var spike := _part(Vector3(0.18, 0.72 - i * 0.025, 0.42), horn, Vector3(0, 1.2, -4.5 + i * 0.72), self)

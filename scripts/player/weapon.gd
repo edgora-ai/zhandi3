@@ -23,6 +23,11 @@ const WEAPONS := {
 		"mag": 36, "start_reserve": 108, "spread": 2.0, "ads_spread": 1.0,
 		"reload": 1.5, "auto": true, "zoom": 1.15, "range": 130.0, "recoil": 0.2,
 	},
+	"bow": {
+		"label": "猎弓", "damage": 0.0, "head_mult": 1.0, "rpm": 60.0,
+		"mag": 1, "start_reserve": 24, "spread": 0.0, "ads_spread": 0.0,
+		"reload": 0.5, "auto": false, "zoom": 1.35, "range": 0.0, "recoil": 0.0,
+	},
 }
 
 const GUNMETAL := Color(0.15, 0.16, 0.18)
@@ -54,15 +59,16 @@ func setup(p_owner: CharacterBody3D, p_is_player: bool) -> void:
 
 func set_weapon(id: String, p_mag: int = -1, p_reserve: int = -1) -> void:
 	weapon_id = id
+	# 猎弓使用玩家侧的弓模型，先清掉上一把枪的视模型。
+	if viewmodel and (id == "" or id == "bow"):
+		viewmodel.queue_free()
+		viewmodel = null
+		muzzle = null
+		_flash = null
 	if id == "":
 		data = {}
 		mag_left = 0
 		reserve = 0
-		if viewmodel:
-			viewmodel.queue_free()
-			viewmodel = null
-			muzzle = null
-			_flash = null
 		ammo_changed.emit(0, 0)
 		return
 	data = WEAPONS[id]
@@ -70,7 +76,7 @@ func set_weapon(id: String, p_mag: int = -1, p_reserve: int = -1) -> void:
 	reserve = p_reserve if p_reserve >= 0 else data.start_reserve
 	reloading = false
 	_cool = 0.0
-	if is_player:
+	if is_player and id != "bow":
 		_build_viewmodel()
 	ammo_changed.emit(mag_left, reserve)
 

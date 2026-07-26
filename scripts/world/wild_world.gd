@@ -1192,6 +1192,9 @@ func _spawn_wild_loot() -> void:
 	Loot.spawn(scene, _ground(Vector3(4, 0, -121), 32.35 - terrain.get_height(4, -121)), "weapon", "dmr", 0, 3)
 	Loot.spawn(scene, _ground(Vector3(-132, 0, 109), 17.1), "weapon", "dmr", 0, 3)
 	Loot.spawn(scene, _ground(Vector3(106, 0, 28), 0.6), "weapon", "smg", 0, 1)
+	# 猎弓：遗迹门口与高原古树下各一把。
+	Loot.spawn(scene, _ground(Vector3(16, 0, -92), 0.6), "weapon", "bow", 0, 2)
+	Loot.spawn(scene, _ground(Vector3(-143, 0, 98), 0.6), "weapon", "bow", 0, 2)
 	# 弹药：五处营地、驿站、城堡、桥头、二塔顶。
 	for c in _camp_positions:
 		Loot.spawn(scene, c + Vector3(1.2, 0.1, 0.6), "ammo", "", 45, 1)

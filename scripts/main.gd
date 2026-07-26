@@ -59,6 +59,7 @@ var _wild_test_jeep_peak_speed := 0.0
 var _wild_test_loot_before := 0
 var _wild_test_stamina := 0.0
 var _wild_test_surf_start := Vector3.ZERO
+var _wild_test_moblin: WildMoblin = null
 var _wild_test_hp := 0.0
 
 
@@ -892,6 +893,7 @@ func _update_wild_test() -> void:
 			print("[wildtest] wild_loot weapons=%d ammo=%d npcs=%d" % [weapon_loot, ammo_loot, get_tree().get_nodes_in_group("npc").size()])
 			# 烹饪回归：火堆旁使用生兽肉应烤成烤兽肉；种子数量检查。
 			player.give_item("meat", 1)
+			player.backpack_items["mushroom"] = 0
 			var camp: Vector3 = wild_world._camp_positions[0]
 			player.global_position = camp + Vector3(1.5, 0, 0)
 			player.backpack_index = player.backpack_weapons.size() + 1
@@ -1025,11 +1027,11 @@ func _update_wild_test() -> void:
 				circle._process(1.1)
 			print("[wildtest] fish meat=%d circle=%s" % [int(player.backpack_items["meat"]) - meat_f, str(circle.completed if circle else false)])
 			# 莫布林回归：前摇结束后猛击命中；烤串加攻。
-			var moblin: WildMoblin = null
 			for e in get_tree().get_nodes_in_group("wild_enemy"):
 				if e is WildMoblin:
-					moblin = e as WildMoblin
+					_wild_test_moblin = e as WildMoblin
 					break
+			var moblin := _wild_test_moblin
 			if moblin:
 				player._dodge_iframe_end = -1.0
 				player.global_position = moblin.global_position + Vector3(0, 0, 2.0)
@@ -1044,6 +1046,23 @@ func _update_wild_test() -> void:
 			player.backpack_index = player.backpack_weapons.size() + 1
 			player._use_backpack_selection()
 			print("[wildtest] skewer mult=%.2f t=%.0f" % [player.skewer_mult, player._skewer_t])
+			# 弓箭回归：满拉弓射出箭矢，稍后检查命中。
+			if _wild_test_moblin:
+				player.weapon.set_weapon("bow")
+				player.global_position = _wild_test_moblin.global_position + Vector3(0, 0, 15)
+				var to_m3: Vector3 = _wild_test_moblin.global_position - player.global_position
+				player.rotation.y = atan2(to_m3.x, to_m3.z) + PI
+				player.pitch = 0.0
+				player.camera.rotation.x = 0.0
+				player._bow_draw = 1.0
+				_wild_test_hp = _wild_test_moblin.hp
+				player._fire_arrow()
+				print("[wildtest] bow reserve=%d" % player.weapon.reserve)
+			_wild_test_frame = 757
+		790:
+			if _wild_test_moblin:
+				print("[wildtest] bow_hit dmg=%.0f" % [_wild_test_hp - _wild_test_moblin.hp])
+			print("[wildtest] end nodes=%d" % Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
 			_wild_test_frame = -1
 
 

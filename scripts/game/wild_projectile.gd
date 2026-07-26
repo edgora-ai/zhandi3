@@ -14,13 +14,13 @@ func configure(p_kind: String, p_velocity: Vector3, p_damage: float, p_source: N
 	velocity = p_velocity
 	damage = p_damage
 	source = p_source
-	gravity = 2.0 if kind == "fire" else (0.0 if kind == "energy" else 9.0)
+	gravity = 2.0 if kind == "fire" else (0.0 if kind == "energy" else (6.0 if kind == "arrow" else 9.0))
 
 
 func _ready() -> void:
 	add_to_group("wild_projectile")
 	collision_layer = 0
-	collision_mask = 1 | 2
+	collision_mask = (1 | 4) if kind == "arrow" else (1 | 2)
 	var col := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
 	shape.radius = 0.22 if kind == "rock" else 0.30
@@ -30,6 +30,34 @@ func _ready() -> void:
 
 
 func _build_visual() -> void:
+	if kind == "arrow":
+		var shaft := MeshInstance3D.new()
+		var sm := BoxMesh.new()
+		sm.size = Vector3(0.035, 0.035, 0.75)
+		shaft.mesh = sm
+		shaft.material_override = Toon.make_material(Color(0.55, 0.40, 0.20), true, 0.006)
+		add_child(shaft)
+		var head := MeshInstance3D.new()
+		var hm := CylinderMesh.new()
+		hm.top_radius = 0.0
+		hm.bottom_radius = 0.05
+		hm.height = 0.12
+		hm.radial_segments = 6
+		head.mesh = hm
+		head.material_override = Toon.make_material(Color(0.70, 0.72, 0.75), true, 0.006)
+		head.rotation_degrees.x = -90.0
+		head.position = Vector3(0, 0, -0.42)
+		add_child(head)
+		var tail := MeshInstance3D.new()
+		var tm := BoxMesh.new()
+		tm.size = Vector3(0.02, 0.12, 0.10)
+		tail.mesh = tm
+		tail.material_override = Toon.make_material(Color(0.90, 0.92, 0.95), false)
+		tail.position = Vector3(0, 0, 0.36)
+		add_child(tail)
+		if velocity.length_squared() > 0.01:
+			look_at(global_position + velocity, Vector3.UP)
+		return
 	var mi := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
 	mesh.radius = 0.22 if kind == "rock" else 0.30

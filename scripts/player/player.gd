@@ -33,6 +33,8 @@ var _block_start := -1.0
 var debug_block := false   # 自动化测试用：强制举盾
 var dodge_cd := 0.0
 var flurry := false
+var _bow_draw := 0.0
+var _bow: Node3D
 var _dodge_iframe_end := -1.0
 var _flurry_end_ms := 0
 var _surf_notified := false
@@ -135,6 +137,7 @@ func _ready() -> void:
 	_build_glider()
 	_build_sword()
 	_build_shield()
+	_build_bow()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -434,10 +437,15 @@ func _physics_process(delta: float) -> void:
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			if weapon.weapon_id != "":
+			if weapon.weapon_id == "bow":
+				_bow_draw = minf(1.0, _bow_draw + delta * 1.3)
+				weapon.set_ads(_bow_draw > 0.15)
+			elif weapon.weapon_id != "":
 				weapon.hold_trigger()
 			elif _melee_cd <= 0.0:
 				_melee_swing()
+		elif weapon.weapon_id == "bow" and _bow_draw > 0.0:
+			_fire_arrow()
 		var rmb := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 		if debug_block:
 			rmb = true
@@ -735,6 +743,68 @@ func _build_shield() -> void:
 	_shield_root.visible = false
 
 
+func _build_bow() -> void:
+	# 猎弓视模型：装配猎弓时显示在左下镜头位。
+	_bow = Node3D.new()
+	_bow.position = Vector3(-0.26, -0.24, -0.55)
+	_bow.rotation_degrees = Vector3(0, 14, 0)
+	_bow.visible = false
+	camera.add_child(_bow)
+	var wood := Toon.make_material(Color(0.50, 0.30, 0.13), true, 0.010)
+	for sign in [-1.0, 1.0]:
+		var limb := MeshInstance3D.new()
+		var lm := CylinderMesh.new()
+		lm.top_radius = 0.015
+		lm.bottom_radius = 0.022
+		lm.height = 0.42
+		lm.radial_segments = 6
+		limb.mesh = lm
+		limb.material_override = wood
+		limb.position = Vector3(0, sign * 0.24, -0.04)
+		limb.rotation_degrees.x = sign * 32.0
+		_bow.add_child(limb)
+	var grip := MeshInstance3D.new()
+	var gm := CylinderMesh.new()
+	gm.top_radius = 0.022
+	gm.bottom_radius = 0.024
+	gm.height = 0.16
+	gm.radial_segments = 7
+	grip.mesh = gm
+	grip.material_override = Toon.make_material(Color(0.30, 0.18, 0.08), true, 0.008)
+	_bow.add_child(grip)
+	var string := MeshInstance3D.new()
+	var sm := CylinderMesh.new()
+	sm.top_radius = 0.004
+	sm.bottom_radius = 0.004
+	sm.height = 0.78
+	sm.radial_segments = 4
+	string.mesh = sm
+	string.material_override = Toon.make_material(Color(0.85, 0.85, 0.80), false)
+	string.position = Vector3(0, 0, 0.05)
+	_bow.add_child(string)
+
+
+func _fire_arrow() -> void:
+	if weapon.reserve <= 0:
+		if hud:
+			hud.add_feed("没箭了")
+		_bow_draw = 0.0
+		return
+	weapon.reserve -= 1
+	weapon.ammo_changed.emit(weapon.mag_left, weapon.reserve)
+	var dir := get_aim_dir()
+	var speed := 16.0 + 22.0 * _bow_draw
+	var arrow := WildProjectile.new()
+	arrow.configure("arrow", dir * speed + Vector3(0, 1.5 * _bow_draw, 0), 16.0 + 22.0 * _bow_draw, self)
+	get_parent().add_child(arrow)
+	arrow.global_position = camera.global_position + dir * 0.7 - Vector3(0, 0.12, 0)
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play("hit", -10.0)
+	_bow_draw = 0.0
+	weapon.set_ads(false)
+
+
 func _melee_swing() -> void:
 	_melee_cd = 0.5
 	_swing_t = 0.0
@@ -772,6 +842,8 @@ func _update_sword(delta: float) -> void:
 	if _sword == null:
 		return
 	_sword.visible = weapon.weapon_id == "" and not is_gliding
+	if _bow:
+		_bow.visible = weapon.weapon_id == "bow" and not is_gliding
 	if _swing_t < 0.0:
 		return
 	_swing_t += delta

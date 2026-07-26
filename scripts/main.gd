@@ -61,6 +61,9 @@ var _wild_test_stamina := 0.0
 var _wild_test_surf_start := Vector3.ZERO
 var _wild_test_moblin: WildMoblin = null
 var _wild_test_parry_hp := 0.0
+var quest_states := {"mushroom3": 0, "moblin2": 0}
+var _quest_mushroom_base := 0
+var _quest_moblin_kills := 0
 var _wild_test_hp := 0.0
 
 
@@ -450,6 +453,62 @@ func _on_blood_moon() -> void:
 		print("[bloodmoon] respawned=%d" % count)
 
 
+# ---------- 任务链 ----------
+
+func _on_npc_talk(npc: Node) -> void:
+	var qid: String = npc.quest_id
+	var state: int = quest_states.get(qid, 0)
+	var npc_name: String = npc.npc_name
+	match qid:
+		"mushroom3":
+			match state:
+				0:
+					quest_states[qid] = 1
+					_quest_mushroom_base = int(player.backpack_items["mushroom"])
+					hud.add_feed("%s：最近蘑菇不够用了，帮我摘 3 个海拉鲁蘑菇好吗？（任务：蘑菇 0/3）" % npc_name)
+				1:
+					var got := int(player.backpack_items["mushroom"]) - _quest_mushroom_base
+					if got >= 3:
+						quest_states[qid] = 3
+						player.armor = minf(100.0, player.armor + 25.0)
+						player.health_changed.emit(player.hp, player.armor)
+						hud.add_feed("%s：太感谢了！这些蘑菇够吃几天了（奖励：护甲 +25）" % npc_name)
+					else:
+						hud.add_feed("%s：蘑菇还差 %d 个，河边芦苇丛里最多。" % [npc_name, 3 - got])
+				3:
+					hud.add_feed("%s：有你在，驿站的日子好过多了。" % npc_name)
+		"moblin2":
+			match state:
+				0:
+					quest_states[qid] = 1
+					_quest_moblin_kills = 0
+					hud.add_feed("%s：莫布林最近老在城外晃，帮我教训它们两顿！（任务：莫布林 0/2）" % npc_name)
+				1:
+					if _quest_moblin_kills >= 2:
+						quest_states[qid] = 3
+						Loot.spawn(self, player.global_position + Vector3(0, 0.5, 0), "orb", "", 1, 3)
+						hud.add_feed("%s：好样的！这是守军的谢礼（奖励：精灵宝珠）" % npc_name)
+					else:
+						hud.add_feed("%s：还差 %d 只，它们块头大但前摇长，盾反伺候。" % [npc_name, 2 - _quest_moblin_kills])
+				3:
+					hud.add_feed("%s：城堡一带现在安全多了。" % npc_name)
+
+
+func _on_moblin_killed(from: Variant) -> void:
+	if quest_states.get("moblin2", 0) == 1 and from == player:
+		_quest_moblin_kills += 1
+		hud.add_feed("任务进度：莫布林 %d/2" % mini(_quest_moblin_kills, 2))
+
+
+func quest_status_text() -> String:
+	if quest_states.get("mushroom3", 0) == 1:
+		var got := int(player.backpack_items["mushroom"]) - _quest_mushroom_base
+		return "任务：蘑菇 %d/3" % clampi(got, 0, 3)
+	if quest_states.get("moblin2", 0) == 1:
+		return "任务：莫布林 %d/2" % mini(_quest_moblin_kills, 2)
+	return ""
+
+
 func _recompute_buffs() -> void:
 	for c in get_tree().get_nodes_in_group("combatant"):
 		if c.alive:
@@ -700,6 +759,9 @@ func _process(delta: float) -> void:
 			state = " · 按住 Space 展开滑翔伞"
 		hud.set_zone_text(wild_world.get_region_name(player.global_position))
 		hud.set_world_state("海拉鲁阔野 · %s%s\nM 地图  ·  B 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
+		var quest_text := quest_status_text()
+		if quest_text != "":
+			hud.set_world_state("海拉鲁阔野 · %s%s\n%s\nM 地图  ·  B 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state, quest_text])
 	else:
 		hud.set_zone_text(zone.status_text())
 		hud.set_world_state("群岛战场\nM 地图选择")
@@ -1120,6 +1182,28 @@ func _update_wild_test() -> void:
 				raft.enter(player)
 				raft.debug_forward = 1.0
 				_wild_test_surf_start = raft.global_position
+			# 任务回归：蘑菇任务接取-采集-交付。
+			var npc0: WildNPC = null
+			for n in get_tree().get_nodes_in_group("npc"):
+				if n.quest_id == "mushroom3":
+					npc0 = n
+					break
+			var armor_before := player.armor
+			if npc0:
+				player.backpack_items["mushroom"] = 0
+				npc0.talk()
+				player.give_item("mushroom", 3)
+				npc0.talk()
+			print("[wildtest] quest state=%d armor=%.0f->%.0f" % [quest_states["mushroom3"], armor_before, player.armor])
+			# 花径回归：顺序触碰全部花朵出种子。
+			var trail := get_tree().get_first_node_in_group("flower_trail") as FlowerTrail
+			if trail:
+				var guard := 0
+				while not trail.completed and guard < 8:
+					guard += 1
+					player.global_position = trail.global_position + trail._flowers[trail._next].position
+					trail._process(0.1)
+				print("[wildtest] flower_trail completed=%s" % str(trail.completed))
 			_wild_test_frame = 757
 		790:
 			print("[wildtest] parry hp_delta=%.0f count=%d" % [_wild_test_parry_hp - player.hp, player.parry_count])

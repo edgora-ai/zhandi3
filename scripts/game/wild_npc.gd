@@ -6,6 +6,7 @@ var terrain: Terrain
 var player: Player
 var npc_name := "旅人"
 var lines: Array[String] = []
+var quest_id := ""
 var coat := Color(0.45, 0.32, 0.55)
 var hat_style := 0   # 0 草帽 / 1 尖帽 / 2 头巾
 
@@ -150,10 +151,14 @@ func _cone(parent: Node3D, top: float, bottom: float, height: float, mat: Materi
 
 
 func talk() -> void:
+	var scene := get_tree().current_scene
+	if quest_id != "" and scene and scene.has_method("_on_npc_talk"):
+		scene._on_npc_talk(self)
+		_talk_cd = 0.4
+		return
 	if _talk_cd > 0.0 or lines.is_empty():
 		return
 	_talk_cd = 1.2
-	var scene := get_tree().current_scene
 	if scene and scene.get("hud") != null:
 		scene.hud.add_feed("%s：%s" % [npc_name, lines[_line_index]])
 	_line_index = (_line_index + 1) % lines.size()

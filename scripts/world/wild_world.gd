@@ -956,6 +956,13 @@ func _spawn_fish_and_circles() -> void:
 		add_child(circle)
 		circle.configure(player, float(i) * 1.7 + 0.4)
 		circle.global_position = _ground(circle_spots[i], 0.02)
+	# 两条花径呀哈哈。
+	var trail1 := FlowerTrail.new()
+	add_child(trail1)
+	trail1.configure(player, [_ground(Vector3(-80, 0, 40), 0.5), _ground(Vector3(-70, 0, 45), 0.5), _ground(Vector3(-60, 0, 50), 0.5), _ground(Vector3(-50, 0, 55), 0.5), _ground(Vector3(-40, 0, 60), 0.5)])
+	var trail2 := FlowerTrail.new()
+	add_child(trail2)
+	trail2.configure(player, [_ground(Vector3(90, 0, 60), 0.5), _ground(Vector3(100, 0, 65), 0.5), _ground(Vector3(110, 0, 70), 0.5)])
 
 
 # 林克之家：高原上的小屋与床铺，睡到天亮回满状态。
@@ -1217,12 +1224,17 @@ func _spawn_npcs() -> void:
 		[Vector3(2.5, 0, -134.5), "城堡卫兵", ["城堡平台上有守军留下的装备。", "遗迹那边的断柱可以当掩体。", "滑翔伞从城墙一跃而下最省力。"], Color(0.35, 0.38, 0.50), 2],
 		[Vector3(30.5, 0, 20.5), "旅行商人", ["桥两头的石阶是前人修的，别小看它们。", "河滩的芦苇荡里常有蘑菇。", "森林里的树砍倒有木材，木材能换护甲。"], Color(0.45, 0.55, 0.25), 0],
 	]
-	for spec in specs:
+	for i in range(specs.size()):
+		var spec: Array = specs[i]
 		var npc := WildNPC.new()
 		var lines_value: Array[String] = []
 		for line in spec[2]:
 			lines_value.append(str(line))
 		npc.setup(terrain, player, str(spec[1]), lines_value, spec[3], int(spec[4]))
+		if i == 0:
+			npc.quest_id = "mushroom3"
+		elif i == 2:
+			npc.quest_id = "moblin2"
 		add_child(npc)
 		npc.global_position = _ground(spec[0], 0.02)
 		npc.rotation.y = randf_range(0.0, TAU)

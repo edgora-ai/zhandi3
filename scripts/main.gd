@@ -206,6 +206,8 @@ func _ready() -> void:
 		var kpos := player.global_position - player.global_transform.basis.z * 2.5
 		kpos.y = terrain.get_height(kpos.x, kpos.z)
 		Korok.spawn(self, kpos, player.global_position)
+	if args.has("--melleetest"):
+		player._melee_swing()
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:
@@ -1004,7 +1006,11 @@ func _update_wild_test() -> void:
 			print("[wildtest] tree_wood loot_delta=%d" % [get_tree().get_nodes_in_group("loot").size() - _wild_test_loot_before])
 		431:
 			# 近战回归：空手挥剑应命中 2.6m 内怪物。
-			var m2 := get_tree().get_first_node_in_group("wild_enemy") as WildMonster
+			var m2: WildMonster = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildMonster and e.alive:
+					m2 = e as WildMonster
+					break
 			if m2 and m2.alive:
 				player.global_position = m2.global_position + Vector3(0, 0.1, 2.0)
 				var to_m: Vector3 = m2.global_position - player.global_position
@@ -1013,6 +1019,8 @@ func _update_wild_test() -> void:
 				player.camera.rotation.x = 0.0
 				var m2_hp := m2.hp
 				player._melee_swing()
+				player._update_sword(0.08)
+				player._update_sword(0.05)
 				var dbg_dot: float = ((m2.global_position + Vector3(0, 0.8, 0)) - player.camera.global_position).normalized().dot(player.get_aim_dir())
 				print("[wildtest] melee monster_hp %.0f->%.0f dot=%.2f dist=%.2f" % [m2_hp, m2.hp, dbg_dot, player.global_position.distance_to(m2.global_position)])
 			# 临时生成吉普，覆盖加速、转弯和制动；测试完成后立即从树中移除。

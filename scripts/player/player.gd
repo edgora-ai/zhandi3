@@ -88,6 +88,10 @@ var _glider: Node3D
 var _airborne_time := 0.0
 var _glider_open := 0.0
 var _melee_cd := 0.0
+var _combo_i := 0
+var _combo_reset_t := 0.0
+var _swing_hit_done := false
+var _hitstop_end_ms := 0
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
@@ -466,6 +470,11 @@ func _physics_process(delta: float) -> void:
 			_shield_root.visible = blocking
 	_scan_loot()
 	_melee_cd = maxf(0.0, _melee_cd - delta)
+	# 顿帧恢复：墙钟计时，不受 time_scale 影响。
+	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
+		_hitstop_end_ms = 0
+		if not flurry:
+			Engine.time_scale = 1.0
 	_update_sword(delta)
 	dodge_cd = maxf(0.0, dodge_cd - delta)
 	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
@@ -837,7 +846,29 @@ func _fire_arrow() -> void:
 func _melee_swing() -> void:
 	_melee_cd = 0.5
 	_swing_t = 0.0
+	_swing_hit_done = false
+	if _combo_reset_t <= 0.0:
+		_combo_i = 0
+	_combo_reset_t = 1.0
+
+
+# 连段姿态：每段 [蓄力 pose, 挥击 pose]（视模空间位置+欧拉角）。
+func _combo_poses() -> Array:
+	match _combo_i:
+		0:  # 右横扫
+			return [[Vector3(0.38, -0.24, -0.52), Vector3(0.1, -0.5, 0.5)], [Vector3(-0.05, -0.30, -0.62), Vector3(-0.3, 0.6, -1.7)]]
+		1:  # 左回扫
+			return [[Vector3(0.05, -0.30, -0.58), Vector3(-0.3, 0.7, -1.5)], [Vector3(0.45, -0.22, -0.50), Vector3(0.15, -0.6, 0.9)]]
+		_:  # 过顶劈砍
+			return [[Vector3(0.34, -0.05, -0.45), Vector3(-1.2, 0.1, 0.2)], [Vector3(0.26, -0.48, -0.66), Vector3(0.5, 0.0, 0.1)]]
+	return [[_sword_base_pos, _sword_base_rot], [_sword_base_pos, _sword_base_rot]]
+
+
+# 挥击阶段生效的近战判定与命中反馈（顿帧 + 镜头微震 + 火花）。
+func _apply_melee_hit() -> void:
+	var mult := (1.35 if _combo_i == 2 else 1.0) * (2.0 if flurry else 1.0)
 	var hit_something := false
+	var hit_pos := camera.global_position + get_aim_dir() * 1.6
 	var forward := get_aim_dir()
 	# 中心射线：砍树、点符文等静态可伤害物。
 	var space := get_world_3d().direct_space_state
@@ -846,8 +877,9 @@ func _melee_swing() -> void:
 	if not result.is_empty():
 		var col: Object = result.collider
 		if col.has_method("take_damage"):
-			col.take_damage(melee_damage * (2.0 if flurry else 1.0), self, "body")
+			col.take_damage(melee_damage * mult, self, "body")
 			hit_something = true
+			hit_pos = result.position
 	# 弧形范围：怪物、动物、AI 战士。
 	for group in ["wild_enemy", "wildlife", "combatant"]:
 		for target in get_tree().get_nodes_in_group(group):
@@ -859,12 +891,18 @@ func _melee_swing() -> void:
 			if to_t.length() > 2.6 or to_t.normalized().dot(forward) < 0.5:
 				continue
 			if target.has_method("take_damage"):
-				target.take_damage(melee_damage * (2.0 if flurry else 1.0), self, "body")
+				target.take_damage(melee_damage * mult, self, "body")
 				hit_something = true
+				hit_pos = target.global_position + Vector3(0, 0.8, 0)
 	if hit_something:
 		var sfx := get_tree().get_first_node_in_group("sfx_bank")
 		if sfx:
 			sfx.play("hit", -6.0)
+		FX.impact(hit_pos)
+		if not flurry:
+			Engine.time_scale = 0.05
+			_hitstop_end_ms = Time.get_ticks_msec() + 50
+		pitch += randf_range(0.008, 0.018)
 
 
 func _update_sword(delta: float) -> void:
@@ -876,15 +914,33 @@ func _update_sword(delta: float) -> void:
 	if _swing_t < 0.0:
 		return
 	_swing_t += delta
-	var k := _swing_t / 0.30
-	if k >= 1.0:
+	_combo_reset_t = maxf(0.0, _combo_reset_t - delta)
+	# 三段式：蓄力(0.07/0.09s 缓入) → 挥击(0.10s 快速) → 收势(0.22s 缓出)；进入挥击帧结算伤害。
+	var windup := 0.07 if _combo_i < 2 else 0.09
+	var swipe := 0.10
+	var recover := 0.22
+	var poses := _combo_poses()
+	if _swing_t < windup:
+		var t := 1.0 - pow(1.0 - _swing_t / windup, 2.0)
+		_sword.position = _sword_base_pos.lerp(poses[0][0], t)
+		_sword.rotation = _sword_base_rot.lerp(poses[0][1], t)
+	elif _swing_t < windup + swipe:
+		if not _swing_hit_done:
+			_swing_hit_done = true
+			_apply_melee_hit()
+		var t := (_swing_t - windup) / swipe
+		_sword.position = poses[0][0].lerp(poses[1][0], t)
+		_sword.rotation = poses[0][1].lerp(poses[1][1], t)
+	elif _swing_t < windup + swipe + recover:
+		var t := (_swing_t - windup - swipe) / recover
+		t = t * t * (3.0 - 2.0 * t)
+		_sword.position = poses[1][0].lerp(_sword_base_pos, t)
+		_sword.rotation = poses[1][1].lerp(_sword_base_rot, t)
+	else:
 		_swing_t = -1.0
+		_combo_i = (_combo_i + 1) % 3
 		_sword.position = _sword_base_pos
 		_sword.rotation = _sword_base_rot
-	else:
-		var sweep := sin(k * PI)
-		_sword.rotation = _sword_base_rot + Vector3(-0.4 * sweep, 0, -1.6 * sweep)
-		_sword.position = _sword_base_pos + Vector3(-0.30 * sweep, 0.06 * sweep, -0.12 * sweep)
 
 # ---------- 攀爬（树干 / 塔身 / 悬崖，一切陡面） ----------
 

@@ -32,6 +32,7 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	_build_materials()
 	_build_shrine(Vector3(-112, terrain.get_height(-112, 92), 92), 0.15)
 	_build_shrine(_ground(Vector3(105, 0, 25)), -0.8, true)
+	_build_shrine(_ground(Vector3(-140, 0, -110)), 2.2, "plate")
 	_build_stable(Vector3(-72, terrain.get_height(-72, 21), 21))
 	_build_temple_ruins(Vector3(18, terrain.get_height(18, -94), -94))
 	_build_river_bridge(18.0)
@@ -192,7 +193,7 @@ func _cylinder_collision(body: StaticBody3D, radius: float, height: float, pos: 
 	body.add_child(col)
 
 
-func _build_shrine(world_pos: Vector3, yaw: float, torch_trial: bool = false) -> void:
+func _build_shrine(world_pos: Vector3, yaw: float, trial_mode: Variant = "rune") -> void:
 	var shrine := Node3D.new()
 	shrine.name = "AncientShrine"
 	shrine.position = world_pos
@@ -230,7 +231,7 @@ func _build_shrine(world_pos: Vector3, yaw: float, torch_trial: bool = false) ->
 	_part(Vector3(2.6, 0.28, 0.40), _stone_dark, Vector3(0, 3.88, -3.35), shrine)
 	# 神庙试炼：限时射符文的解谜入口。
 	var trial := ShrineTrial.new()
-	trial.setup(player, torch_trial)
+	trial.setup(player, trial_mode)
 	shrine.add_child(trial)
 	trials.append(trial)
 	# 顶部同心圆盘和四根弯角用圆柱与斜梁组合。
@@ -1196,6 +1197,8 @@ func _spawn_wild_loot() -> void:
 	# 两只可捕捉的小精灵：高原古树下与双子山谷深处。
 	Loot.spawn(scene, _ground(Vector3(-142, 0, 96), 0.9), "fairy", "", 1, 3)
 	Loot.spawn(scene, _ground(Vector3(82, 0, 66), 0.9), "fairy", "", 1, 3)
+	# 古代剑：城堡平台最深处的奖励。
+	Loot.spawn(scene, _ground(Vector3(4, 0, -120), 32.5 - terrain.get_height(4, -120)), "master_sword", "", 1, 3)
 
 
 func get_region_name(pos: Vector3) -> String:

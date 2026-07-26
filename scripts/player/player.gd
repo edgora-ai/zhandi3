@@ -30,6 +30,8 @@ var stamina := 100.0
 var max_stamina := 100.0
 var blocking := false
 var _block_start := -1.0
+var debug_block := false   # 自动化测试用：强制举盾
+var _surf_notified := false
 var _shield: MeshInstance3D
 var _shield_root: Node3D
 var _stamina_wait := 0.0
@@ -76,6 +78,8 @@ var _glider_open := 0.0
 var _melee_cd := 0.0
 var _swing_t := -1.0
 var _sword: Node3D
+var _sword_blade: MeshInstance3D
+var melee_damage := 26.0
 
 
 func _ready() -> void:
@@ -251,6 +255,10 @@ func _whistle_horse() -> void:
 func _physics_process(delta: float) -> void:
 	if not alive:
 		return
+	# 测试钩子：无头环境下输入分支不执行，举盾状态在这里维护。
+	if debug_block and not blocking:
+		blocking = true
+		_block_start = Time.get_ticks_msec() / 1000.0
 	if vehicle:
 		return  # 驾驶中：移动由车辆接管
 	if backpack_open:
@@ -347,6 +355,24 @@ func _physics_process(delta: float) -> void:
 			velocity.y = maxf(velocity.y - GRAVITY * delta, -30.0)
 	_update_glider_visual(delta)
 
+	# 盾滑：举盾站在坡面上会顺坡加速滑下（旷野之息式的下山方式）。
+	# 陡坡（>45°）is_on_floor 为 false，用地形高度差判断“贴着地面”。
+	if blocking and terrain and (is_on_floor() or global_position.y - terrain.get_height(global_position.x, global_position.z) < 0.35):
+		var slope_n := terrain.get_normal(global_position.x, global_position.z, 1.2)
+		if slope_n.y < 0.92:
+			var downhill := Vector3(slope_n.x, 0, slope_n.z).normalized()
+			# 直接接管水平速度（步行衰减在盾滑时不适用），0.5s 内冲到 10m/s。
+			var surf_speed := minf(10.0, Vector2(velocity.x, velocity.z).length() + 22.0 * delta)
+			velocity.x = downhill.x * surf_speed
+			velocity.z = downhill.z * surf_speed
+			var surf_h := Vector2(velocity.x, velocity.z)
+			_drain_stamina(3.0 * delta)
+			if not _surf_notified and surf_h.length() > 6.0:
+				_surf_notified = true
+				if hud:
+					hud.add_feed("盾牌滑行！")
+		elif _surf_notified:
+			_surf_notified = false
 	move_and_slide()
 	if is_on_floor() and is_gliding:
 		_set_gliding(false)
@@ -372,6 +398,8 @@ func _physics_process(delta: float) -> void:
 			elif _melee_cd <= 0.0:
 				_melee_swing()
 		var rmb := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+		if debug_block:
+			rmb = true
 		weapon.set_ads(rmb and weapon.weapon_id != "")
 		# 空手举盾：右键格挡，举盾瞬间为完美格挡窗口。
 		if weapon.weapon_id == "":
@@ -478,6 +506,20 @@ func collect_orb() -> void:
 		hud.add_feed("精灵宝珠融入身体：生命上限 +10（当前 %d）" % int(max_hp))
 
 
+func equip_master_sword() -> void:
+	melee_damage = 42.0
+	if _sword_blade:
+		var gold := StandardMaterial3D.new()
+		gold.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		gold.albedo_color = Color(0.95, 0.85, 0.45)
+		gold.emission_enabled = true
+		gold.emission = Color(0.9, 0.75, 0.3)
+		gold.emission_energy_multiplier = 1.4
+		_sword_blade.material_override = gold
+	if hud:
+		hud.add_feed("获得古代剑！近战伤害提升至 %d" % int(melee_damage))
+
+
 func switch_slot(i: int) -> void:
 	if i < 0 or i >= weapon_slots.size() or i == slot_index:
 		return
@@ -565,6 +607,7 @@ func _build_sword() -> void:
 	blade.material_override = steel
 	blade.position = Vector3(0, 0.42, 0)
 	_sword.add_child(blade)
+	_sword_blade = blade
 	var tip := MeshInstance3D.new()
 	var tip_mesh := PrismMesh.new()
 	tip_mesh.size = Vector3(0.035, 0.12, 0.085)
@@ -633,7 +676,7 @@ func _melee_swing() -> void:
 	if not result.is_empty():
 		var col: Object = result.collider
 		if col.has_method("take_damage"):
-			col.take_damage(26.0, self, "body")
+			col.take_damage(melee_damage, self, "body")
 			hit_something = true
 	# 弧形范围：怪物、动物、AI 战士。
 	for group in ["wild_enemy", "wildlife", "combatant"]:
@@ -646,7 +689,7 @@ func _melee_swing() -> void:
 			if to_t.length() > 2.6 or to_t.normalized().dot(forward) < 0.5:
 				continue
 			if target.has_method("take_damage"):
-				target.take_damage(26.0, self, "body")
+				target.take_damage(melee_damage, self, "body")
 				hit_something = true
 	if hit_something:
 		var sfx := get_tree().get_first_node_in_group("sfx_bank")

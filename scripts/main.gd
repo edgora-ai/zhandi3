@@ -58,6 +58,7 @@ var _wild_test_jeep_yaw := 0.0
 var _wild_test_jeep_peak_speed := 0.0
 var _wild_test_loot_before := 0
 var _wild_test_stamina := 0.0
+var _wild_test_surf_start := Vector3.ZERO
 var _wild_test_hp := 0.0
 
 
@@ -976,7 +977,34 @@ func _update_wild_test() -> void:
 			for rune in torch_trial._runes:
 				rune.take_damage(10.0, player)
 			print("[wildtest] torch_trial completed=%s" % str(torch_trial.completed))
+			# 古代剑回归：拾取后近战伤害 42。
+			var sword_loot: Loot = null
+			for item in get_tree().get_nodes_in_group("loot"):
+				if item.kind == "master_sword":
+					sword_loot = item
+					break
+			if sword_loot:
+				sword_loot.apply_to(player)
+			print("[wildtest] master_sword melee_damage=%.0f" % player.melee_damage)
+			# 压力板回归：站上后计时完成。
+			var plate_trial: ShrineTrial = wild_world.trials[2]
+			player.global_position = plate_trial._plate.global_position
+			plate_trial._plate_t = 3.95
+			plate_trial._process(0.1)
+			print("[wildtest] plate_trial completed=%s" % str(plate_trial.completed))
+			# 盾滑回归：高原边缘坡面举盾应加速下滑。
+			player.global_position = Vector3(-174, terrain.get_height(-174, 92) + 0.1, 92)
+			player.velocity = Vector3.ZERO
+			player.weapon.set_weapon("")
+			player.debug_block = true
+			_wild_test_surf_start = player.global_position
 			print("[wildtest] done nodes=%d mem=%dMB" % [Performance.get_monitor(Performance.OBJECT_NODE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+			_wild_test_frame = 739
+		756:
+			player.debug_block = false
+			player.blocking = false
+			var surf_d := player.global_position - _wild_test_surf_start
+			print("[wildtest] shield_surf moved=%.2f speed=%.1f" % [Vector2(surf_d.x, surf_d.z).length(), Vector2(player.velocity.x, player.velocity.z).length()])
 			_wild_test_frame = -1
 
 

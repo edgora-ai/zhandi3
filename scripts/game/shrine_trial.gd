@@ -8,28 +8,71 @@ const START_DIST := 22.0
 
 var player: Player
 var completed := false
+var mode := "rune"
+var _plate_t := 0.0
+var _plate: MeshInstance3D
 var _runes: Array[ShrineRune] = []
 var _active := false
 var _window := 0.0
 var _hit_count := 0
 
 
-func setup(p_player: Player, torch_mode: bool = false) -> void:
+func setup(p_player: Player, trial_mode: Variant = "rune") -> void:
 	player = p_player
+	# 兼容布尔调用：true = 火盆。
+	if trial_mode is bool:
+		mode = "torch" if trial_mode else "rune"
+	else:
+		mode = str(trial_mode)
+	if mode == "plate":
+		_build_plate()
+		return
 	# 符文环绕神庙入口悬浮，高度错落，需要稍微找角度；火盆模式改为三座待点燃火盆。
 	var spots := [
 		Vector3(-2.6, 2.2, -4.6), Vector3(2.8, 3.4, -4.0),
 		Vector3(-3.4, 4.6, -1.0), Vector3(3.2, 2.6, 1.6),
 	]
-	if torch_mode:
+	if mode == "torch":
 		spots = [Vector3(-2.6, 1.0, -4.6), Vector3(2.8, 1.0, -4.0), Vector3(0.0, 1.0, -1.0), Vector3(3.2, 1.0, 1.6)]
 	for spot in spots:
 		var rune := ShrineRune.new()
-		rune.torch_style = torch_mode
+		rune.torch_style = mode == "torch"
 		rune.trial = self
 		add_child(rune)
 		rune.position = spot
 		_runes.append(rune)
+
+
+func _build_plate() -> void:
+	# 压力板：站上 4 秒完成试炼。
+	var stone := Toon.make_material(Color(0.22, 0.26, 0.28), true, 0.010)
+	_plate = MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 1.2
+	pm.bottom_radius = 1.35
+	pm.height = 0.16
+	pm.radial_segments = 14
+	_plate.mesh = pm
+	_plate.material_override = stone
+	_plate.position = Vector3(0, 0.55, -4.2)
+	add_child(_plate)
+	var ring := MeshInstance3D.new()
+	var rm := TorusMesh.new()
+	rm.inner_radius = 0.05
+	rm.outer_radius = 1.05
+	rm.rings = 20
+	rm.ring_segments = 6
+	ring.mesh = rm
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring_mat.albedo_color = Color(0.1, 0.9, 0.85)
+	ring_mat.emission_enabled = true
+	ring_mat.emission = Color(0.05, 0.95, 0.85)
+	ring_mat.emission_energy_multiplier = 1.8
+	ring.material_override = ring_mat
+	ring.rotation_degrees.x = 90.0
+	ring.position = Vector3(0, 0.66, -4.2)
+	add_child(ring)
 
 
 func on_rune_hit(_rune: ShrineRune) -> void:
@@ -60,6 +103,10 @@ func _complete() -> void:
 func hud_status(pos: Vector3) -> Array:
 	if completed or global_position.distance_to(pos) > 30.0:
 		return ["", -1.0]
+	if mode == "plate":
+		if _plate_t > 0.05:
+			return ["压力板 %.1f / 4.0 秒" % _plate_t, _plate_t / 4.0]
+		return ["站上发光的圆盘", 0.0]
 	if _active:
 		return ["神庙试炼 %d/%d（剩 %ds）" % [_hit_count, RUNE_COUNT, int(_window)], float(_hit_count) / RUNE_COUNT]
 	return ["接近神庙开启试炼", 0.0]
@@ -67,6 +114,19 @@ func hud_status(pos: Vector3) -> Array:
 
 func _process(delta: float) -> void:
 	if completed or player == null:
+		return
+	if mode == "plate":
+		var pd := player.global_position.distance_to(_plate.global_position)
+		if pd < 1.7:
+			_plate_t += delta
+			if _plate_t >= 4.0:
+				completed = true
+				var scene := get_tree().current_scene
+				if scene and scene.get("hud") != null:
+					scene.hud.add_feed("机关启动！获得精灵宝珠")
+				Loot.spawn(scene, global_position + Vector3(0, 1.2, -5.2), "orb", "", 1, 3)
+		else:
+			_plate_t = maxf(0.0, _plate_t - delta * 2.0)
 		return
 	var dist := global_position.distance_to(player.global_position)
 	if not _active and dist < START_DIST:

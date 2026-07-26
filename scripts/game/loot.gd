@@ -82,6 +82,8 @@ func _build_visual() -> void:
 			_build_orb()
 		"fairy":
 			_build_fairy()
+		"master_sword":
+			_build_master_sword()
 
 
 func _build_box(size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
@@ -251,6 +253,39 @@ func _build_fairy() -> void:
 			_item.add_child(wing)
 
 
+func _build_master_sword() -> void:
+	# 古代剑：金色剑身插在小石台上。
+	var gold := StandardMaterial3D.new()
+	gold.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gold.albedo_color = Color(0.95, 0.85, 0.45)
+	gold.emission_enabled = true
+	gold.emission = Color(0.9, 0.75, 0.3)
+	gold.emission_energy_multiplier = 1.4
+	var blade := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.06, 0.85, 0.12)
+	blade.mesh = bm
+	blade.material_override = gold
+	blade.position.y = 0.55
+	blade.rotation_degrees.z = 12.0
+	_item.add_child(blade)
+	var guard := MeshInstance3D.new()
+	var gm := BoxMesh.new()
+	gm.size = Vector3(0.22, 0.05, 0.16)
+	guard.mesh = gm
+	guard.material_override = Toon.make_material(Color(0.20, 0.18, 0.22), true, 0.006)
+	guard.position = Vector3(0.05, 0.16, 0)
+	guard.rotation_degrees.z = 12.0
+	_item.add_child(guard)
+	var stone := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = Vector3(0.5, 0.22, 0.5)
+	stone.mesh = sm
+	stone.material_override = Toon.make_material(Color(0.45, 0.47, 0.44), true, 0.010)
+	stone.position.y = -0.06
+	_item.add_child(stone)
+
+
 func _process(delta: float) -> void:
 	if consumed:
 		return
@@ -283,6 +318,8 @@ func describe() -> String:
 			return "精灵宝珠（生命上限 +10）"
 		"fairy":
 			return "小精灵（死亡时复活一次）"
+		"master_sword":
+			return "古代剑（近战伤害 42）"
 	return ""
 
 
@@ -318,6 +355,9 @@ func apply_to(target: CharacterBody3D) -> void:
 				target.fairies += 1
 				if target.hud:
 					target.hud.add_feed("捉到一只小精灵（共 %d 只）" % int(target.fairies))
+		"master_sword":
+			if target.has_method("equip_master_sword"):
+				target.equip_master_sword()
 	consumed = true
 	if target is Player:
 		var sfx := target.get_tree().get_first_node_in_group("sfx_bank")

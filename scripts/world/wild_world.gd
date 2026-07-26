@@ -93,6 +93,10 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	# 维佐法师两名：火山山麓与北谷（悬浮施法、近身闪现）。
 	for wp in [Vector3(95, 0, -60), Vector3(-60, 0, -120)]:
 		Wizzrobe.create(self, terrain, player, _ground(wp, 1.5))
+	# 三座防具宝箱：城堡庭院（士兵）、测绘塔下（攀爬者）、火山口（蛮族）。
+	LootChest.create(self, _ground(Vector3(4, 0, -116), 0.0), "armor_soldier", 0.4)
+	LootChest.create(self, _ground(Vector3(-128, 0, 106), 0.0), "armor_climber", -0.6)
+	LootChest.create(self, _ground(Vector3(152, 0, -138), 0.0), "armor_barbarian", 2.2)
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

@@ -1185,6 +1185,18 @@ func _update_wild_test() -> void:
 			var tp_dist: float = wz.global_position.distance_to(wpos)
 			wz.take_damage(999.0, player)
 			print("[wildtest] wizzrobe cast=%s tp=%.1f dead=%s" % [str(cast_ok), tp_dist, str(not wz.alive)])
+			# 宝箱与防具回归：开箱得防具、装备三套效果互斥生效。
+			var ch := LootChest.create(self, player.global_position + Vector3(1.2, 0, 0), "armor_soldier")
+			ch.open(player)
+			var got_armor := int(player.backpack_items.get("armor_soldier", 0))
+			player.backpack_index = player.backpack_weapons.size() + 6
+			player._use_backpack_selection()
+			var soldier_ok := player.equipped_armor == "armor_soldier" and player.damage_taken_mult < 0.9
+			player.give_item("armor_barbarian", 1)
+			player.backpack_index = player.backpack_weapons.size() + 8
+			player._use_backpack_selection()
+			var barb_ok := player.equipped_armor == "armor_barbarian" and player.armor_melee_mult > 1.1 and player.damage_taken_mult > 0.9
+			print("[wildtest] armor_chest got=%d soldier=%s barbarian=%s" % [got_armor, str(soldier_ok), str(barb_ok)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

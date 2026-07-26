@@ -64,6 +64,12 @@ var nearby_vehicle: Node = null
 var nearby_npc: Node = null
 var nearby_fish: Node = null
 var nearby_bed: Node = null
+var nearby_chest: Node = null
+var equipped_armor := ""
+var damage_taken_mult := 1.0
+var climb_speed_mult := 1.0
+var climb_stamina_mult := 1.0
+var armor_melee_mult := 1.0
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
 var debug_glide := false     # 自动化测试用：强制展开斗篷
@@ -760,6 +766,16 @@ func _scan_loot() -> void:
 		if d_b < best_b:
 			best_b = d_b
 			nearby_bed = b
+	nearby_chest = null
+	var best_c := 2.6
+	for candidate_c in get_tree().get_nodes_in_group("loot_chest"):
+		var c: Node = candidate_c
+		if c.opened:
+			continue
+		var d_c := global_position.distance_to(c.global_position)
+		if d_c < best_c:
+			best_c = d_c
+			nearby_chest = c
 
 
 func _try_pickup() -> void:
@@ -771,6 +787,8 @@ func _try_pickup() -> void:
 		nearby_fish.catch(self)
 	elif nearby_bed:
 		nearby_bed.use(self)
+	elif nearby_chest:
+		nearby_chest.open(self)
 
 
 func give_weapon(id: String) -> void:
@@ -861,6 +879,7 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 	if not alive:
 		return
 	var dmg := amount
+	dmg *= damage_taken_mult
 	# 完美闪避：闪身窗口内被击中触发林克时间——无伤且时间变慢。
 	if Time.get_ticks_msec() / 1000.0 < _dodge_iframe_end:
 		_start_flurry()
@@ -1089,7 +1108,7 @@ func _combo_poses() -> Array:
 
 # 挥击阶段生效的近战判定与命中反馈（顿帧 + 镜头微震 + 火花）。
 func _apply_melee_hit() -> void:
-	var mult := (1.35 if _combo_i == 2 else 1.0) * (2.0 if flurry else 1.0)
+	var mult := (1.35 if _combo_i == 2 else 1.0) * (2.0 if flurry else 1.0) * armor_melee_mult
 	var hit_something := false
 	var hit_pos := camera.global_position + get_aim_dir() * 1.6
 	var forward := get_aim_dir()
@@ -1200,7 +1219,7 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 			is_climbing = false
 			return false
 		# 攀爬耗精力：静止缓耗、移动快耗，耗尽后滑落。
-		_drain_stamina((5.0 + 7.0 * (absf(f) + absf(r))) * _delta)
+		_drain_stamina((5.0 + 7.0 * (absf(f) + absf(r))) * _delta * climb_stamina_mult)
 		if stamina <= 0.0:
 			velocity = n * 1.5 + Vector3(0, -3.0, 0)
 			is_climbing = false
@@ -1208,7 +1227,7 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 				hud.add_feed("精力耗尽，滑下来了！")
 			return false
 		var side := n.cross(Vector3.UP).normalized()
-		velocity = Vector3.UP * f * CLIMB_SPEED + side * r * CLIMB_SPEED * 0.75 - n * 0.8
+		velocity = Vector3.UP * f * CLIMB_SPEED * climb_speed_mult + side * r * CLIMB_SPEED * climb_speed_mult * 0.75 - n * 0.8
 		return true
 	# 进入攀爬：朝陡面推 W（树干、塔身、悬崖、石壁均可）。
 	if f > 0.05 and not hit.is_empty():
@@ -1217,7 +1236,7 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 			is_climbing = true
 			if is_gliding:
 				_set_gliding(false)
-			velocity = Vector3.UP * CLIMB_SPEED * 0.8 - n2 * 0.8
+			velocity = Vector3.UP * CLIMB_SPEED * climb_speed_mult * 0.8 - n2 * 0.8
 			return true
 	return false
 
@@ -1407,6 +1426,9 @@ func get_backpack_lines() -> Array[String]:
 	lines.append("材料 · 木材 × %d（护甲 8）" % int(backpack_items["wood"]))
 	lines.append("料理 · 烤兽肉 × %d（回血 55）" % int(backpack_items["roast_meat"]))
 	lines.append("料理 · 烤蘑菇 × %d（回血 28+护甲 4）" % int(backpack_items["roast_mushroom"]))
+	lines.append("防具 · 士兵铠甲 × %d（受伤 -20%%）%s" % [int(backpack_items.get("armor_soldier", 0)), "（已装备）" if equipped_armor == "armor_soldier" else ""])
+	lines.append("防具 · 攀爬者手套 × %d（攀爬增效）%s" % [int(backpack_items.get("armor_climber", 0)), "（已装备）" if equipped_armor == "armor_climber" else ""])
+	lines.append("防具 · 蛮族护符 × %d（近战 +20%%）%s" % [int(backpack_items.get("armor_barbarian", 0)), "（已装备）" if equipped_armor == "armor_barbarian" else ""])
 	return lines
 
 
@@ -1415,9 +1437,22 @@ func _use_backpack_selection() -> void:
 		_retrieve_weapon(backpack_index)
 		return
 	var item_index := backpack_index - backpack_weapons.size()
-	var key: String = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom"][item_index]
+	var key: String = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom", "armor_soldier", "armor_climber", "armor_barbarian"][item_index]
 	var count := int(backpack_items[key])
 	if count <= 0:
+		return
+	# 防具：使用即装备（不消耗），三套效果互斥。
+	if key in ["armor_soldier", "armor_climber", "armor_barbarian"]:
+		equipped_armor = key
+		damage_taken_mult = 0.8 if key == "armor_soldier" else 1.0
+		climb_speed_mult = 1.4 if key == "armor_climber" else 1.0
+		climb_stamina_mult = 0.5 if key == "armor_climber" else 1.0
+		armor_melee_mult = 1.2 if key == "armor_barbarian" else 1.0
+		var armor_labels := {"armor_soldier": "士兵铠甲（受伤 -20%）", "armor_climber": "攀爬者手套（攀爬增效）", "armor_barbarian": "蛮族护符（近战 +20%）"}
+		if hud:
+			hud.add_feed("已装备：" + str(armor_labels[key]))
+		backpack_changed.emit()
+		_refresh_backpack()
 		return
 	# 篝火烹饪：站在火堆旁使用生食材会烤成料理（回复更强）。
 	var scene := get_tree().current_scene

@@ -554,7 +554,8 @@ func _recompute_buffs() -> void:
 	for c in get_tree().get_nodes_in_group("combatant"):
 		if c.alive:
 			var skewer_value: Variant = c.get("skewer_mult")
-			c.damage_mult = float(skewer_value) if skewer_value != null else 1.0
+			var charm_value: Variant = c.get("charm_mult")
+			c.damage_mult = (float(skewer_value) if skewer_value != null else 1.0) * (float(charm_value) if charm_value != null else 1.0)
 			c.regen_rate = 0.0
 	for cp in capture_points:
 		if cp.owner_body and cp.owner_body.alive:
@@ -1260,6 +1261,12 @@ func _update_wild_test() -> void:
 				player.global_position = merchant.global_position + Vector3(1.5, 0, 0)
 				_update_escort_quest()
 			print("[wildtest] scale_quest=%d stam=%.0f->%.0f escort=%d" % [quest_states["scale1"], stam_before, player.max_stamina, quest_states["escort"]])
+			# 血月全类型苏醒回归；呀哈哈面具回归。
+			var enemies_before := get_tree().get_nodes_in_group("wild_enemy").size()
+			var respawned := wild_world.respawn_monsters()
+			player.seed_count = 9
+			player.collect_seed()
+			print("[wildtest] bloodmoon_full respawned=%d enemies %d->%d charm=%.2f" % [respawned, enemies_before, get_tree().get_nodes_in_group("wild_enemy").size(), player.charm_mult])
 			# 花径回归：顺序触碰全部花朵出种子。
 			var trail := get_tree().get_first_node_in_group("flower_trail") as FlowerTrail
 			if trail:

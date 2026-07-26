@@ -80,6 +80,7 @@ var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0, "
 var seed_count := 0
 var fairies := 1
 var skewer_mult := 1.0
+var charm_mult := 1.0
 var _skewer_t := 0.0
 var _ladder: Area3D = null
 var _col: CollisionShape3D
@@ -581,6 +582,11 @@ func collect_seed() -> void:
 	if seed_count % 3 == 0:
 		max_stamina += 10.0
 		stamina = max_stamina
+	if seed_count >= 10 and charm_mult < 1.05:
+		charm_mult = 1.05
+		damage_mult = skewer_mult * charm_mult
+		if hud:
+			hud.add_feed("集齐 10 颗种子！获得呀哈哈面具（永久攻击 +5%）")
 	if hud:
 		hud.add_feed("找到一颗海拉鲁种子！（第 %d 颗%s）" % [seed_count, "，精力上限 +10" if seed_count % 3 == 0 else "，护甲 +5"])
 	_refresh_backpack()

@@ -24,6 +24,9 @@ var trials: Array[ShrineTrial] = []
 var _time := 0.0
 var _monster_points: Array = []
 var _animal_specs: Array = []
+var _moblin_points: Array = []
+var _liz_points: Array = []
+var _guardian_points: Array = []
 
 
 func generate(p_terrain: Terrain, p_player: Player) -> void:
@@ -58,12 +61,14 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	_spawn_flying_attackers()
 	# 两台古代守卫：遗迹与城堡各一台。
 	for gp in [Vector3(26, 0, -88), Vector3(-6, 0, -116)]:
+		_guardian_points.append(gp)
 		var guardian := Guardian.new()
 		guardian.setup(terrain, player)
 		add_child(guardian)
 		guardian.global_position = _ground(gp, 0.05)
 	# 三只莫布林：草原/谷地/营地外围的重击手。
 	for mp in [Vector3(30, 0, 60), Vector3(-60, 0, -20), Vector3(120, 0, -40)]:
+		_moblin_points.append(mp)
 		var moblin := WildMoblin.new()
 		moblin.setup(terrain, player)
 		add_child(moblin)
@@ -77,6 +82,7 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	raft.global_position = Vector3(raft_x, Terrain.WATER_LEVEL + 0.05, raft_z + 2.0)
 	# 两只蜥蜴战士：草原与河滩的高速袭扰者。
 	for lp in [Vector3(-30, 0, 75), Vector3(55, 0, -20)]:
+		_liz_points.append(lp)
 		var liz := WildLizalfos.new()
 		liz.setup(terrain, player)
 		add_child(liz)
@@ -938,7 +944,39 @@ func respawn_monsters() -> int:
 			creature.global_position = _ground(p2, altitude)
 			creature.rotation.y = randf_range(0, TAU)
 			respawned += 1
+	# 莫布林/蜥蜴战士/古代守卫同样按刷新点补齐。
+	for mp in _moblin_points:
+		if not _enemy_near(mp, 12.0):
+			var moblin := WildMoblin.new()
+			moblin.setup(terrain, player)
+			add_child(moblin)
+			moblin.global_position = _ground(mp, 0.05)
+			moblin.rotation.y = randf_range(0, TAU)
+			respawned += 1
+	for lp in _liz_points:
+		if not _enemy_near(lp, 12.0):
+			var liz := WildLizalfos.new()
+			liz.setup(terrain, player)
+			add_child(liz)
+			liz.global_position = _ground(lp, 0.05)
+			liz.rotation.y = randf_range(0, TAU)
+			respawned += 1
+	for gp in _guardian_points:
+		if not _enemy_near(gp, 14.0):
+			var guardian := Guardian.new()
+			guardian.setup(terrain, player)
+			add_child(guardian)
+			guardian.global_position = _ground(gp, 0.05)
+			respawned += 1
 	return respawned
+
+
+func _enemy_near(p: Vector3, radius: float) -> bool:
+	var ground_p := _ground(p, 0.05)
+	for e in get_tree().get_nodes_in_group("wild_enemy"):
+		if e.alive and e.global_position.distance_to(ground_p) < radius:
+			return true
+	return false
 
 
 # 河鱼与石头阵呀哈哈。

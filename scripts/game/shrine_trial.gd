@@ -167,7 +167,14 @@ func _process(delta: float) -> void:
 		return
 	if mode == "plate":
 		var pd := player.global_position.distance_to(_plate.global_position)
-		if pd < 1.7:
+		var weighted := pd < 1.7
+		if not weighted:
+			# 金属块压板：磁力搬箱压在上面同样触发（旷野之息式解谜）。
+			for prop in get_tree().get_nodes_in_group("metal_prop"):
+				if prop.global_position.distance_to(_plate.global_position) < 1.6:
+					weighted = true
+					break
+		if weighted:
 			_plate_t += delta
 			if _plate_t >= 4.0:
 				completed = true

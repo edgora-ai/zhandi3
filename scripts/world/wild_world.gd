@@ -78,6 +78,9 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	# 三块磁力金属块：压力板神庙、城堡门前、遗迹旁，供磁力搬运与投掷。
 	for mp in [Vector3(-136, 0, -104), Vector3(6, 0, -108), Vector3(30, 0, -84)]:
 		MetalProp.create(self, _ground(mp, 0.45))
+	# 丘丘果冻群：河滩与林缘四只大只（死亡分裂）。
+	for cp in [Vector3(-40, 0, 45), Vector3(15, 0, 70), Vector3(-90, 0, -30), Vector3(60, 0, 40)]:
+		Chuchu.create(self, terrain, player, _ground(cp, 0.05))
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

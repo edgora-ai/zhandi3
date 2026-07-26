@@ -1116,6 +1116,22 @@ func _update_wild_test() -> void:
 				var pull_speed: float = mp.linear_velocity.length()
 				player._throw_magnet()
 				print("[wildtest] magnesis grab=%s pull=%.1f throw=%.1f" % [str(grabbed), pull_speed, mp.linear_velocity.length()])
+			# 丘丘回归：大只死亡分裂两只小只，小只死亡掉蘑菇。
+			var cbig := Chuchu.create(self, terrain, player, player.global_position + Vector3(2, 0, 0))
+			var small_before := 0
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is Chuchu and e.small:
+					small_before += 1
+			cbig.take_damage(999.0, player)
+			var small_after := 0
+			for e2 in get_tree().get_nodes_in_group("wild_enemy"):
+				if e2 is Chuchu and e2.small:
+					small_after += 1
+			var loot_before := get_tree().get_nodes_in_group("loot").size()
+			for e3 in get_tree().get_nodes_in_group("wild_enemy"):
+				if e3 is Chuchu and e3.small:
+					e3.take_damage(999.0, player)
+			print("[wildtest] chuchu split %d->%d loot_delta=%d" % [small_before, small_after, get_tree().get_nodes_in_group("loot").size() - loot_before])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

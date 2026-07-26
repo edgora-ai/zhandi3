@@ -1149,6 +1149,28 @@ func _update_wild_test() -> void:
 			var dove_hit := player.hp < khp
 			kb.take_damage(999.0, player)
 			print("[wildtest] keese dive_hit=%s dead=%s" % [str(dove_hit), str(not kb.alive)])
+			# 骷髅回归：夜间破土→激活→撕抓→散架出头颅。
+			var st := Stal.create_body(self, terrain, player, player.global_position + Vector3(2, 0, 0))
+			st._physics_process(0.1)
+			var rose := st._state == "rise"
+			st._physics_process(1.4)
+			var act := st._state == "active"
+			st.global_position = player.global_position + Vector3(1.2, 0, 0)
+			st._attack_cd = 0.0
+			player.alive = true
+			var shp := player.hp
+			st._physics_process(0.3)
+			var clawed := player.hp < shp
+			var skull_before := 0
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is Stal and e.mode == "skull":
+					skull_before += 1
+			st.take_damage(999.0, player)
+			var skull_after := 0
+			for e2 in get_tree().get_nodes_in_group("wild_enemy"):
+				if e2 is Stal and e2.mode == "skull":
+					skull_after += 1
+			print("[wildtest] stal rose=%s active=%s claw=%s skull %d->%d" % [str(rose), str(act), str(clawed), skull_before, skull_after])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

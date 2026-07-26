@@ -87,6 +87,9 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 			var bat := Keese.new()
 			bat.setup(terrain, player, _ground(kp, 6.0) + Vector3(randf_range(-3, 3), randf_range(0, 2), randf_range(-3, 3)))
 			add_child(bat)
+	# 骷髅坟场：遗迹三具、城堡外两具（夜间破土，白天潜伏）。
+	for sp in [Vector3(28, 0, -86), Vector3(23, 0, -91), Vector3(30, 0, -90), Vector3(2, 0, -100), Vector3(-4, 0, -103)]:
+		add_child(Stal.create_body(self, terrain, player, _ground(sp, 0.05)))
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

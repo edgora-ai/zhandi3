@@ -38,6 +38,7 @@ var _camera_pitch := -0.22
 var _camera_idle := 0.0
 var _head_node: Node3D
 var bonded := false
+var _rider: Node3D
 var _buck_t := 0.0
 var _graze_t := 0.0
 var _call_target: Player = null
@@ -150,6 +151,41 @@ func _build_model() -> void:
 			_capsule(knee, 0.105, 0.82, coat, Vector3(0, -0.37, 0.025), Vector3.ZERO, Vector3.ONE)
 			_part(Vector3(0.20, 0.14, 0.26), dark, Vector3(0, -0.68, -0.02), knee, Vector3(6, 0, 0))
 			_part(Vector3(0.29, 0.18, 0.40), dark, Vector3(0, -0.82, -0.055), knee, Vector3(6, 0, 0))
+	_build_rider()
+
+
+# 骑手：乘骑时显示的冒险者人偶（绿衣尖帽），挂在 _visual 下随马体起伏。
+func _build_rider() -> void:
+	_rider = Node3D.new()
+	_rider.name = "Rider"
+	_rider.visible = false
+	_visual.add_child(_rider)
+	var tunic := Toon.make_material(Color(0.16, 0.42, 0.22), true, 0.012)
+	var skin := Toon.make_material(Color(0.90, 0.70, 0.54), true, 0.010)
+	var hair := Toon.make_material(Color(0.55, 0.38, 0.16), true, 0.008)
+	var pants := Toon.make_material(Color(0.32, 0.26, 0.20), true, 0.010)
+	var boots := Toon.make_material(Color(0.22, 0.14, 0.08), true, 0.008)
+	var strap := Toon.make_material(Color(0.30, 0.20, 0.12), true, 0.006)
+	var dark := Toon.make_material(Color(0.12, 0.10, 0.10), false)
+	# 躯干、腰带与斜挎肩带，轻微前倾。
+	_capsule(_rider, 0.21, 0.56, tunic, Vector3(0, 3.34, 0.10), Vector3(8, 0, 0), Vector3.ONE)
+	_part(Vector3(0.34, 0.09, 0.26), strap, Vector3(0, 3.10, 0.10), _rider)
+	_part(Vector3(0.07, 0.48, 0.24), strap, Vector3(-0.06, 3.38, 0.10), _rider, Vector3(0, 0, 28))
+	# 头部：脸、双眼、发髻与后垂尖顶软帽。
+	_sphere(_rider, 0.155, skin, Vector3(0, 3.80, 0.06), Vector3(1.0, 1.08, 1.0))
+	for sx in [-1.0, 1.0]:
+		_sphere(_rider, 0.026, dark, Vector3(sx * 0.058, 3.81, -0.085), Vector3.ONE)
+	_sphere(_rider, 0.16, hair, Vector3(0, 3.86, 0.10), Vector3(1.02, 0.72, 1.02))
+	_cone(_rider, 0.012, 0.14, 0.32, tunic, Vector3(0, 4.02, 0.14), Vector3(22, 0, 0), 7)
+	# 双臂前伸握缰。
+	for sx in [-1.0, 1.0]:
+		_capsule(_rider, 0.06, 0.42, tunic, Vector3(sx * 0.26, 3.34, -0.06), Vector3(-52, 0, sx * -8), Vector3.ONE)
+		_sphere(_rider, 0.055, skin, Vector3(sx * 0.27, 3.20, -0.24), Vector3.ONE)
+	# 双腿跨坐、踩蹬。
+	for sx in [-1.0, 1.0]:
+		_capsule(_rider, 0.085, 0.46, pants, Vector3(sx * 0.30, 2.92, 0.14), Vector3(20, 0, sx * -38), Vector3.ONE)
+		_capsule(_rider, 0.065, 0.42, pants, Vector3(sx * 0.50, 2.38, 0.16), Vector3(-12, 0, sx * -6), Vector3.ONE)
+		_part(Vector3(0.12, 0.10, 0.24), boots, Vector3(sx * 0.53, 2.13, 0.10), _rider)
 
 
 func _build_camera() -> void:
@@ -282,6 +318,7 @@ func enter(p: Player) -> void:
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
+	_rider.visible = true
 	driver.set_deferred("collision_layer", 0)
 	driver.set_deferred("collision_mask", 0)
 	_camera_yaw = 0.0
@@ -300,6 +337,7 @@ func exit() -> void:
 	var side := global_transform.basis.x * 1.7
 	p.global_position = global_position + side + Vector3(0, 0.35, 0)
 	p.visible = true
+	_rider.visible = false
 	p.set_deferred("collision_layer", 2)
 	p.set_deferred("collision_mask", 1 | 4)
 	p.vehicle = null

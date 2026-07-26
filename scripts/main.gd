@@ -189,6 +189,13 @@ func _ready() -> void:
 		call_deferred("_open_backpack_test")
 	if args.has("--endtest"):
 		hud.show_end(false, 12, 3, 24)
+	if args.has("--ridertest") and _map_id == "wild":
+		var rt_horse := get_tree().get_first_node_in_group("vehicle") as Horse
+		if rt_horse:
+			rt_horse.bonded = true
+			player.global_position = rt_horse.global_position + Vector3(1.2, 0, 0)
+			rt_horse.enter(player)
+			rt_horse.debug_forward = 0.6
 	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
 		_ft_bot = Bot.new()
 		add_child(_ft_bot)

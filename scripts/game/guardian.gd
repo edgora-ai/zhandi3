@@ -88,7 +88,7 @@ func _build_model() -> void:
 		var lower := MeshInstance3D.new()
 		var lm := CylinderMesh.new()
 		lm.top_radius = 0.06
-		lm.bottom_radius = 0.05
+		lm.bottom_radius = 0.015
 		lm.height = 0.95
 		lm.radial_segments = 6
 		lower.mesh = lm
@@ -114,6 +114,17 @@ func _build_model() -> void:
 	_laser.material_override = laser_mat
 	_laser.visible = false
 	add_child(_laser)
+	# 顶部小圆帽：守卫穹顶的收束件。
+	var cap := MeshInstance3D.new()
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = 0.10
+	cap_mesh.bottom_radius = 0.20
+	cap_mesh.height = 0.14
+	cap_mesh.radial_segments = 10
+	cap.mesh = cap_mesh
+	cap.material_override = dark
+	cap.position = Vector3(0, 1.84, 0)
+	add_child(cap)
 
 
 func _sphere(parent: Node3D, radius: float, mat: Material, pos: Vector3, shape_scale: Vector3) -> MeshInstance3D:

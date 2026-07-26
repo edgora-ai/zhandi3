@@ -75,6 +75,8 @@ var backpack_weapons: Array[Dictionary] = []
 var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0, "roast_meat": 0, "roast_mushroom": 0}
 var seed_count := 0
 var fairies := 1
+var skewer_mult := 1.0
+var _skewer_t := 0.0
 var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
@@ -457,6 +459,14 @@ func _physics_process(delta: float) -> void:
 	dodge_cd = maxf(0.0, dodge_cd - delta)
 	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
 		_end_flurry()
+	# 烤串增益倒计时。
+	if _skewer_t > 0.0:
+		_skewer_t -= delta
+		if _skewer_t <= 0.0:
+			skewer_mult = 1.0
+			damage_mult = 1.0
+			if hud:
+				hud.add_feed("烤串的劲头过去了")
 
 
 func _scan_loot() -> void:
@@ -1030,6 +1040,18 @@ func _use_backpack_selection() -> void:
 	var near_fire := false
 	if scene and scene.get("wild_world") != null:
 		near_fire = scene.wild_world.is_near_campfire(global_position, 4.0)
+	# 烤串：火堆旁兽肉+蘑菇各一，换 90 秒攻击 +25%。
+	if key == "meat" and near_fire and int(backpack_items["mushroom"]) >= 1:
+		backpack_items["meat"] = count - 1
+		backpack_items["mushroom"] = int(backpack_items["mushroom"]) - 1
+		skewer_mult = 1.25
+		_skewer_t = 90.0
+		damage_mult = 1.25
+		if hud:
+			hud.add_feed("烤了肉串：90 秒攻击 +25%")
+		backpack_changed.emit()
+		_refresh_backpack()
+		return
 	if key in ["meat", "mushroom"] and near_fire:
 		backpack_items[key] = count - 1
 		var cooked := "roast_meat" if key == "meat" else "roast_mushroom"

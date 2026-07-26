@@ -62,6 +62,12 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		guardian.setup(terrain, player)
 		add_child(guardian)
 		guardian.global_position = _ground(gp, 0.05)
+	# 三只莫布林：草原/谷地/营地外围的重击手。
+	for mp in [Vector3(30, 0, 60), Vector3(-60, 0, -20), Vector3(120, 0, -40)]:
+		var moblin := WildMoblin.new()
+		moblin.setup(terrain, player)
+		add_child(moblin)
+		moblin.global_position = _ground(mp, 0.05)
 	_spawn_npcs()
 	_spawn_wild_loot()
 	_spawn_fish_and_circles()

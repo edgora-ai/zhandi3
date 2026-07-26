@@ -451,7 +451,8 @@ func _on_blood_moon() -> void:
 func _recompute_buffs() -> void:
 	for c in get_tree().get_nodes_in_group("combatant"):
 		if c.alive:
-			c.damage_mult = 1.0
+			var skewer_value: Variant = c.get("skewer_mult")
+			c.damage_mult = float(skewer_value) if skewer_value != null else 1.0
 			c.regen_rate = 0.0
 	for cp in capture_points:
 		if cp.owner_body and cp.owner_body.alive:
@@ -1023,6 +1024,26 @@ func _update_wild_test() -> void:
 				player.global_position = circle.global_position + circle._gap_pos
 				circle._process(1.1)
 			print("[wildtest] fish meat=%d circle=%s" % [int(player.backpack_items["meat"]) - meat_f, str(circle.completed if circle else false)])
+			# 莫布林回归：前摇结束后猛击命中；烤串加攻。
+			var moblin: WildMoblin = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildMoblin:
+					moblin = e as WildMoblin
+					break
+			if moblin:
+				player._dodge_iframe_end = -1.0
+				player.global_position = moblin.global_position + Vector3(0, 0, 2.0)
+				player.velocity = Vector3.ZERO
+				var hp_m := player.hp
+				moblin._windup = 0.89
+				moblin._physics_process(0.05)
+				print("[wildtest] moblin smash dmg=%.0f" % [hp_m - player.hp])
+			player.give_item("meat", 1)
+			player.give_item("mushroom", 1)
+			player.global_position = wild_world._camp_positions[0] + Vector3(1.5, 0, 0)
+			player.backpack_index = player.backpack_weapons.size() + 1
+			player._use_backpack_selection()
+			print("[wildtest] skewer mult=%.2f t=%.0f" % [player.skewer_mult, player._skewer_t])
 			_wild_test_frame = -1
 
 

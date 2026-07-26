@@ -6,6 +6,7 @@ var player: Player
 var center := Vector3.ZERO
 var alive := true
 var hp := 260.0
+var _enraged := false
 var display_name := "赤焰巨龙"
 var damage_mult := 1.0
 var kills := 0
@@ -144,12 +145,21 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 func _physics_process(delta: float) -> void:
 	if not alive or player == null:
 		return
+	# 半血进入第二阶段：焚天者暴怒，飞得更快、喷得更密。
+	if not _enraged and hp <= 130.0:
+		_enraged = true
+		var scene := get_tree().current_scene
+		if scene and scene.get("hud") != null:
+			scene.hud.add_feed("焚天者暴怒了！")
+		DamageNumber.spawn_at(scene, global_position, "暴怒!", Color(1.0, 0.35, 0.10))
 	_time += delta
 	_fire_cooldown -= delta
-	var angle := _time * 0.16
+	var rate := 0.26 if _enraged else 0.16
+	var chase := 2.6 if _enraged else 1.6
+	var angle := _time * rate
 	var next := center + Vector3(cos(angle) * 42.0, 45.0 + sin(_time * 0.43) * 9.0, sin(angle) * 42.0)
 	var forward := (next - global_position).normalized()
-	global_position = global_position.lerp(next, minf(1.0, delta * 1.6))
+	global_position = global_position.lerp(next, minf(1.0, delta * chase))
 	if forward.length_squared() > 0.01:
 		look_at(global_position + forward, Vector3.UP)
 	_wing_left.rotation.z = sin(_time * 2.4) * 0.42 - 0.08
@@ -158,16 +168,17 @@ func _physics_process(delta: float) -> void:
 		_tail_segments[i].rotation.y = sin(_time * 1.8 - i * 0.42) * (0.10 + i * 0.018)
 	if global_position.distance_to(player.global_position) < 145.0 and _fire_cooldown <= 0.0:
 		_breathe_fire()
-		_fire_cooldown = 3.4
+		_fire_cooldown = 1.8 if _enraged else 3.4
 
 
 func _breathe_fire() -> void:
 	var mouth := global_position + -global_transform.basis.z * 7.1 + Vector3(0, 1.5, 0)
 	var target := player.global_position + Vector3(0, 0.8, 0)
-	for i in range(5):
+	var count := 8 if _enraged else 5
+	for i in range(count):
 		var direction := (target - mouth).normalized()
 		direction = direction.rotated(Vector3.UP, (i - 2) * 0.035)
 		var projectile := WildProjectile.new()
-		projectile.configure("fire", direction * (18.0 + i * 0.8), 18.0, self)
+		projectile.configure("fire", direction * ((22.0 if _enraged else 18.0) + i * 0.8), 18.0, self)
 		get_tree().current_scene.add_child(projectile)
 		projectile.global_position = mouth + direction * float(i) * 0.32

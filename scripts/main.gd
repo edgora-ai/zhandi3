@@ -61,7 +61,8 @@ var _wild_test_stamina := 0.0
 var _wild_test_surf_start := Vector3.ZERO
 var _wild_test_moblin: WildMoblin = null
 var _wild_test_parry_hp := 0.0
-var quest_states := {"mushroom3": 0, "moblin2": 0}
+var quest_states := {"mushroom3": 0, "moblin2": 0, "scale1": 0, "escort": 0}
+var _escort_npc: WildNPC = null
 var _quest_mushroom_base := 0
 var _quest_moblin_kills := 0
 var _wild_test_hp := 0.0
@@ -492,6 +493,32 @@ func _on_npc_talk(npc: Node) -> void:
 						hud.add_feed("%s：还差 %d 只，它们块头大但前摇长，盾反伺候。" % [npc_name, 2 - _quest_moblin_kills])
 				3:
 					hud.add_feed("%s：城堡一带现在安全多了。" % npc_name)
+		"scale1":
+			match state:
+				0:
+					quest_states[qid] = 1
+					hud.add_feed("%s：我需要一片龙鳞做研究，火山上那条龙最近很活跃。（任务：龙鳞 0/1）" % npc_name)
+				1:
+					if int(player.backpack_items["dragon_scale"]) >= 1:
+						player.backpack_items["dragon_scale"] = int(player.backpack_items["dragon_scale"]) - 1
+						quest_states[qid] = 3
+						player.max_stamina += 10.0
+						player.stamina = player.max_stamina
+						hud.add_feed("%s：完美的样本！这是给你的回礼（奖励：精力上限 +10）" % npc_name)
+					else:
+						hud.add_feed("%s：龙鳞只能从火山巨龙的掉落里拿，小心它的俯冲。" % npc_name)
+				3:
+					hud.add_feed("%s：这片龙鳞够我写三篇论文了。" % npc_name)
+		"escort":
+			match state:
+				0:
+					quest_states[qid] = 1
+					_escort_npc = npc as WildNPC
+					hud.add_feed("%s：陪我走到海利亚大桥东头吧，这段路最近不太平。（护送出发）" % npc_name)
+				1:
+					hud.add_feed("%s：跟紧我，过了桥就安全了。" % npc_name)
+				3:
+					hud.add_feed("%s：一路顺风，朋友。" % npc_name)
 
 
 func _on_moblin_killed(from: Variant) -> void:
@@ -506,7 +533,21 @@ func quest_status_text() -> String:
 		return "任务：蘑菇 %d/3" % clampi(got, 0, 3)
 	if quest_states.get("moblin2", 0) == 1:
 		return "任务：莫布林 %d/2" % mini(_quest_moblin_kills, 2)
+	if quest_states.get("scale1", 0) == 1:
+		return "任务：龙鳞 %d/1" % mini(int(player.backpack_items["dragon_scale"]), 1)
+	if quest_states.get("escort", 0) == 1:
+		return "任务：护送行商"
 	return ""
+
+
+func _update_escort_quest() -> void:
+	if quest_states.get("escort", 0) != 1 or _escort_npc == null:
+		return
+	# 行商巡逻到桥段（路径索引 ≥3）且玩家在 12m 内，护送完成。
+	if _escort_npc._patrol_i >= 3 and player.global_position.distance_to(_escort_npc.global_position) < 12.0:
+		quest_states["escort"] = 3
+		Loot.spawn(self, _escort_npc.global_position + Vector3(0, 0.5, 0), "ammo", "", 90, 2)
+		hud.add_feed("行商多戈：到了！这些弹药你拿着防身（奖励：弹药 90）")
 
 
 func _recompute_buffs() -> void:
@@ -714,6 +755,7 @@ func _process(delta: float) -> void:
 	if _buff_acc >= 0.5:
 		_buff_acc = 0.0
 		_recompute_buffs()
+	_update_escort_quest()
 
 	if _sim:
 		_sim_acc += delta
@@ -1195,6 +1237,29 @@ func _update_wild_test() -> void:
 				player.give_item("mushroom", 3)
 				npc0.talk()
 			print("[wildtest] quest state=%d armor=%.0f->%.0f" % [quest_states["mushroom3"], armor_before, player.armor])
+			# 龙鳞任务回归：交付龙鳞得精力上限。
+			var npc1: WildNPC = null
+			for n in get_tree().get_nodes_in_group("npc"):
+				if n.quest_id == "scale1":
+					npc1 = n
+					break
+			var stam_before := player.max_stamina
+			if npc1:
+				npc1.talk()
+				player.give_item("dragon_scale", 1)
+				npc1.talk()
+			# 护送回归：接受后行商到达桥段且玩家随行，判定完成。
+			var merchant: WildNPC = null
+			for n in get_tree().get_nodes_in_group("npc"):
+				if n.quest_id == "escort":
+					merchant = n
+					break
+			if merchant:
+				merchant.talk()
+				merchant._patrol_i = 3
+				player.global_position = merchant.global_position + Vector3(1.5, 0, 0)
+				_update_escort_quest()
+			print("[wildtest] scale_quest=%d stam=%.0f->%.0f escort=%d" % [quest_states["scale1"], stam_before, player.max_stamina, quest_states["escort"]])
 			# 花径回归：顺序触碰全部花朵出种子。
 			var trail := get_tree().get_first_node_in_group("flower_trail") as FlowerTrail
 			if trail:

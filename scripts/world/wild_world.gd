@@ -1235,6 +1235,8 @@ func _spawn_npcs() -> void:
 			npc.quest_id = "mushroom3"
 		elif i == 2:
 			npc.quest_id = "moblin2"
+		elif i == 1:
+			npc.quest_id = "scale1"
 		add_child(npc)
 		npc.global_position = _ground(spec[0], 0.02)
 		npc.rotation.y = randf_range(0.0, TAU)
@@ -1243,6 +1245,7 @@ func _spawn_npcs() -> void:
 	merchant.setup(terrain, player, "行商多戈", ["这条商路我走了十年，桥修好后好走多了。", "驿站收兽肉，蘑菇在河滩芦苇边最多。", "马上了路会自己认路，你尽管看风景。"], Color(0.60, 0.42, 0.20), 0)
 	add_child(merchant)
 	merchant.global_position = _ground(Vector3(-40, 0, 20), 0.02)
+	merchant.quest_id = "escort"
 	merchant.patrol = [Vector3(-70, 0, 21.5), Vector3(-40, 0, 20), Vector3(-15.5, 0, 18.5), Vector3(6, 0, 18), Vector3(-15.5, 0, 18.5), Vector3(-40, 0, 20)]
 
 

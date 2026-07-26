@@ -154,6 +154,7 @@ scripts/
   fx/damage_number.gd    # 飘字伤害反馈：命中弹数字、上浮淡出
   fx/sfx_bank.gd         # 音效池（2D/3D）
 assets/
+  models/              # Blender 无头生成的 glb 角色/动画（可再生产物，源在 tools/blender_gen）
   shaders/ground.gdshader # 多尺度地表斑驳 + 岩层 + 积雪/湿润
   shaders/grass.gdshader # 草叶广告牌化 + 行进风场阵风 + 三段色带
   shaders/water.gdshader # 深度水色 + 岸线环 + 雨滴扩散 + 冬季冰裂
@@ -162,6 +163,7 @@ assets/
 tools/
   Godot.app              # Godot 4.7.1 编辑器/运行时
   gen_sfx.py             # 音效合成脚本
+  blender_gen/           # Blender 无头生成脚本（蒙皮角色 + NLA 动画 → assets/models/*.glb）
 ```
 
 ### 调试参数（`--` 之后传入）
@@ -185,6 +187,7 @@ tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 520 -- --w
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/map.png --mapmenutest
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/backpack.png --backpacktest --map wild
 # 射击链路自检（生成测试bot并开火，打印血量）
+# 视觉调试：--pilottest（Blender 小人）、--moblintest（前摇）、--ridertest/--biketest/--jeeptest（骑乘）、--koroktest（呀哈哈）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm
 # 失焦恢复自检（模拟漏收恢复通知，确认暂停外定时器能自动解锁）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --focusrecoverytest

@@ -520,6 +520,14 @@ handle_crash: Program crashed with signal 11
 - 修复：重做两级肩/肘手臂带手掌、髋部腿带皮靴、裙摆+腰带扣+立领、眼睛加高光点、微笑嘴、腮红、耳朵与后发/两鬓/马尾（发色随帽款）；鼻子改肤色小凸点。行走时双腿对摆，说话时右手比划 + 头部轻点（_gesture_t），独处时头部缓慢游视。
 - 回归：npc_facing dot=1.00 legs=true（把玩家传到 NPC 面前跑 40 帧物理看朝向点积）。另修测试自身的随机性：Horse.enter 首骑 45% 概率尥蹶子会让骑乘回归静默跳过，测试前置 horse.bonded = true 固定结果——随机玩法分支进回归前必须先钉死随机源。
 
+### 5.36 第三十一轮：Blender 无头管线接入骨骼动画
+
+- 动机：代码掰关节（单枢轴 lerp/sin）做不出预备-发力-跟随的攻击三段与髋膝两级步态，这是“动作战斗”手感天花板。管线定为 tools/blender_gen/*.py（源码，提交）→ blender --background --python 无头生成 → assets/models/*.glb（可再生产物，与 gen_sfx.py/WAV 同一约定）→ Godot AnimationPlayer。不需要 Blender MCP（配完要重启会话才生效，无头 CLI 等价且更贴合“一切由代码生成”）。
+- Blender 5.2 API 坑：材质 Principled 节点不能按名字找（要按 n.type == BSDF_PRINCIPLED）；Action.fcurves 已移除（动作分层化）；armature 必须先 animation_data_create() 再赋 action；多段动画用 NLA 轨道命名 + export_animation_mode='NLA_TRACKS' 导出，Godot 按轨道名播放。
+- 朝向约定：Blender 中角色面向 -Y 建模，glTF 导出即 Godot 本地 -Z，与工程 atan2(dir.x, dir.z) + PI 约定一致。
+- 接入模式：ResourceLoader.exists 探测 glb → 实例化 → find_child AnimationPlayer，缺失一律回退原程序化模型；换色按 Blender 材质名遍历 mesh surface 再 set_surface_override_material（村民 tunic 按 NPC coat 染色）；挂点件（三顶帽子）在 Blender 里 parent 到骨骼（parent_type='BONE'），Godot 侧按款式显隐。
+- 纪律：模型与动画只改生成脚本重跑 Blender，不手改 glb；新增剪辑先在 --xxxtest 调试参数下截图核对姿态再接状态机。
+
 ## 6. 音频生命周期
 
 - 背景音乐和环境音由脚本生成的 WAV 提供，运行时设置循环区间。

@@ -90,6 +90,9 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	# 骷髅坟场：遗迹三具、城堡外两具（夜间破土，白天潜伏）。
 	for sp in [Vector3(28, 0, -86), Vector3(23, 0, -91), Vector3(30, 0, -90), Vector3(2, 0, -100), Vector3(-4, 0, -103)]:
 		add_child(Stal.create_body(self, terrain, player, _ground(sp, 0.05)))
+	# 维佐法师两名：火山山麓与北谷（悬浮施法、近身闪现）。
+	for wp in [Vector3(95, 0, -60), Vector3(-60, 0, -120)]:
+		Wizzrobe.create(self, terrain, player, _ground(wp, 1.5))
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

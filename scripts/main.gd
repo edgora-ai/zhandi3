@@ -1171,6 +1171,20 @@ func _update_wild_test() -> void:
 				if e2 is Stal and e2.mode == "skull":
 					skull_after += 1
 			print("[wildtest] stal rose=%s active=%s claw=%s skull %d->%d" % [str(rose), str(act), str(clawed), skull_before, skull_after])
+			# 法师回归：施法产生火弹、近身闪现拉开距离。
+			var wz := Wizzrobe.create(self, terrain, player, player.global_position + Vector3(10, 0, 0))
+			var proj_before := get_tree().get_nodes_in_group("wild_projectile").size()
+			wz._cast_cd = 0.0
+			player.alive = true
+			wz._physics_process(0.1)
+			var cast_ok := get_tree().get_nodes_in_group("wild_projectile").size() > proj_before
+			var wpos: Vector3 = wz.global_position
+			wz._tp_cd = 0.0
+			player.global_position = wpos + Vector3(3, 0, 0)
+			wz._physics_process(0.1)
+			var tp_dist: float = wz.global_position.distance_to(wpos)
+			wz.take_damage(999.0, player)
+			print("[wildtest] wizzrobe cast=%s tp=%.1f dead=%s" % [str(cast_ok), tp_dist, str(not wz.alive)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

@@ -23,6 +23,8 @@ var _capture_wrap: Control
 var _capture_label: Label
 var _stamina_segs: Array[ColorRect] = []
 var _stamina_wrap: Control
+var _minimap_wrap: Control
+var _minimap_player: ColorRect
 var _vignette: TextureRect
 var _end_panel: Control
 var _pause_panel: Control
@@ -48,6 +50,7 @@ func _ready() -> void:
 	add_child(_ui)
 	_build_crosshair()
 	_build_stamina_wheel()
+	_build_minimap()
 	_build_bars()
 	_build_top()
 	_build_feed()
@@ -115,6 +118,59 @@ func set_stamina(frac: float) -> void:
 	var color := Color(0.35, 0.90, 0.45) if frac > 0.5 else Color(0.95, 0.80, 0.25) if frac > 0.22 else Color(0.95, 0.30, 0.20)
 	for i in range(_stamina_segs.size()):
 		_stamina_segs[i].color = color if i < lit else Color(1, 1, 1, 0.15)
+
+
+# ---------- 小地图 ----------
+
+func _world_to_map(p: Vector3) -> Vector2:
+	return Vector2((p.x + 250.0) / 500.0 * 164.0, (p.z + 250.0) / 500.0 * 164.0)
+
+
+func _build_minimap() -> void:
+	_minimap_wrap = Control.new()
+	_minimap_wrap.name = "Minimap"
+	_minimap_wrap.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_minimap_wrap.position = Vector2(-176, -176)
+	_minimap_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui.add_child(_minimap_wrap)
+	_mk_rect(_minimap_wrap, Vector2.ZERO, Vector2(164, 164), Color(0.04, 0.07, 0.06, 0.60))
+	_mk_rect(_minimap_wrap, Vector2.ZERO, Vector2(164, 2), Color(0.4, 0.5, 0.4, 0.8))
+	# 静态地标：驿站/神庙/塔/城堡/大桥/家/遗迹。
+	var landmarks := [
+		[Vector3(-72, 0, 21), Color(0.95, 0.75, 0.30)],
+		[Vector3(-112, 0, 92), Color(0.20, 0.90, 0.80)],
+		[Vector3(105, 0, 25), Color(0.20, 0.90, 0.80)],
+		[Vector3(-140, 0, -110), Color(0.20, 0.90, 0.80)],
+		[Vector3(-132, 0, 109), Color(0.95, 0.55, 0.20)],
+		[Vector3(72, 0, 116), Color(0.95, 0.55, 0.20)],
+		[Vector3(-132, 0, -78), Color(0.95, 0.55, 0.20)],
+		[Vector3(4, 0, -124), Color(0.40, 0.60, 1.00)],
+		[Vector3(6, 0, 18), Color(0.70, 0.55, 0.35)],
+		[Vector3(-122, 0, 98), Color(0.45, 0.85, 0.45)],
+		[Vector3(18, 0, -94), Color(0.75, 0.70, 0.65)],
+		[Vector3(164, 0, -145), Color(1.00, 0.30, 0.10)],
+	]
+	for entry in landmarks:
+		var dot := ColorRect.new()
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dot.size = Vector2(6, 6)
+		dot.color = entry[1]
+		dot.position = _world_to_map(entry[0]) - Vector2(3, 3)
+		_minimap_wrap.add_child(dot)
+	_minimap_player = ColorRect.new()
+	_minimap_player.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_minimap_player.size = Vector2(8, 8)
+	_minimap_player.color = Color(1.0, 1.0, 1.0)
+	_minimap_wrap.add_child(_minimap_player)
+
+
+func update_minimap(player: Player) -> void:
+	if _minimap_wrap == null:
+		return
+	_minimap_wrap.visible = player != null and player.alive
+	if player == null:
+		return
+	_minimap_player.position = _world_to_map(player.global_position) - Vector2(4, 4)
 
 
 # ---------- 准星 ----------
@@ -366,6 +422,30 @@ func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var sub := _mk_label(box, "排名 #%d / %d      击杀 %d" % [rank, total, kills], 24)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var hint := _mk_label(box, "按 R 重新开始", 20, Color(0.8, 0.9, 1.0))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ignore_mouse(_end_panel)
+
+
+func show_quest_end(title_text: String, lines: Array[String]) -> void:
+	if _end_panel:
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_end_panel = Control.new()
+	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ui.add_child(_end_panel)
+	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.55))
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.position = Vector2(-280, -120)
+	box.custom_minimum_size.x = 560
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_end_panel.add_child(box)
+	var title := _mk_label(box, title_text, 48, Color(1.0, 0.85, 0.3))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for line in lines:
+		var sub := _mk_label(box, line, 22)
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var hint := _mk_label(box, "按 R 重新开始", 20, Color(0.8, 0.9, 1.0))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ignore_mouse(_end_panel)

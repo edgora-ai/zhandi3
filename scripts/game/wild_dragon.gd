@@ -139,6 +139,9 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		Loot.spawn(get_tree().current_scene, global_position, "dragon_scale", "", 1, 3)
 		for i in range(4):
 			Loot.spawn(get_tree().current_scene, global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2)), "meat", "", 2, 2)
+		var scene := get_tree().current_scene
+		if scene and scene.has_method("_on_dragon_killed"):
+			scene._on_dragon_killed(from)
 		queue_free()
 
 

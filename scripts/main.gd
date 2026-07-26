@@ -527,6 +527,25 @@ func _on_moblin_killed(from: Variant) -> void:
 		hud.add_feed("任务进度：莫布林 %d/2" % mini(_quest_moblin_kills, 2))
 
 
+func _on_dragon_killed(from: Variant) -> void:
+	if from != player or match_over:
+		return
+	match_over = true
+	player.input_locked = true
+	sfx.play("victory", -2.0)
+	var quest_done := 0
+	for q in quest_states.values():
+		if int(q) == 3:
+			quest_done += 1
+	var lines: Array[String] = [
+		"焚天者已被讨伐",
+		"海拉鲁种子  %d / 10+" % player.seed_count,
+		"完成任务  %d / %d" % [quest_done, quest_states.size()],
+		"弹反  %d 次    击败  %d" % [player.parry_count, player.kills],
+	]
+	hud.show_quest_end("讨 伐 成 功", lines)
+
+
 func quest_status_text() -> String:
 	if quest_states.get("mushroom3", 0) == 1:
 		var got := int(player.backpack_items["mushroom"]) - _quest_mushroom_base
@@ -767,6 +786,7 @@ func _process(delta: float) -> void:
 	if not player.alive:
 		return
 	hud.set_stamina(player.stamina / player.max_stamina)
+	hud.update_minimap(player)
 	hud.set_spread(6.0 + player.weapon.current_spread() * 9.0)
 	hud.set_crosshair_visible(player.weapon.weapon_id != "")
 	if player.nearby_loot:
@@ -1291,6 +1311,15 @@ func _update_wild_test() -> void:
 			if _wild_test_moblin:
 				print("[wildtest] bow_hit dmg=%.0f" % [_wild_test_hp - _wild_test_moblin.hp])
 			print("[wildtest] end nodes=%d" % Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
+			# 讨伐结局回归：玩家击杀焚天者触发讨伐结算。
+			var dragon: WildDragon = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildDragon:
+					dragon = e as WildDragon
+					break
+			if dragon:
+				dragon.take_damage(999.0, player)
+			print("[wildtest] dragon_end match_over=%s" % str(match_over))
 			_wild_test_frame = -1
 
 

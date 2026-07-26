@@ -60,6 +60,7 @@ var _wild_test_loot_before := 0
 var _wild_test_stamina := 0.0
 var _wild_test_surf_start := Vector3.ZERO
 var _wild_test_moblin: WildMoblin = null
+var _wild_test_parry_hp := 0.0
 var _wild_test_hp := 0.0
 
 
@@ -768,7 +769,13 @@ func _update_wild_test() -> void:
 			player.global_position = Vector3(-22, terrain.get_height(-22, 104) + 0.1, 104)
 			player.collision_layer = 2
 			player.collision_mask = 1 | 4
-			_wild_test_hp = player.hp
+			_wild_test_parry_hp = player.hp
+			# 种子里程碑回归：第 3 颗种子精力上限 +10。
+			var stam_before := player.max_stamina
+			player.collect_seed()
+			player.collect_seed()
+			player.collect_seed()
+			print("[wildtest] seed_milestone %.0f->%.0f" % [stam_before, player.max_stamina])
 			var enemy := get_tree().get_first_node_in_group("wild_enemy") as WildMonster
 			if enemy:
 				var enemy_pos := player.global_position + Vector3(0, 0, -9)
@@ -1036,6 +1043,8 @@ func _update_wild_test() -> void:
 			var moblin := _wild_test_moblin
 			if moblin:
 				player._dodge_iframe_end = -1.0
+				player.alive = true
+				player.hp = player.max_hp
 				player.global_position = moblin.global_position + Vector3(0, 0, 2.0)
 				player.velocity = Vector3.ZERO
 				var hp_m := player.hp
@@ -1070,8 +1079,18 @@ func _update_wild_test() -> void:
 				_wild_test_hp = _wild_test_moblin.hp
 				player._fire_arrow()
 				print("[wildtest] bow reserve=%d" % player.weapon.reserve)
+			# 弹反回归：举盾面向来石应将其弹回且不伤血（放在弓箭之后，避免传送冲突）。
+			player.weapon.set_weapon("")
+			player.debug_block = true
+			player._dodge_iframe_end = -1.0
+			var rock := WildProjectile.new()
+			add_child(rock)
+			rock.configure("rock", player.global_transform.basis.z * 12.0, 12.0, null)
+			rock.global_position = player.global_position - player.global_transform.basis.z * 3.0 + Vector3(0, 1.0, 0)
+			_wild_test_parry_hp = player.hp
 			_wild_test_frame = 757
 		790:
+			print("[wildtest] parry hp_delta=%.0f count=%d" % [_wild_test_parry_hp - player.hp, player.parry_count])
 			if _wild_test_moblin:
 				print("[wildtest] bow_hit dmg=%.0f" % [_wild_test_hp - _wild_test_moblin.hp])
 			print("[wildtest] end nodes=%d" % Performance.get_monitor(Performance.OBJECT_NODE_COUNT))

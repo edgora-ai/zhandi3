@@ -93,6 +93,22 @@ func _physics_process(delta: float) -> void:
 	var collision := move_and_collide(velocity * delta)
 	if collision:
 		var collider: Object = collision.get_collider()
+		# 弹反：举盾且面向投射物时，石头被原路弹回（旷野之息弹反）。
+		if collider is Player and collider.blocking:
+			var facing: Vector3 = -(collider as Player).global_transform.basis.z
+			if facing.dot(velocity.normalized()) < -0.3:
+				var back_dir := Vector3.ZERO
+				if source and source is Node3D:
+					back_dir = ((source as Node3D).global_position + Vector3(0, 1.2, 0) - global_position).normalized()
+				else:
+					back_dir = -velocity.normalized()
+				velocity = back_dir * maxf(18.0, velocity.length() * 1.4)
+				source = collider
+				lifetime = 3.0
+				collider.parry_count += 1
+				if collider.hud:
+					collider.hud.add_feed("弹反！")
+				return
 		if OS.get_cmdline_user_args().has("--wildtest"):
 			print("[wildtest] projectile collision kind=%s collider=%s pos=%s" % [kind, str(collider), str(global_position)])
 		if collider and collider != source and collider.has_method("take_damage"):

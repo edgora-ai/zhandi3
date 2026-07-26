@@ -31,6 +31,7 @@ var max_stamina := 100.0
 var blocking := false
 var _block_start := -1.0
 var debug_block := false   # 自动化测试用：强制举盾
+var parry_count := 0
 var dodge_cd := 0.0
 var flurry := false
 var _bow_draw := 0.0
@@ -577,8 +578,11 @@ func collect_seed() -> void:
 	seed_count += 1
 	armor = minf(100.0, armor + 5.0)
 	health_changed.emit(hp, armor)
+	if seed_count % 3 == 0:
+		max_stamina += 10.0
+		stamina = max_stamina
 	if hud:
-		hud.add_feed("找到一颗海拉鲁种子！（第 %d 颗，护甲 +5）" % seed_count)
+		hud.add_feed("找到一颗海拉鲁种子！（第 %d 颗%s）" % [seed_count, "，精力上限 +10" if seed_count % 3 == 0 else "，护甲 +5"])
 	_refresh_backpack()
 
 

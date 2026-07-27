@@ -117,6 +117,7 @@ var _stasis_dmg := 0.0
 var _stasis_shell: MeshInstance3D
 var _magnet_prop: MetalProp = null
 var _magnet_beam: MeshInstance3D
+var _magnet_motes: Array[MeshInstance3D] = []
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
@@ -423,8 +424,8 @@ func _toggle_magnet() -> void:
 	hud.add_feed("磁力吸附中：移动视线搬运，Z 放下，左键投掷")
 	_magnet_beam = MeshInstance3D.new()
 	var cm := CylinderMesh.new()
-	cm.top_radius = 0.03
-	cm.bottom_radius = 0.03
+	cm.top_radius = 0.055
+	cm.bottom_radius = 0.055
 	cm.height = 1.0
 	cm.radial_segments = 6
 	_magnet_beam.mesh = cm
@@ -433,10 +434,22 @@ func _toggle_magnet() -> void:
 	bmat.albedo_color = Color(0.10, 0.85, 0.80, 0.7)
 	bmat.emission_enabled = true
 	bmat.emission = Color(0.05, 0.90, 0.80)
-	bmat.emission_energy_multiplier = 2.0
+	bmat.emission_energy_multiplier = 2.8
 	bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_magnet_beam.material_override = bmat
 	get_tree().current_scene.add_child(_magnet_beam)
+	# 三颗沿光束滑动的能量微粒，让磁力链接有"流动感"。
+	for i in range(3):
+		var mote := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.05
+		sm.height = 0.10
+		sm.radial_segments = 8
+		sm.rings = 5
+		mote.mesh = sm
+		mote.material_override = bmat
+		get_tree().current_scene.add_child(mote)
+		_magnet_motes.append(mote)
 
 
 func _release_magnet(impulse: Vector3) -> void:
@@ -446,6 +459,10 @@ func _release_magnet(impulse: Vector3) -> void:
 	if is_instance_valid(_magnet_beam):
 		_magnet_beam.queue_free()
 	_magnet_beam = null
+	for mote in _magnet_motes:
+		if is_instance_valid(mote):
+			mote.queue_free()
+	_magnet_motes.clear()
 
 
 func _throw_magnet() -> void:
@@ -465,6 +482,12 @@ func _update_magnet_beam() -> void:
 		return
 	_magnet_beam.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, d.normalized())), (from + to) * 0.5)
 	_magnet_beam.scale = Vector3(1.0, d.length(), 1.0)
+	var flow := Time.get_ticks_msec() * 0.0012
+	for i in range(_magnet_motes.size()):
+		var mote := _magnet_motes[i]
+		if is_instance_valid(mote):
+			var tt := fposmod(flow + float(i) / 3.0, 1.0)
+			mote.global_position = from.lerp(to, tt)
 
 
 func _toggle_prone() -> void:

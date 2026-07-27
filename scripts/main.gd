@@ -222,6 +222,9 @@ func _ready() -> void:
 		player.global_position = Vector3(-129.3, terrain.get_height(-129.3, 109) + 0.1, 109)
 		player.rotation.y = atan2(-132.0 - player.global_position.x, 109.0 - player.global_position.z) + PI
 		player.debug_move = 1.0
+	if args.has("--snowtest") and weather:
+		weather.snowing = true
+		weather.snow_strength = 1.0
 	if args.has("--bombtest"):
 		player._place_bomb()
 	if args.has("--cryonistest") and terrain:
@@ -1318,6 +1321,19 @@ func _update_wild_test() -> void:
 			var stam_ok := player.max_stamina == _elixir_test_stam + 20.0 and player._elixir_stam_end_ms > 0
 			player._elixir_stam_end_ms = 1
 			print("[wildtest] elixir power=%s stam=%s" % [str(power_ok), str(stam_ok)])
+			# 雪天回归：雪山地区降水触发为雪而非雨，雪幕可见。
+			player.global_position = Vector3(-120, terrain.get_height(-120, -90), -90)
+			weather.raining = false
+			weather.snowing = false
+			weather._state_t = 999.0
+			weather._process(0.1)
+			var snow_ok := weather.snowing and not weather.raining
+			weather.snow_strength = 0.5
+			weather._process(0.1)
+			var snow_vis := weather._snow_mm.visible
+			weather.snowing = false
+			weather.snow_strength = 0.0
+			print("[wildtest] snow region_snow=%s flakes=%s" % [str(snow_ok), str(snow_vis)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

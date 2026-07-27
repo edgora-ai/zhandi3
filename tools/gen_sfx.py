@@ -323,4 +323,8 @@ for goff in [1.0, 5.0, 9.0]:
             wind[off + j] += x
 write_wav("snowwind.wav", wind)
 
+# 雷声：近距爆裂 + 低频滚滚长尾。
+thun = mix(noise_burst(0.5, 0.10, 0.75), sweep(2.4, 90, 30, 1.4, 0.5))
+write_wav("thunder.wav", thun)
+
 print("done")

@@ -148,16 +148,109 @@ func _process(delta: float) -> void:
 					d2.z = _rng.randf_range(-AREA, AREA)
 				_flakes[i] = d2
 				mm2.set_instance_transform(i, Transform3D(Basis.IDENTITY, center2 + Vector3(d2.x, d2.y, d2.z)))
-	# 闪电：雨时每 8~20s 一次环境光脉冲。
+	# 闪电：雨时每 8~20s 一次落雷（雷柱+光脉冲+雷声+落点杀伤），测试序列豁免。
 	if raining:
 		_lightning_t -= delta
 		if _lightning_t <= 0.0:
 			_lightning_t = _rng.randf_range(8.0, 20.0)
-			if _env:
-				_env.ambient_light_energy = 1.4
-			_feed("远雷滚滚")
+			if not OS.get_cmdline_user_args().has("--wildtest"):
+				_strike_lightning()
 	if _env and _env.ambient_light_energy > 0.6:
 		_env.ambient_light_energy = move_toward(_env.ambient_light_energy, 0.5, delta * 3.0)
+
+
+# 落雷：玩家附近 25~45m 随机点；手持金属武器时 35% 概率劈向玩家（旷野之息式引雷）。
+func _strike_lightning() -> void:
+	if player == null or terrain == null:
+		return
+	var metal_out: bool = player.weapon != null and player.weapon.weapon_id != ""
+	var at_player := metal_out and _rng.randf() < 0.35
+	var pos: Vector3
+	if at_player:
+		pos = player.global_position
+		_feed("金属武器引来了雷电！")
+	else:
+		var ang := _rng.randf() * TAU
+		var r := _rng.randf_range(25.0, 45.0)
+		pos = player.global_position + Vector3(cos(ang) * r, 0, sin(ang) * r)
+		_feed("远雷滚滚")
+	pos.y = terrain.get_height(pos.x, pos.z)
+	_spawn_bolt(pos)
+	if _env:
+		_env.ambient_light_energy = 1.4
+	# 雷声按距离延迟（声速 340m/s）。
+	var delay: float = pos.distance_to(player.global_position) / 340.0
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		if delay > 0.05:
+			get_tree().create_timer(delay).timeout.connect(func() -> void: sfx.play_at("thunder", pos, -2.0))
+		else:
+			sfx.play_at("thunder", pos, -2.0)
+	# 落点杀伤：半径 3.5m 的怪物与野兽；玩家被引雷命中掉 25 血。
+	for group in ["wild_enemy", "wildlife"]:
+		for target in get_tree().get_nodes_in_group(group):
+			if not (target is CharacterBody3D) or not target.alive:
+				continue
+			if target.global_position.distance_to(pos) < 3.5 and target.has_method("take_damage"):
+				target.take_damage(35.0, self, "body")
+	if at_player and player.alive:
+		player.take_damage(25.0, self)
+
+
+# 锯齿雷柱：五段折线从 60m 高空劈落 + 落点闪光，0.14 秒后消散。
+func _spawn_bolt(pos: Vector3) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var bolt := Node3D.new()
+	scene.add_child(bolt)
+	bolt.global_position = pos
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.85, 0.92, 1.0)
+	mat.emission_enabled = true
+	mat.emission = Color(0.75, 0.88, 1.0)
+	mat.emission_energy_multiplier = 4.0
+	var sheath := StandardMaterial3D.new()
+	sheath.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sheath.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sheath.albedo_color = Color(0.45, 0.65, 1.0, 0.28)
+	sheath.emission_enabled = true
+	sheath.emission = Color(0.40, 0.60, 1.0)
+	sheath.emission_energy_multiplier = 1.2
+	var prev := Vector3(0, 60.0, 0)
+	for i in range(5):
+		var next := Vector3(_rng.randf_range(-1.5, 1.5) * (1.0 - float(i) / 5.0), 60.0 - float(i + 1) * 12.0, _rng.randf_range(-1.5, 1.5) * (1.0 - float(i) / 5.0))
+		var seg := MeshInstance3D.new()
+		var sm := BoxMesh.new()
+		var d := next - prev
+		sm.size = Vector3(0.22, d.length(), 0.22)
+		seg.mesh = sm
+		seg.material_override = mat
+		seg.transform = Transform3D(Basis(Quaternion(Vector3.UP, d.normalized())), (prev + next) * 0.5)
+		bolt.add_child(seg)
+		var glow := MeshInstance3D.new()
+		var gm := BoxMesh.new()
+		gm.size = Vector3(0.85, d.length(), 0.85)
+		glow.mesh = gm
+		glow.material_override = sheath
+		glow.transform = seg.transform
+		bolt.add_child(glow)
+		prev = next
+	var flash := OmniLight3D.new()
+	flash.light_color = Color(0.75, 0.85, 1.0)
+	flash.light_energy = 6.0
+	flash.omni_range = 30.0
+	flash.position.y = 6.0
+	bolt.add_child(flash)
+	var tw := bolt.create_tween()
+	# 经典二次回击闪烁：亮 0.10s → 熄 0.06s → 再亮 0.16s 后消散。
+	tw.tween_interval(0.10)
+	tw.tween_property(bolt, "visible", false, 0.0)
+	tw.tween_interval(0.06)
+	tw.tween_property(bolt, "visible", true, 0.0)
+	tw.tween_interval(0.16)
+	tw.tween_callback(bolt.queue_free)
 
 
 func _feed(text_value: String) -> void:

@@ -72,6 +72,7 @@ var _quest_mushroom_base := 0
 var _quest_moblin_kills := 0
 var _wild_test_hp := 0.0
 var _music_check_t := 0.0
+var _thundertest_frame := -1
 
 
 func _ready() -> void:
@@ -150,6 +151,9 @@ func _ready() -> void:
 	weather.setup(terrain, player, _env)
 	if args.has("--rain"):
 		weather.force_rain(true)
+	if args.has("--thundertest") and weather:
+		weather.force_rain(true)
+		_thundertest_frame = 0
 	if args.has("--night"):
 		daynight.t = 0.8
 		daynight._apply()
@@ -349,6 +353,23 @@ func _resolve_map(args: PackedStringArray) -> String:
 			if saved in ["battlefield", "wild"]:
 				return saved
 	return "battlefield"
+
+
+func _thundertest_fire(tpos: Vector3) -> void:
+	weather._spawn_bolt(tpos)
+
+
+func _tick_thundertest() -> void:
+	if _thundertest_frame < 0:
+		return
+	_thundertest_frame += 1
+	if _thundertest_frame == 80:
+		_thundertest_frame = -1
+		var fwd := -player.global_transform.basis.z
+		fwd.y = 0.0
+		var tpos := player.global_position + fwd.normalized() * 14.0
+		tpos.y = terrain.get_height(tpos.x, tpos.z)
+		weather._spawn_bolt(tpos)
 
 
 func _open_backpack_test() -> void:
@@ -894,6 +915,7 @@ func _process(delta: float) -> void:
 		_music_check_t = 1.0
 		if daynight and sfx:
 			sfx.set_night_music(daynight.is_night())
+	_tick_thundertest()
 	if _wild_test_frame >= 0:
 		_update_wild_test()
 	if _season_test_frame >= 0:

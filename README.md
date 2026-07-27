@@ -157,6 +157,8 @@ scripts/
   game/chuchu.gd         # 丘丘果冻：蹦跳撞击，大只死亡分裂小只
   game/keese.gd          # 夜行蝙蝠：夜间盘旋俯冲，白天蛰伏
   game/stal.gd           # 骷髅夜袭：夜间破土，击碎后蹦跳头颅
+  game/wizzrobe.gd       # 维佐法师：悬浮施法、中距游走、近身闪现
+  game/loot_chest.gd     # 古代宝箱：E 开箱给防具（士兵/攀爬者/蛮族三套）
   fx/fx.gd               # 曳光/命中特效
   fx/damage_number.gd    # 飘字伤害反馈：命中弹数字、上浮淡出
   fx/sfx_bank.gd         # 音效池（2D/3D）

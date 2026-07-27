@@ -67,6 +67,7 @@ var _escort_npc: WildNPC = null
 var _stasis_test_mob: WildMoblin = null
 var _stasis_test_pos := Vector3.ZERO
 var _stasis_test_hp := 0.0
+var _elixir_test_stam := 0.0
 var _quest_mushroom_base := 0
 var _quest_moblin_kills := 0
 var _wild_test_hp := 0.0
@@ -1299,6 +1300,20 @@ func _update_wild_test() -> void:
 			player.global_position = (warp_points[0]["pos"] as Vector3) + Vector3(0, 0.5, 0)
 			var teleported := player.global_position.distance_to(pre_pos) < 3.0
 			print("[wildtest] warp reg=%s teleport=%s" % [str(warp_reg), str(teleported)])
+			# 药剂回归：火堆旁材料+蘑菇=力量药剂、+兽肉=精力药剂。
+			player.global_position = Vector3(-67, terrain.get_height(-67, 16), 16) + Vector3(1.5, 0, 0)
+			player.backpack_items["monster_part"] = 2
+			player.backpack_items["mushroom"] = 1
+			player.backpack_items["meat"] = 1
+			player.backpack_index = player.backpack_weapons.size() + 9
+			player._use_backpack_selection()
+			var power_ok := player.skewer_mult > 1.1 and int(player.backpack_items.get("monster_part", 0)) == 1
+			_elixir_test_stam = player.max_stamina
+			player.backpack_items["monster_part"] = 1
+			player._use_backpack_selection()
+			var stam_ok := player.max_stamina == _elixir_test_stam + 20.0 and player._elixir_stam_end_ms > 0
+			player._elixir_stam_end_ms = 1
+			print("[wildtest] elixir power=%s stam=%s" % [str(power_ok), str(stam_ok)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)
@@ -1339,6 +1354,8 @@ func _update_wild_test() -> void:
 		590:
 			player.debug_move = 0.0
 			print("[wildtest] castle_stairs start_y=%.2f end_y=%.2f climbed=%.2f" % [_wild_test_height, player.global_position.y, player.global_position.y - _wild_test_height])
+			# 药剂到期恢复（下半）：下车后恢复已触发，上限应回落。
+			print("[wildtest] elixir_expire max_stam %.0f->%.0f" % [_elixir_test_stam + 20.0, player.max_stamina])
 			# 攀爬回归：贴着测绘塔墙面推前进，应进入攀爬并升高。
 			player.global_position = Vector3(-129.3, terrain.get_height(-129.3, 109) + 0.1, 109)
 			player.rotation.y = PI * 0.5

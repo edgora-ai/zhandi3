@@ -151,6 +151,7 @@ func _die(from: Variant) -> void:
 	if mode == "skull":
 		Loot.spawn(scene, global_position, "wood", "", 2, 1)
 		Loot.spawn(scene, global_position + Vector3(0.4, 0, 0), "meat", "", 1, 1)
+		Loot.spawn(scene, global_position + Vector3(-0.4, 0, 0.2), "monster_part", "", 1, 1)
 		queue_free()
 		return
 	# 本体散架：播 crumble 并放出蹦跳头颅。
@@ -158,6 +159,7 @@ func _die(from: Variant) -> void:
 	_state_t = 0.85
 	_play(&"crumble")
 	var skull := Stal.create_skull(get_parent(), terrain, player, global_position + Vector3(0, 0.4, 0))
+	Loot.spawn(scene, global_position + Vector3(0.7, 0, 0.4), "monster_part", "", 2, 1)
 	skull.velocity = Vector3(randf_range(-2, 2), 4.0, randf_range(-2, 2))
 	DamageNumber.spawn_at(scene, global_position + Vector3(0, 1.8, 0), "散架!", Color(0.85, 0.82, 0.70))
 

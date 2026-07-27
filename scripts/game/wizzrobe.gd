@@ -86,6 +86,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		collision_layer = 0
 		Loot.spawn(get_tree().current_scene, global_position, "meat", "", 2, 1)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0, 0), "seed", "", 1, 2)
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.5, 0, 0.3), "monster_part", "", 3, 1)
 		await get_tree().create_timer(0.8).timeout
 		queue_free()
 		return

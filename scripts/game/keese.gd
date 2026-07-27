@@ -83,6 +83,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		from.give_rupees(1)
 		if randf() < 0.3:
 			Loot.spawn(get_tree().current_scene, global_position, "meat", "", 1, 1)
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.3, 0, 0.2), "monster_part", "", 1, 1)
 		queue_free()
 
 

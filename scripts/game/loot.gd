@@ -84,6 +84,8 @@ func _build_visual() -> void:
 			_build_fairy()
 		"master_sword":
 			_build_master_sword()
+		"monster_part":
+			_build_horn()
 
 
 func _build_box(size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
@@ -100,6 +102,23 @@ func _build_weapon_model(rc: Color) -> void:
 	_build_box(Vector3(0.09, 0.13, 0.62), Color(0.16, 0.17, 0.19))
 	_build_box(Vector3(0.06, 0.2, 0.09), rc, Vector3(0, -0.13, -0.05))
 	_build_box(Vector3(0.07, 0.1, 0.2), rc, Vector3(0, -0.02, 0.32))
+
+
+# 怪物材料：小兽角（两根斜交叉的骨锥）。
+func _build_horn() -> void:
+	var mat := Toon.make_material(Color(0.88, 0.84, 0.72), true, 0.008)
+	for sx in [-1.0, 1.0]:
+		var horn := MeshInstance3D.new()
+		var hm := CylinderMesh.new()
+		hm.top_radius = 0.02
+		hm.bottom_radius = 0.07
+		hm.height = 0.42
+		hm.radial_segments = 7
+		horn.mesh = hm
+		horn.material_override = mat
+		horn.position = Vector3(sx * 0.10, 0.05, 0)
+		horn.rotation_degrees = Vector3(35.0, 0.0, sx * 22.0)
+		_item.add_child(horn)
 
 
 func _build_mushroom() -> void:
@@ -341,7 +360,7 @@ func apply_to(target: CharacterBody3D) -> void:
 		"ammo":
 			if target.has_method("give_ammo"):
 				target.give_ammo(amount)
-		"mushroom", "meat", "dragon_scale", "wood":
+		"mushroom", "meat", "dragon_scale", "wood", "monster_part":
 			if target.has_method("give_item"):
 				target.give_item(kind, amount)
 		"seed":

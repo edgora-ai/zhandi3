@@ -237,6 +237,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		from.give_rupees(10)
 		Loot.spawn(get_tree().current_scene, global_position, "armor", "", 50, 2)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.8, 0, 0.5), "ammo", "", 90, 2)
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.8, 0, 0.5), "monster_part", "", 3, 1)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), "击破!", Color(1.0, 0.55, 0.20))
 		if _ap:
 			_play(&"die")

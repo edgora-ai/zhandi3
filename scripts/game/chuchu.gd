@@ -114,6 +114,7 @@ func _die(from: Variant) -> void:
 	var scene := get_tree().current_scene
 	if small:
 		Loot.spawn(scene, global_position + Vector3(0, 0.3, 0), "mushroom", "", 1, 1)
+		Loot.spawn(scene, global_position + Vector3(0.4, 0.3, 0.2), "monster_part", "", 1, 1)
 	else:
 		# 大只分裂成两只小只。
 		for sx in [-1.0, 1.0]:

@@ -73,6 +73,7 @@ var climb_stamina_mult := 1.0
 var armor_melee_mult := 1.0
 var rupees := 0
 var shop_open := false
+var _elixir_stam_end_ms := 0
 var bonded_horse: Horse = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
@@ -727,6 +728,11 @@ func _physics_process(delta: float) -> void:
 			Engine.time_scale = 1.0
 	if _stasis_end_ms > 0 and Time.get_ticks_msec() >= _stasis_end_ms:
 		_release_stasis()
+	if _elixir_stam_end_ms > 0 and Time.get_ticks_msec() >= _elixir_stam_end_ms:
+		_elixir_stam_end_ms = 0
+		max_stamina -= 20.0
+		stamina = minf(stamina, max_stamina)
+		hud.add_feed("药剂效果消退了")
 	_update_sword(delta)
 	dodge_cd = maxf(0.0, dodge_cd - delta)
 	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
@@ -1534,6 +1540,7 @@ func get_backpack_lines() -> Array[String]:
 	lines.append("防具 · 士兵铠甲 × %d（受伤 -20%%）%s" % [int(backpack_items.get("armor_soldier", 0)), "（已装备）" if equipped_armor == "armor_soldier" else ""])
 	lines.append("防具 · 攀爬者手套 × %d（攀爬增效）%s" % [int(backpack_items.get("armor_climber", 0)), "（已装备）" if equipped_armor == "armor_climber" else ""])
 	lines.append("防具 · 蛮族护符 × %d（近战 +20%%）%s" % [int(backpack_items.get("armor_barbarian", 0)), "（已装备）" if equipped_armor == "armor_barbarian" else ""])
+	lines.append("材料 · 怪物材料 × %d（火堆炼药：+蘑菇力量药剂 / +兽肉精力药剂）" % int(backpack_items.get("monster_part", 0)))
 	return lines
 
 
@@ -1542,7 +1549,7 @@ func _use_backpack_selection() -> void:
 		_retrieve_weapon(backpack_index)
 		return
 	var item_index := backpack_index - backpack_weapons.size()
-	var key: String = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom", "armor_soldier", "armor_climber", "armor_barbarian"][item_index]
+	var key: String = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom", "armor_soldier", "armor_climber", "armor_barbarian", "monster_part"][item_index]
 	var count := int(backpack_items[key])
 	if count <= 0:
 		return
@@ -1565,6 +1572,31 @@ func _use_backpack_selection() -> void:
 	if scene and scene.get("wild_world") != null:
 		near_fire = scene.wild_world.is_near_campfire(global_position, 4.0)
 	# 烤串：火堆旁兽肉+蘑菇各一，换 90 秒攻击 +25%。
+	# 炼药：火堆旁怪物材料+蘑菇=力量药剂（60s +15%），+兽肉=精力药剂（全满+临时上限 20）。
+	if key == "monster_part":
+		if not near_fire:
+			hud.add_feed("怪物材料要在火堆旁炼药")
+			return
+		if int(backpack_items["mushroom"]) >= 1:
+			backpack_items["monster_part"] = count - 1
+			backpack_items["mushroom"] = int(backpack_items["mushroom"]) - 1
+			skewer_mult = 1.15
+			_skewer_t = 60.0
+			damage_mult = 1.15
+			hud.add_feed("炼成力量药剂：60 秒攻击 +15%")
+		elif int(backpack_items["meat"]) >= 1:
+			backpack_items["monster_part"] = count - 1
+			backpack_items["meat"] = int(backpack_items["meat"]) - 1
+			_elixir_stam_end_ms = Time.get_ticks_msec() + 60000
+			max_stamina += 20.0
+			stamina = max_stamina
+			hud.add_feed("炼成精力药剂：精力全满，上限 +20（60 秒）")
+		else:
+			hud.add_feed("炼药需要蘑菇或兽肉做药引")
+			return
+		backpack_changed.emit()
+		_refresh_backpack()
+		return
 	if key == "meat" and near_fire and int(backpack_items["mushroom"]) >= 1:
 		backpack_items["meat"] = count - 1
 		backpack_items["mushroom"] = int(backpack_items["mushroom"]) - 1

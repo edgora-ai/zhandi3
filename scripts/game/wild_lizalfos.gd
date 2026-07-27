@@ -185,6 +185,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	if from and from.has_method("give_rupees"):
 		from.give_rupees(4)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 2, 1)
+		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "monster_part", "", 2, 1)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), "击破!", Color(1.0, 0.55, 0.20))
 		if _ap:
 			_play(&"die")

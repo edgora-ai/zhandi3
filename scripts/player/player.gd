@@ -72,6 +72,7 @@ var climb_stamina_mult := 1.0
 var armor_melee_mult := 1.0
 var rupees := 0
 var shop_open := false
+var bonded_horse: Horse = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
 var debug_glide := false     # 自动化测试用：强制展开斗篷
@@ -224,6 +225,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					_buy(1)
 				KEY_3:
 					_buy(2)
+				KEY_4:
+					_buy(3)
+				KEY_5:
+					_buy(4)
 				KEY_E, KEY_ESCAPE, KEY_B:
 					close_shop()
 			return
@@ -485,11 +490,15 @@ func _toggle_vehicle() -> void:
 func _whistle_horse() -> void:
 	var best: Horse = null
 	var best_d := 45.0
+	# 绑定马优先：无论多远都会跑来；没有绑定马才唤最近的野马。
+	if bonded_horse and is_instance_valid(bonded_horse) and bonded_horse.driver == null and global_position.distance_to(bonded_horse.global_position) < 220.0:
+		best = bonded_horse
+		best_d = 0.0
 	for candidate in get_tree().get_nodes_in_group("vehicle"):
 		if candidate is Horse:
 			var h := candidate as Horse
 			var d := global_position.distance_to(h.global_position)
-			if d < best_d and h.driver == null:
+			if best == null and d < best_d and h.driver == null:
 				best_d = d
 				best = h
 	if best:
@@ -846,6 +855,8 @@ func open_shop() -> void:
 			"1 · 箭矢 ×10 —— 15 卢比",
 			"2 · 烤兽肉 ×1 —— 12 卢比",
 			"3 · 生命药水（回满血）—— 25 卢比",
+			"4 · 卖兽肉 ×1 —— +8 卢比",
+			"5 · 卖海拉鲁蘑菇 ×1 —— +5 卢比",
 		], rupees)
 
 
@@ -857,6 +868,27 @@ func close_shop() -> void:
 
 func _buy(idx: int) -> void:
 	var prices := [15, 12, 25]
+	# 出售端：卖兽肉 +8、卖蘑菇 +5。
+	if idx == 3:
+		if int(backpack_items["meat"]) <= 0:
+			hud.add_feed("没有兽肉可卖")
+			return
+		backpack_items["meat"] = int(backpack_items["meat"]) - 1
+		give_rupees(8)
+		hud.add_feed("卖出兽肉，+8 卢比")
+		_refresh_backpack()
+		open_shop()
+		return
+	if idx == 4:
+		if int(backpack_items["mushroom"]) <= 0:
+			hud.add_feed("没有蘑菇可卖")
+			return
+		backpack_items["mushroom"] = int(backpack_items["mushroom"]) - 1
+		give_rupees(5)
+		hud.add_feed("卖出蘑菇，+5 卢比")
+		_refresh_backpack()
+		open_shop()
+		return
 	if rupees < prices[idx]:
 		if hud:
 			hud.add_feed("卢比不够了……")

@@ -373,6 +373,7 @@ func enter(p: Player) -> void:
 	bonded = true
 	driver = p
 	driver.vehicle = self
+	p.bonded_horse = self
 	driver.visible = false
 	_rider.visible = true
 	driver.set_deferred("collision_layer", 0)

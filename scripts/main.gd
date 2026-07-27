@@ -1225,6 +1225,22 @@ func _update_wild_test() -> void:
 				ammo1 += int(player.reserves.get(wid2, 0))
 			player._buy(2)
 			print("[wildtest] shop rupees %d->%d(+kill) ammo +%d spent=%d->%d reject=%s" % [rp0, rp1, ammo1 - ammo0, 20, player.rupees, str(player.rupees == 5)])
+			# 出售与绑定召回回归：卖肉换卢比、绑定马远距离口哨召回。
+			player.backpack_items["meat"] = 2
+			var rp_sell0 := player.rupees
+			player._buy(3)
+			var sell_ok := int(player.backpack_items["meat"]) == 1 and player.rupees == rp_sell0 + 8
+			var rc_horse := get_tree().get_first_node_in_group("vehicle") as Horse
+			var recall_ok := false
+			if rc_horse:
+				rc_horse.bonded = true
+				player.global_position = rc_horse.global_position + Vector3(1, 0, 0)
+				rc_horse.enter(player)
+				rc_horse.exit()
+				player.global_position = rc_horse.global_position + Vector3(0, 0, 120.0)
+				player._whistle_horse()
+				recall_ok = rc_horse._call_target == player
+			print("[wildtest] sell_meat=%s bonded_recall=%s" % [str(sell_ok), str(recall_ok)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

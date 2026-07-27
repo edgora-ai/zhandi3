@@ -60,6 +60,7 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	_spawn_animals()
 	_spawn_dragon()
 	_spawn_flying_attackers()
+	_build_region_ambience()
 	# 两台古代守卫：遗迹与城堡各一台。
 	for gp in [Vector3(26, 0, -88), Vector3(-6, 0, -116)]:
 		_guardian_points.append(gp)
@@ -1320,6 +1321,36 @@ func _spawn_flying_attackers() -> void:
 		attacker.setup(terrain, player)
 		add_child(attacker)
 		attacker.global_position = _ground(p, 9.0)
+
+
+# 地区性 3D 循环环境声：火山低鸣、雪原风吼，靠近地区时自然浮现。
+func _build_region_ambience() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var volc := _make_region_loop("res://assets/sfx/volcano.wav", Vector3(164, terrain.get_height(164, -145) + 30.0, -145), -10.0, 80.0)
+	add_child(volc)
+	volc.play()
+	var wind := _make_region_loop("res://assets/sfx/snowwind.wav", Vector3(-166, terrain.get_height(-166, -142) + 40.0, -142), -12.0, 110.0)
+	add_child(wind)
+	wind.play()
+	tree_exiting.connect(func() -> void:
+		for p in [volc, wind]:
+			p.stop()
+			p.stream = null
+	)
+
+
+func _make_region_loop(path: String, pos: Vector3, vol_db: float, unit: float) -> AudioStreamPlayer3D:
+	var stream: AudioStreamWAV = load(path)
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_end = int(stream.get_length() * stream.mix_rate)
+	var p := AudioStreamPlayer3D.new()
+	p.stream = stream
+	p.volume_db = vol_db
+	p.unit_size = unit
+	p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	p.position = pos
+	return p
 
 
 func _spawn_npcs() -> void:

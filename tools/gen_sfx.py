@@ -30,6 +30,15 @@ def mix(a, b):
     return [x + y for x, y in zip(a, b)]
 
 
+def loopify(samples, fade_sec):
+    """把开头淡入叠到结尾：循环回卷时接缝连续（噪声床专用）。"""
+    f = int(SR * fade_sec)
+    for i in range(f):
+        w = i / f
+        samples[len(samples) - f + i] = samples[len(samples) - f + i] * (1.0 - w) + samples[i] * w
+    return samples
+
+
 def noise_burst(dur, decay, amp=1.0, lowpass=0.0):
     n = int(SR * dur)
     out = []
@@ -285,5 +294,33 @@ for ni in range(4):
         if off + j < len(night):
             night[off + j] += x
 write_wav("music_night.wav", night)
+
+# 火山低鸣：整周期低频双音（频率×12 为整数周期天然无缝）+ 低通隆隆噪声床（loopify 接缝）
+# + 岩浆翻涌的低频小爆点。
+volc = [0.0] * int(SR * 12.0)
+volc_bed = loopify(noise_burst(12.0, 20.0, 0.32, 0.06), 2.0)
+for j, x in enumerate(volc_bed):
+    volc[j] += x
+for f in [38.0, 55.0]:
+    for j, x in enumerate(tone(12.0, f, 60.0, 0.09)):
+        volc[j] += x
+for bi in range(14):
+    off = int(SR * random.uniform(0.5, 11.0))
+    for j, x in enumerate(sweep(0.18, random.uniform(60, 120), 35, 0.10, 0.16)):
+        if off + j < len(volc):
+            volc[off + j] += x
+write_wav("volcano.wav", volc)
+
+# 雪原风吼：中频风噪床 + 三阵涌风。
+wind = [0.0] * int(SR * 12.0)
+wind_bed = loopify(noise_burst(12.0, 20.0, 0.26, 0.45), 2.0)
+for j, x in enumerate(wind_bed):
+    wind[j] += x
+for goff in [1.0, 5.0, 9.0]:
+    off = int(SR * goff)
+    for j, x in enumerate(noise_burst(2.6, 1.3, 0.30, 0.30)):
+        if off + j < len(wind):
+            wind[off + j] += x
+write_wav("snowwind.wav", wind)
 
 print("done")

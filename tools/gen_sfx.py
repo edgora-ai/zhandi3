@@ -266,4 +266,24 @@ for toff, f in [(0.15, 220.0), (0.75, 261.63), (6.15, 220.0), (6.75, 293.66)]:
             boss[off + j] += x
 write_wav("boss.wav", boss)
 
+# 夜曲：Am–F–C–G 慢起音 pad，比白日更轻、交叠更慢，稀疏高音铃点缀。
+NCHORDS = [
+    [220.00, 261.63, 329.63],   # Am
+    [174.61, 220.00, 261.63],   # F
+    [261.63, 329.63, 392.00],   # C
+    [196.00, 246.94, 329.63],   # G
+]
+night = chord(SEG, NCHORDS[0], 0.09)
+for ci in range(1, 4):
+    night = crossfade(night, chord(SEG, NCHORDS[ci], 0.09), 3.0)
+night = crossfade(night, chord(SEG, NCHORDS[0], 0.09), 3.0)
+NBELLS = [523.25, 659.25, 783.99, 1046.50]
+for ni in range(4):
+    off = int(SR * random.uniform(2.0, len(night) / SR - 3.0))
+    bell = tone(1.6, random.choice(NBELLS), 1.2, 0.045)
+    for j, x in enumerate(bell):
+        if off + j < len(night):
+            night[off + j] += x
+write_wav("music_night.wav", night)
+
 print("done")

@@ -71,6 +71,7 @@ var _elixir_test_stam := 0.0
 var _quest_mushroom_base := 0
 var _quest_moblin_kills := 0
 var _wild_test_hp := 0.0
+var _music_check_t := 0.0
 
 
 func _ready() -> void:
@@ -881,6 +882,12 @@ func _poll_focus_recovery() -> void:
 
 
 func _process(delta: float) -> void:
+	# 昼夜音乐：每秒检查一次昼夜状态，入夜/天明交叉切换配乐。
+	_music_check_t -= delta
+	if _music_check_t <= 0.0:
+		_music_check_t = 1.0
+		if daynight and sfx:
+			sfx.set_night_music(daynight.is_night())
 	if _wild_test_frame >= 0:
 		_update_wild_test()
 	if _season_test_frame >= 0:

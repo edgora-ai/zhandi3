@@ -24,6 +24,8 @@ var _music_player: AudioStreamPlayer
 var _ambience_player: AudioStreamPlayer
 var _boss_player: AudioStreamPlayer
 var _boss_on := false
+var _night_player: AudioStreamPlayer
+var _night_on := false
 
 
 func _ready() -> void:
@@ -86,6 +88,15 @@ func start_ambience() -> void:
 	_ambience_player.volume_db = -13.0
 	add_child(_ambience_player)
 	_ambience_player.play()
+	# 夜曲播放器常驻、日常静音，昼夜交替时与白日配乐 3 秒交叉淡入淡出。
+	var nmusic: AudioStreamWAV = load("res://assets/sfx/music_night.wav")
+	nmusic.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	nmusic.loop_end = int(nmusic.get_length() * nmusic.mix_rate)
+	_night_player = AudioStreamPlayer.new()
+	_night_player.stream = nmusic
+	_night_player.volume_db = -32.0
+	add_child(_night_player)
+	_night_player.play()
 
 
 func set_streams_paused(paused: bool) -> void:
@@ -99,6 +110,19 @@ func set_streams_paused(paused: bool) -> void:
 		_ambience_player.stream_paused = paused
 	if _boss_player:
 		_boss_player.stream_paused = paused
+	if _night_player:
+		_night_player.stream_paused = paused
+
+
+# 昼夜音乐切换：入夜白日配乐淡出、夜曲淡入（3 秒缓慢交叉）。
+func set_night_music(night: bool) -> void:
+	if night == _night_on or _music_player == null or _night_player == null:
+		return
+	_night_on = night
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_music_player, "volume_db", -32.0 if night else -16.0, 3.0)
+	tw.tween_property(_night_player, "volume_db", -18.0 if night else -32.0, 3.0)
 
 
 # Boss 战音乐：进入战区渐强鼓点、压暗日常配乐；脱离战区淡回。
@@ -147,4 +171,7 @@ func _exit_tree() -> void:
 	if _boss_player:
 		_boss_player.stop()
 		_boss_player.stream = null
+	if _night_player:
+		_night_player.stop()
+		_night_player.stream = null
 	_streams.clear()

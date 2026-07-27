@@ -10,7 +10,7 @@ bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 
 
-def mat(name, rgb, emit=None):
+def mat(name, rgb, emit=None, emit_strength=2.2):
 	m = bpy.data.materials.new(name)
 	m.use_nodes = True
 	bsdf = None
@@ -27,13 +27,13 @@ def mat(name, rgb, emit=None):
 				bsdf.inputs[key].default_value = (*emit, 1.0)
 				break
 		if "Emission Strength" in bsdf.inputs:
-			bsdf.inputs["Emission Strength"].default_value = 2.2
+			bsdf.inputs["Emission Strength"].default_value = emit_strength
 	return m
 
 
 FUR = mat("keese_fur", (0.22, 0.14, 0.20))
 MEMB = mat("keese_membrane", (0.30, 0.16, 0.28))
-EYE = mat("keese_eye", (1.0, 0.20, 0.12), emit=(1.0, 0.10, 0.05))
+EYE = mat("keese_eye", (1.0, 0.22, 0.10), emit=(1.0, 0.12, 0.03), emit_strength=7.0)
 FANG = mat("keese_fang", (0.92, 0.88, 0.78))
 
 
@@ -71,7 +71,7 @@ parts.append(sphere("body", (0, 0, 0), (0.20, 0.26, 0.18), FUR))
 parts.append(sphere("head", (0, -0.22, 0.10), (0.14, 0.13, 0.12), FUR))
 for sx in [-1, 1]:
 	parts.append(cone("ear", (sx * 0.09, -0.20, 0.24), 0.05, 0.008, 0.16, FUR, rot=(0, sx * math.radians(-18), 0)))
-	parts.append(sphere("eye", (sx * 0.055, -0.33, 0.12), (0.028, 0.02, 0.028), EYE))
+	parts.append(sphere("eye", (sx * 0.058, -0.335, 0.12), (0.048, 0.036, 0.048), EYE))
 	parts.append(cone("fang", (sx * 0.03, -0.32, 0.02), 0.012, 0.003, 0.06, FANG, rot=(math.radians(180), 0, 0)))
 	parts.append(box("wing", (sx * 0.42, 0.06, 0.04), (0.70, 0.42, 0.025), MEMB, rot=(0, sx * math.radians(14), 0)))
 

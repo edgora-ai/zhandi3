@@ -260,6 +260,15 @@ func _ready() -> void:
 			player._toggle_magnet()
 	if args.has("--keesetest") and daynight:
 		daynight.t = 0.8
+	if args.has("--stasistest") and _map_id == "wild":
+		var stm := get_tree().get_first_node_in_group("wild_enemy") as WildMoblin
+		if stm:
+			player.global_position = stm.global_position + Vector3(0, 0, 5.0)
+			var sdir := (stm.global_position - player.camera.global_position).normalized()
+			player.rotation.y = atan2(sdir.x, sdir.z) + PI
+			player.pitch = -0.05
+			player.camera.rotation.x = -0.05
+			player._toggle_stasis()
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:

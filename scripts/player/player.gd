@@ -759,6 +759,11 @@ func _physics_process(delta: float) -> void:
 			Engine.time_scale = 1.0
 	if _stasis_end_ms > 0 and Time.get_ticks_msec() >= _stasis_end_ms:
 		_release_stasis()
+	# 时停壳呼吸脉动，并随剩余时间收缩（壳体本身就是倒计时）。
+	if _stasis_shell and is_instance_valid(_stasis_shell):
+		var remain := clampf((_stasis_end_ms - Time.get_ticks_msec()) / 5000.0, 0.0, 1.0)
+		var pulse := 1.0 + sin(Time.get_ticks_msec() * 0.008) * 0.03
+		_stasis_shell.scale = Vector3.ONE * pulse * lerpf(0.82, 1.0, remain)
 	if _elixir_stam_end_ms > 0 and Time.get_ticks_msec() >= _elixir_stam_end_ms:
 		_elixir_stam_end_ms = 0
 		max_stamina -= 20.0

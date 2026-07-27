@@ -47,7 +47,8 @@ void fragment() {
 
 	// 基础水色：浅滩绿松石 → 深水蓝
 	vec3 col = mix(color_shallow.rgb, color_deep.rgb, sqrt(d));
-	float alpha = mix(0.72, 0.94, sqrt(d));
+	// 浅滩压低不透明度：透出沙质河床（旷野之息式的清水），深水保持浓色。
+	float alpha = mix(0.42, 0.95, sqrt(d));
 
 	float t = TIME * wave_speed;
 	// 表面流动波带：波峰亮、波谷暗，肉眼可见的涌动

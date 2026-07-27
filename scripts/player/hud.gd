@@ -419,20 +419,57 @@ func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
 	_end_panel = Control.new()
 	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_ui.add_child(_end_panel)
-	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.55))
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.position = Vector2(-250, -110)
-	box.custom_minimum_size.x = 500
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_end_panel.add_child(box)
-	var title := _mk_label(box, "大吉大利，今晚吃鸡！" if victory else "阵 亡", 52, Color(1.0, 0.85, 0.3) if victory else Color(0.95, 0.4, 0.3))
+	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.62))
+	# 结算卡片：主题顶条 + 大字排名 + 分隔线 + 数据行，胜金败红。
+	var accent := Color(1.0, 0.85, 0.3) if victory else Color(0.95, 0.42, 0.32)
+	var card := Control.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.position = Vector2(-260, -190)
+	card.size = Vector2(520, 380)
+	_end_panel.add_child(card)
+	_mk_rect(card, Vector2.ZERO, Vector2(520, 380), Color(0.05, 0.06, 0.08, 0.92))
+	_mk_rect(card, Vector2(6, 6), Vector2(508, 368), Color(0.10, 0.13, 0.16, 0.85))
+	_mk_rect(card, Vector2(6, 6), Vector2(508, 6), accent)
+	var title := _mk_label(card, "大吉大利，今晚吃鸡！" if victory else "阵  亡", 38, accent)
+	title.position = Vector2(0, 28)
+	title.size.x = 520
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var sub := _mk_label(box, "排名 #%d / %d      击杀 %d" % [rank, total, kills], 24)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var hint := _mk_label(box, "按 R 重新开始", 20, Color(0.8, 0.9, 1.0))
+	var rank_label := _mk_label(card, "#%d" % rank, 62, Color(1.0, 0.95, 0.75) if victory else Color(0.90, 0.88, 0.82))
+	rank_label.position = Vector2(0, 88)
+	rank_label.size.x = 520
+	rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var total_label := _mk_label(card, "共 %d 名战士" % total, 18, Color(0.72, 0.78, 0.84))
+	total_label.position = Vector2(0, 166)
+	total_label.size.x = 520
+	total_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mk_rect(card, Vector2(60, 206), Vector2(400, 2), Color(0.35, 0.38, 0.42, 0.8))
+	var stats := [
+		["击  杀", "%d" % kills, Color(0.95, 0.55, 0.45)],
+		["评  价", _rank_comment(victory, rank, total), Color(0.55, 0.85, 0.95)],
+	]
+	for i in range(stats.size()):
+		var row: Array = stats[i]
+		_mk_rect(card, Vector2(122, 236 + i * 42), Vector2(14, 14), row[2])
+		var name_l := _mk_label(card, str(row[0]), 22, Color(0.82, 0.85, 0.88))
+		name_l.position = Vector2(148, 228 + i * 42)
+		var val_l := _mk_label(card, str(row[1]), 22, Color(0.97, 0.93, 0.80))
+		val_l.position = Vector2(252, 228 + i * 42)
+	var hint := _mk_label(card, "按 R 重新开始", 19, Color(0.75, 0.88, 1.0))
+	hint.position = Vector2(0, 330)
+	hint.size.x = 520
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ignore_mouse(_end_panel)
+
+
+# 结算评语：按名次给一句 tiers 评价。
+func _rank_comment(victory: bool, rank: int, total: int) -> String:
+	if victory:
+		return "传说再续"
+	if rank <= 3:
+		return "虽败犹荣"
+	if rank <= int(ceil(total / 2.0)):
+		return "可圈可点"
+	return "再接再厉"
 
 
 func show_quest_end(title_text: String, lines: Array[String]) -> void:
@@ -442,19 +479,28 @@ func show_quest_end(title_text: String, lines: Array[String]) -> void:
 	_end_panel = Control.new()
 	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_ui.add_child(_end_panel)
-	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.55))
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.position = Vector2(-280, -120)
-	box.custom_minimum_size.x = 560
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_end_panel.add_child(box)
-	var title := _mk_label(box, title_text, 48, Color(1.0, 0.85, 0.3))
+	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.62))
+	# 与战场结算同款的卡片：金色顶条 + 居中标题与逐行结语。
+	var card := Control.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.position = Vector2(-300, -175)
+	card.size = Vector2(600, 350)
+	_end_panel.add_child(card)
+	_mk_rect(card, Vector2.ZERO, Vector2(600, 350), Color(0.05, 0.06, 0.08, 0.92))
+	_mk_rect(card, Vector2(6, 6), Vector2(588, 338), Color(0.10, 0.13, 0.16, 0.85))
+	_mk_rect(card, Vector2(6, 6), Vector2(588, 6), Color(1.0, 0.85, 0.3))
+	var title := _mk_label(card, title_text, 38, Color(1.0, 0.85, 0.3))
+	title.position = Vector2(0, 26)
+	title.size.x = 600
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	for line in lines:
-		var sub := _mk_label(box, line, 22)
+	for i in range(lines.size()):
+		var sub := _mk_label(card, lines[i], 22, Color(0.88, 0.90, 0.92))
+		sub.position = Vector2(0, 100 + i * 36)
+		sub.size.x = 600
 		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var hint := _mk_label(box, "按 R 重新开始", 20, Color(0.8, 0.9, 1.0))
+	var hint := _mk_label(card, "按 R 重新开始", 19, Color(0.75, 0.88, 1.0))
+	hint.position = Vector2(0, 300)
+	hint.size.x = 600
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ignore_mouse(_end_panel)
 

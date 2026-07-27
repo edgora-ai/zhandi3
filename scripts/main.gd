@@ -218,6 +218,10 @@ func _ready() -> void:
 		Korok.spawn(self, kpos, player.global_position)
 	if args.has("--melleetest"):
 		player._melee_swing()
+	if args.has("--climbtest") and terrain:
+		player.global_position = Vector3(-129.3, terrain.get_height(-129.3, 109) + 0.1, 109)
+		player.rotation.y = atan2(-132.0 - player.global_position.x, 109.0 - player.global_position.z) + PI
+		player.debug_move = 1.0
 	if args.has("--bombtest"):
 		player._place_bomb()
 	if args.has("--cryonistest") and terrain:

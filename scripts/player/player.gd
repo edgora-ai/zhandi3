@@ -74,6 +74,10 @@ var armor_melee_mult := 1.0
 var rupees := 0
 var shop_open := false
 var _elixir_stam_end_ms := 0
+var _climb_arms: Node3D
+var _climb_arm_l: Node3D
+var _climb_arm_r: Node3D
+var _climb_phase := 0.0
 var bonded_horse: Horse = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
@@ -165,6 +169,7 @@ func _ready() -> void:
 	_build_sword()
 	_build_shield()
 	_build_bow()
+	_build_climb_arms()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -603,6 +608,7 @@ func _physics_process(delta: float) -> void:
 	if _update_climbing(delta, f, r):
 		# 攀爬中：速度由攀爬逻辑设置（W/S 上下、A/D 横移、Space 蹬离）
 		pass
+		_update_climb_arms(delta)
 	elif _ladder and f > 0.0:
 		# 攀爬：W 沿梯子上升
 		velocity.y = 3.2
@@ -734,6 +740,8 @@ func _physics_process(delta: float) -> void:
 		stamina = minf(stamina, max_stamina)
 		hud.add_feed("药剂效果消退了")
 	_update_sword(delta)
+	if not is_climbing and _climb_arms:
+		_climb_arms.visible = false
 	dodge_cd = maxf(0.0, dodge_cd - delta)
 	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
 		_end_flurry()
@@ -1132,6 +1140,56 @@ func _build_shield() -> void:
 	shield_root.add_child(boss)
 	_shield_root = shield_root
 	_shield_root.visible = false
+
+
+# 第一人称攀爬手臂：贴墙攀爬时可见的双手（绿袖+手掌），只在 is_climbing 时显示。
+func _build_climb_arms() -> void:
+	_climb_arms = Node3D.new()
+	_climb_arms.name = "ClimbArms"
+	_climb_arms.visible = false
+	camera.add_child(_climb_arms)
+	var tunic := Toon.make_material(Color(0.16, 0.42, 0.22), true, 0.010)
+	var skin := Toon.make_material(Color(0.90, 0.70, 0.54), true, 0.008)
+	_climb_arm_l = _make_climb_arm(Vector3(-0.26, -0.34, -0.52), tunic, skin)
+	_climb_arm_r = _make_climb_arm(Vector3(0.26, -0.34, -0.52), tunic, skin)
+
+
+func _make_climb_arm(pos: Vector3, tunic: Material, skin: Material) -> Node3D:
+	var arm := Node3D.new()
+	arm.position = pos
+	arm.rotation_degrees = Vector3(-52.0, 0.0, 0.0)
+	_climb_arms.add_child(arm)
+	var forearm := MeshInstance3D.new()
+	var fm := CapsuleMesh.new()
+	fm.radius = 0.055
+	fm.height = 0.30
+	fm.radial_segments = 8
+	fm.rings = 4
+	forearm.mesh = fm
+	forearm.material_override = tunic
+	arm.add_child(forearm)
+	var hand := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 0.065
+	hm.height = 0.13
+	hm.radial_segments = 8
+	hm.rings = 5
+	hand.mesh = hm
+	hand.material_override = skin
+	hand.position = Vector3(0, 0.19, 0)
+	arm.add_child(hand)
+	return arm
+
+
+# 攀爬动画：双手交替上攀，移动越快交替越快，带侧移摆动。
+func _update_climb_arms(delta: float) -> void:
+	_climb_arms.visible = true
+	var rate := 1.1 + clampf(velocity.length() * 0.8, 0.0, 1.6)
+	_climb_phase += delta * rate
+	var grab := sin(_climb_phase * TAU)
+	var sway := sin(_climb_phase * PI) * 0.02
+	_climb_arm_l.position = Vector3(-0.26 + sway, -0.34 + maxf(0.0, grab) * 0.13, -0.52)
+	_climb_arm_r.position = Vector3(0.26 + sway, -0.34 + maxf(0.0, -grab) * 0.13, -0.52)
 
 
 func _build_bow() -> void:

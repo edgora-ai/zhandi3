@@ -21,6 +21,8 @@ var _glb: Node3D
 var _ap: AnimationPlayer
 var _cur_anim := ""
 var _anim_hold := 0.0
+var _snore_t := 0.0
+var _breath_t := 0.0
 
 
 static func create(parent: Node, p_terrain: Terrain, p_player: Player, pos: Vector3) -> Hinox:
@@ -129,6 +131,8 @@ func take_damage(amount: float, from: Variant = null, part_name: String = "body"
 func _wake() -> void:
 	_state = "wake"
 	_state_t = 1.0
+	if _glb:
+		_glb.scale = Vector3.ONE
 	_cur_anim = ""
 	_play(&"wake")
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 4.5, 0), "!!", Color(1.0, 0.4, 0.15))
@@ -171,6 +175,16 @@ func _physics_process(delta: float) -> void:
 		velocity.z = 0.0
 		velocity.y = -4.0
 		move_and_slide()
+		# 睡眠可读性：肚皮缓慢起伏 + 周期性飘出鼾声 Z 字，远看是活物而不是黑石头。
+		_breath_t += delta
+		if _glb:
+			_glb.scale = Vector3.ONE * (1.0 + sin(_breath_t * 1.35) * 0.018)
+		_snore_t -= delta
+		if _snore_t <= 0.0:
+			_snore_t = 1.5
+			var scene := get_tree().current_scene
+			if scene:
+				DamageNumber.spawn_at(scene, global_position + Vector3(randf_range(-0.4, 0.4), 4.3, -0.4), "Z", Color(0.72, 0.82, 1.0))
 		if dist < 14.0 and player.alive:
 			_wake()
 		return

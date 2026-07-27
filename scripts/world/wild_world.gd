@@ -809,6 +809,15 @@ func _build_castle(world_pos: Vector3) -> void:
 	_frustum(1.6, 8.2, 6.5, _castle_blue, Vector3(0, 19.0, 1.0), castle, 4)
 	_part(Vector3(2.6, 12.5, 2.6), _plaster, Vector3(0, 27.0, 1.0), castle)
 	_frustum(0.12, 1.9, 4.6, _castle_blue, Vector3(0, 35.5, 1.0), castle, 8)
+	# 主堡立面细节：横向石带压边、成排窄窗（隔扇暖光），近看不再是素板。
+	for wy in [6.2, 9.6, 13.0]:
+		_part(Vector3(11.9, 0.32, 10.4), _stone_dark, Vector3(0, wy, 1.0), castle)
+	for ix in range(4):
+		for iy in range(3):
+			var wx := -3.9 + ix * 2.6
+			var wy2 := 7.4 + iy * 3.2
+			var lit := (ix + iy) % 3 == 0
+			_part(Vector3(0.55, 1.35, 0.18), _ancient if lit else _stone_dark, Vector3(wx, wy2, -4.06), castle)
 	# 四座蓝色尖顶角塔拉开横向轮廓。
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -817,9 +826,22 @@ func _build_castle(world_pos: Vector3) -> void:
 			_cylinder(2.1, 9.5, _plaster, Vector3(tx, 6.8, tz), castle, Vector3.ZERO, 10)
 			_cylinder(2.45, 0.5, _stone_dark, Vector3(tx, 11.75, tz), castle, Vector3.ZERO, 10)
 			_frustum(0.10, 2.3, 5.2, _castle_blue, Vector3(tx, 14.6, tz), castle, 10)
+			# 角塔窄窗与中部环带，打破光塔素面。
+			_cylinder(2.18, 0.3, _stone_dark, Vector3(tx, 8.0, tz), castle, Vector3.ZERO, 10)
+			for wi in range(2):
+				var wlit := (wi + int(sx + sz)) % 2 == 0
+				var wpos := Vector3(tx + float(sx) * 2.12, 5.6 + wi * 2.6, tz)
+				var win := _part(Vector3(0.18, 1.15, 0.48), _ancient if wlit else _stone_dark, wpos, castle)
+				win.rotation.y = PI * 0.5
 	# 正门、发光长窗与两侧旗帜。
 	_part(Vector3(4.4, 5.6, 0.6), _stone_dark, Vector3(0, 4.2, -4.35), castle)
 	_part(Vector3(3.0, 4.4, 0.3), _wood_dark, Vector3(0, 3.6, -4.55), castle)
+	# 城墙门洞石拱与纹章：出入城堡的正式门面。
+	for sx in [-1.0, 1.0]:
+		_part(Vector3(1.25, 4.6, 1.25), _stone, Vector3(sx * 2.7, 3.1, -10.4), castle)
+	_part(Vector3(6.6, 1.05, 1.45), _stone, Vector3(0, 5.85, -10.4), castle)
+	_cylinder(0.85, 0.16, _castle_blue, Vector3(0, 7.05, -10.85), castle, Vector3(90, 0, 0), 12)
+	_cylinder(0.45, 0.18, _ancient, Vector3(0, 7.05, -10.92), castle, Vector3(90, 0, 0), 12)
 	# 大门前台阶：从地面穿过城墙门洞走上基座平台。
 	_staircase(castle, body, Vector3(0, 1.0, -14.3), 5.2, 7.0, 2.2, 0.0, _stone, 7)
 	for sx in [-1.0, 1.0]:

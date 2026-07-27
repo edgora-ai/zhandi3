@@ -46,6 +46,7 @@ var _rim: DirectionalLight3D
 var _season_test_frame := -1
 var _map_id := "battlefield"
 var _map_menu_open := false
+var warp_points: Array[Dictionary] = []
 var _map_from_cli := false
 var _show_initial_map_menu := false
 var _map_pause_owned := false
@@ -606,6 +607,14 @@ func _on_npc_talk(npc: Node) -> void:
 				player.open_shop()
 
 
+# 测绘塔顶水晶激活：注册传送点。
+func _activate_warp(p_name: String, pos: Vector3) -> void:
+	warp_points.append({"name": p_name, "pos": pos})
+	hud.add_feed("测绘点已激活：%s（M 地图可传送）" % p_name)
+	if sfx:
+		sfx.play("capture", -4.0)
+
+
 func _on_moblin_killed(from: Variant) -> void:
 	if quest_states.get("moblin2", 0) == 1 and from == player:
 		_quest_moblin_kills += 1
@@ -678,6 +687,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_map("battlefield")
 			elif event.physical_keycode == KEY_2:
 				_select_map("wild")
+			elif event.physical_keycode >= KEY_3 and event.physical_keycode <= KEY_5:
+				var wi := int(event.physical_keycode - KEY_3)
+				if wi < warp_points.size():
+					_toggle_map_menu()
+					player.global_position = (warp_points[wi]["pos"] as Vector3) + Vector3(0, 0.5, 0)
+					hud.add_feed("传送：%s" % str(warp_points[wi]["name"]))
+				else:
+					hud.add_feed("这个传送位还没有激活的测绘点")
 			get_viewport().set_input_as_handled()
 			return
 		if event.physical_keycode == KEY_T and daynight:
@@ -701,6 +718,11 @@ func _toggle_map_menu() -> void:
 			get_tree().paused = true
 			if sfx:
 				sfx.set_streams_paused(true)
+		if not warp_points.is_empty():
+			var names: Array[String] = []
+			for i in range(warp_points.size()):
+				names.append("%d %s" % [i + 3, str(warp_points[i]["name"])])
+			hud.add_feed("可传送：" + "　".join(names))
 	else:
 		hud.hide_map_selector()
 		if _map_pause_owned:
@@ -1268,6 +1290,15 @@ func _update_wild_test() -> void:
 			var thrown := get_tree().get_nodes_in_group("wild_projectile").size() > p_before
 			hx.take_damage(9999.0, player)
 			print("[wildtest] hinox woke=%s active=%s stomp=%s->%s eye2x=%s stag=%s throw=%s" % [str(woke), str(act2), str(stomping), str(stomped), str(eye_mult), str(stag), str(thrown)])
+			# 传送回归：激活水晶注册、传送落点正确。
+			var wb := WarpBeacon.create(self, player.global_position + Vector3(1.5, 0, 0), "测试塔")
+			wb.activate(player)
+			var warp_reg := warp_points.size() > 0
+			var pre_pos := player.global_position
+			player.global_position = Vector3(150, 20, 150)
+			player.global_position = (warp_points[0]["pos"] as Vector3) + Vector3(0, 0.5, 0)
+			var teleported := player.global_position.distance_to(pre_pos) < 3.0
+			print("[wildtest] warp reg=%s teleport=%s" % [str(warp_reg), str(teleported)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

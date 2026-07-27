@@ -100,6 +100,10 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	# 西诺克斯两头：双子山谷与北林缘（沉睡巨人，靠近惊醒）。
 	Hinox.create(self, terrain, player, _ground(Vector3(70, 0, 45), 0.0))
 	Hinox.create(self, terrain, player, _ground(Vector3(-80, 0, -60), 0.0))
+	# 三座测绘塔顶传送水晶（激活后 M 地图传送）。
+	WarpBeacon.create(self, _ground(Vector3(-132, 0, 109)) + Vector3(0, 16.5, 0), "高原塔")
+	WarpBeacon.create(self, _ground(Vector3(72, 0, 116)) + Vector3(0, 19.0, 0), "双子塔")
+	WarpBeacon.create(self, _ground(Vector3(-132, 0, -78)) + Vector3(0, 18.0, 0), "雪原塔")
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

@@ -65,6 +65,7 @@ var nearby_npc: Node = null
 var nearby_fish: Node = null
 var nearby_bed: Node = null
 var nearby_chest: Node = null
+var nearby_beacon: Node = null
 var equipped_armor := ""
 var damage_taken_mult := 1.0
 var climb_speed_mult := 1.0
@@ -798,6 +799,16 @@ func _scan_loot() -> void:
 		if d_c < best_c:
 			best_c = d_c
 			nearby_chest = c
+	nearby_beacon = null
+	var best_wb := 2.8
+	for candidate_wb in get_tree().get_nodes_in_group("warp_beacon"):
+		var wb: Node = candidate_wb
+		if not wb.is_available():
+			continue
+		var d_wb := global_position.distance_to(wb.global_position)
+		if d_wb < best_wb:
+			best_wb = d_wb
+			nearby_beacon = wb
 
 
 func _try_pickup() -> void:
@@ -811,6 +822,8 @@ func _try_pickup() -> void:
 		nearby_bed.use(self)
 	elif nearby_chest:
 		nearby_chest.open(self)
+	elif nearby_beacon:
+		nearby_beacon.activate(self)
 
 
 func give_weapon(id: String) -> void:

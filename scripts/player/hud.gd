@@ -34,6 +34,7 @@ var _shop_panel: Control
 var _flurry_overlay: ColorRect
 var _boss_bar: Control
 var _boss_fill: ColorRect
+var _death_panel: Control
 var _map_panel: Control
 var _spread_px := 8.0
 
@@ -612,6 +613,32 @@ func hide_shop() -> void:
 # ---------- 林克时间 ----------
 
 # ---------- Boss 血条 ----------
+
+# ---------- 死亡画面 ----------
+
+# 旷野之息式死亡：红闪 + “你死了”，随后在最近神庙重生（由 main 调度）。
+func show_death_screen() -> void:
+	if _death_panel:
+		return
+	_death_panel = Control.new()
+	_death_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ui.add_child(_death_panel)
+	_mk_rect(_death_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0.20, 0.0, 0.0, 0.45))
+	var t := _mk_label(_death_panel, "你 死 了", 64, Color(0.92, 0.16, 0.10))
+	t.set_anchors_preset(Control.PRESET_CENTER)
+	t.position = Vector2(-150, -44)
+	var s := _mk_label(_death_panel, "正在返回最近的神庙……", 22, Color(0.86, 0.80, 0.74))
+	s.set_anchors_preset(Control.PRESET_CENTER)
+	s.position = Vector2(-130, 42)
+	_ignore_mouse(_death_panel)
+
+
+func hide_death_screen() -> void:
+	if _death_panel:
+		_death_panel.queue_free()
+		_death_panel = null
+
+
 
 # Boss 战血条：屏幕顶部居中的大型名条（进入战区自动显示，离开或讨伐即撤）。
 func show_boss_bar(boss_name: String, ratio: float) -> void:

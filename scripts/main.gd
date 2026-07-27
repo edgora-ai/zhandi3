@@ -271,6 +271,9 @@ func _ready() -> void:
 			player._toggle_stasis()
 	if args.has("--flurrytest"):
 		player._start_flurry()
+	if args.has("--dietest"):
+		player.fairies = 0
+		player.take_damage(9999.0, null)
 	if args.has("--dragontest") and terrain:
 		player.global_position = Vector3(150, terrain.get_height(150, -128) + 1.0, -128)
 		player.rotation.y = atan2(164.0 - 150.0, -145.0 + 128.0) + PI
@@ -545,6 +548,12 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 	hud.set_kills(player.kills)
 
 	if victim == player:
+		if _map_id == "wild":
+			# 旷野之息式死亡：不终局，红闪“你死了”，2.2 秒后在最近神庙满血重生。
+			sfx.play("defeat", -2.0)
+			hud.show_death_screen()
+			get_tree().create_timer(2.2).timeout.connect(_respawn_wild_player)
+			return
 		match_over = true
 		sfx.play("defeat", -2.0)
 		var rank := _alive_count() + 1
@@ -557,6 +566,31 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 		player.input_locked = true
 		sfx.play("victory", -2.0)
 		hud.show_end(true, 1, player.kills, total_combatants)
+
+
+# 旷野模式重生：回到最近的神庙入口，满血满精力，世界状态照旧。
+func _respawn_wild_player() -> void:
+	if _map_id != "wild" or player.alive:
+		return
+	var spot := Vector3(-122, 0, 98)
+	var best_d := INF
+	if wild_world:
+		for shrine in wild_world.find_children("AncientShrine*", "Node3D", true, false):
+			var d2 := (shrine as Node3D).global_position.distance_squared_to(player.global_position)
+			if d2 < best_d:
+				best_d = d2
+				spot = (shrine as Node3D).global_transform * Vector3(0, 0.4, -9.0)
+	player.alive = true
+	player.hp = player.max_hp
+	player.stamina = player.max_stamina
+	player.velocity = Vector3.ZERO
+	player.blocking = false
+	if player.is_gliding:
+		player._set_gliding(false)
+	player.global_position = Vector3(spot.x, terrain.get_height(spot.x, spot.z) + 0.5, spot.z)
+	player.health_changed.emit(player.hp, player.armor)
+	hud.hide_death_screen()
+	hud.add_feed("你在神庙前苏醒过来")
 
 
 func _on_capture_changed(point: CapturePoint, new_owner: Variant) -> void:

@@ -551,6 +551,8 @@ func _scatter_flowers(terrain: Terrain) -> void:
 		var p := _rand_point(terrain, 0.85)
 		if not _usable(terrain, p, 0.80):
 			continue
+		if terrain.profile == "wild" and terrain.flower_region_factor(p.x, p.z, p.y) > 0.2:
+			continue
 		var basis := Basis(Vector3.UP, _rng.randf_range(0.0, TAU))
 		basis = basis.scaled(Vector3.ONE * _rng.randf_range(0.5, 0.8))
 		mm.set_instance_transform(placed, Transform3D(basis, p))

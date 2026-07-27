@@ -317,6 +317,16 @@ func _wild_road_distance(x: float, z: float) -> float:
 	return best
 
 
+## 雪原/火山区不宜花卉的权重（与 _vertex_color 地区染色公式同源）：
+## >0.2 时花丛不再撒播，避免粉花铺在雪坡/玄武岩上远看成色噪。
+func flower_region_factor(x: float, z: float, y: float) -> float:
+	var d_snow := Vector2(x, z).distance_to(Vector2(-166, -142))
+	var snow := (1.0 - smoothstep(55.0, 125.0, d_snow)) * smoothstep(15.0, 30.0, y)
+	var d_vol := Vector2(x, z).distance_to(Vector2(164, -145))
+	var vol := (1.0 - smoothstep(45.0, 115.0, d_vol)) * smoothstep(10.0, 25.0, y)
+	return maxf(snow, vol)
+
+
 # 48^2 道路邻近掩码：顶点着色前 O(1) 预判，只有可能贴近道路的格子才做精确线段距离。
 func _build_road_mask() -> void:
 	_road_mask.resize(ROAD_MASK_GRID * ROAD_MASK_GRID)

@@ -77,6 +77,7 @@ var _elixir_stam_end_ms := 0
 var _climb_arms: Node3D
 var _climb_arm_l: Node3D
 var _climb_arm_r: Node3D
+var _glide_arms: Node3D
 var _climb_phase := 0.0
 var bonded_horse: Horse = null
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
@@ -166,6 +167,7 @@ func _ready() -> void:
 	camera.add_child(weapon)
 	weapon.setup(self, true)
 	_build_glider()
+	_build_glide_arms()
 	_build_sword()
 	_build_shield()
 	_build_bow()
@@ -1192,6 +1194,44 @@ func _update_climb_arms(delta: float) -> void:
 	_climb_arm_r.position = Vector3(0.26 + sway, -0.34 + maxf(0.0, -grab) * 0.13, -0.52)
 
 
+# 第一人称滑翔握杆手：双手握在伞下横杆两端，小臂伸出画面下缘（与攀爬手臂同风格）。
+func _build_glide_arms() -> void:
+	_glide_arms = Node3D.new()
+	_glide_arms.name = "GlideArms"
+	_glide_arms.visible = false
+	camera.add_child(_glide_arms)
+	var tunic := Toon.make_material(Color(0.16, 0.42, 0.22), true, 0.010)
+	var skin := Toon.make_material(Color(0.90, 0.70, 0.54), true, 0.008)
+	for sx in [-1.0, 1.0]:
+		var hand_pos := Vector3(sx * 0.44, -0.47, -1.50)
+		var root_pos := Vector3(sx * 0.26, -0.80, -0.62)
+		var dir := (root_pos - hand_pos).normalized()
+		var arm := Node3D.new()
+		arm.position = (hand_pos + root_pos) * 0.5
+		arm.basis = Basis(Quaternion(Vector3.UP, dir))
+		_glide_arms.add_child(arm)
+		var forearm := MeshInstance3D.new()
+		var fm := CapsuleMesh.new()
+		fm.radius = 0.062
+		fm.height = 0.92
+		fm.radial_segments = 8
+		fm.rings = 4
+		forearm.mesh = fm
+		forearm.material_override = tunic
+		arm.add_child(forearm)
+		var hand := MeshInstance3D.new()
+		var hm := SphereMesh.new()
+		hm.radius = 0.09
+		hm.height = 0.18
+		hm.height = 0.15
+		hm.radial_segments = 8
+		hm.rings = 5
+		hand.mesh = hm
+		hand.material_override = skin
+		hand.position = hand_pos
+		_glide_arms.add_child(hand)
+
+
 func _build_bow() -> void:
 	# 猎弓视模型：装配猎弓时显示在左下镜头位。
 	_bow = Node3D.new()
@@ -1473,6 +1513,8 @@ func _set_gliding(enabled: bool) -> void:
 	is_gliding = enabled
 	if _glider:
 		_glider.visible = enabled
+	if _glide_arms:
+		_glide_arms.visible = enabled
 	if weapon:
 		weapon.visible = not enabled
 
@@ -1491,6 +1533,9 @@ func _update_glider_visual(delta: float) -> void:
 		var ease := smoothstep(0.0, 1.0, _glider_open)
 		_glider.scale = Vector3(lerpf(0.56, 1.0, ease), lerpf(0.18, 1.0, ease), lerpf(0.72, 1.0, ease))
 		_glider.rotation.z = sin(Time.get_ticks_msec() * 0.0023) * 0.018
+		if _glide_arms:
+			_glide_arms.rotation.z = sin(Time.get_ticks_msec() * 0.0023) * 0.02
+			_glide_arms.position.y = sin(Time.get_ticks_msec() * 0.0017) * 0.012
 	else:
 		_glider_open = 0.0
 

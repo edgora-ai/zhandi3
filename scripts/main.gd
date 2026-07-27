@@ -225,6 +225,10 @@ func _ready() -> void:
 	if args.has("--snowtest") and weather:
 		weather.snowing = true
 		weather.snow_strength = 1.0
+	if args.has("--glidetest") and terrain:
+		player.global_position = Vector3(-86, terrain.get_height(-86, 92) + 18.0, 92)
+		player.rotation.y = 2.4
+		player.debug_glide = true
 	if args.has("--bombtest"):
 		player._place_bomb()
 	if args.has("--cryonistest") and terrain:

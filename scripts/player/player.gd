@@ -39,6 +39,7 @@ var _bow: Node3D
 var _dodge_iframe_end := -1.0
 var _flurry_end_ms := 0
 var _surf_notified := false
+var _surf_fx_t := 0.0
 var _shield: MeshInstance3D
 var _shield_root: Node3D
 var _stamina_wait := 0.0
@@ -699,6 +700,11 @@ func _physics_process(delta: float) -> void:
 			velocity.z = downhill.z * surf_speed
 			var surf_h := Vector2(velocity.x, velocity.z)
 			_drain_stamina(3.0 * delta)
+			# 滑行火花：板底后方周期性溅起沙尘火星。
+			_surf_fx_t -= delta
+			if _surf_fx_t <= 0.0 and surf_h.length() > 4.0:
+				_surf_fx_t = 0.14
+				FX.impact(global_position + Vector3(0, 0.12, 0) - Vector3(velocity.x, 0.0, velocity.z).normalized() * 0.5, Color(0.95, 0.85, 0.55))
 			if not _surf_notified and surf_h.length() > 6.0:
 				_surf_notified = true
 				if hud:
@@ -1043,6 +1049,9 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		to_attacker.y = 0.0
 		if to_attacker.length_squared() > 0.01 and to_attacker.normalized().dot(-global_transform.basis.z) > 0.25:
 			if Time.get_ticks_msec() / 1000.0 - _block_start < 0.18:
+				FX.parry_flash(camera.global_position + get_aim_dir() * 1.2)
+				Engine.time_scale = 0.05
+				_hitstop_end_ms = Time.get_ticks_msec() + 60
 				# 完美格挡守卫光束：直接弹回，守卫自毁。
 				if from is Guardian:
 					from.take_damage(150.0, self, "body")

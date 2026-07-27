@@ -39,6 +39,12 @@ static func blood(pos: Vector3) -> void:
 	_puff(pos, Color(0.75, 0.12, 0.10), 0.09, 2.6, 0.22)
 
 
+# 盾反闪光：蓝白外闪 + 亮核双球，配合顿帧表达完美格挡。
+static func parry_flash(pos: Vector3) -> void:
+	_puff(pos, Color(0.65, 0.90, 1.0), 0.30, 4.5, 0.22)
+	_puff(pos, Color(1.0, 1.0, 0.9), 0.12, 3.0, 0.14)
+
+
 static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: float) -> void:
 	var s := SphereMesh.new()
 	s.radius = radius

@@ -12,6 +12,7 @@ const SOUNDS := {
 	"victory": "res://assets/sfx/victory.wav",
 	"defeat": "res://assets/sfx/defeat.wav",
 	"pickup": "res://assets/sfx/pickup.wav",
+	"cook": "res://assets/sfx/cook.wav",
 }
 
 var _streams := {}

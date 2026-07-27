@@ -222,4 +222,17 @@ stasis_s = sweep(0.55, 1200, 180, 0.34, 0.42)
 stasis_b = mix(tone(0.4, 660, 0.28, 0.30), tone(0.5, 990, 0.34, 0.22))
 write_wav("stasis.wav", mix(stasis_s, stasis_b))
 
+# 烹饪完成：三音上扬琶音 + 嘶声尾（旷野之息式的开锅完成感）。
+cook = [0.0] * int(SR * 0.9)
+for ni, f in enumerate([660.0, 880.0, 1320.0]):
+    off = int(SR * 0.09 * ni)
+    for j, x in enumerate(tone(0.35, f, 0.28, 0.30)):
+        if off + j < len(cook):
+            cook[off + j] += x
+for j, x in enumerate(noise_burst(0.7, 0.5, 0.20)):
+    off = int(SR * 0.18) + j
+    if off < len(cook):
+        cook[off] += x
+write_wav("cook.wav", cook)
+
 print("done")

@@ -1669,6 +1669,15 @@ func _refresh_backpack() -> void:
 		hud.show_backpack(get_backpack_lines(), backpack_index)
 
 
+# 烹饪/炼药成功：开锅琶音 + 金色蒸汽 + “完成！”浮签（旷野之息式的完成感）。
+func _cook_feedback() -> void:
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play("cook", -6.0)
+	FX.impact(global_position + Vector3(0, 1.3, 0), Color(1.0, 0.85, 0.40))
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.0, 0), "完成！", Color(1.0, 0.85, 0.40))
+
+
 func get_backpack_lines() -> Array[String]:
 	var lines: Array[String] = []
 	for packed in backpack_weapons:
@@ -1727,6 +1736,7 @@ func _use_backpack_selection() -> void:
 			_skewer_t = 60.0
 			damage_mult = 1.15
 			hud.add_feed("炼成力量药剂：60 秒攻击 +15%")
+			_cook_feedback()
 		elif int(backpack_items["meat"]) >= 1:
 			backpack_items["monster_part"] = count - 1
 			backpack_items["meat"] = int(backpack_items["meat"]) - 1
@@ -1734,6 +1744,7 @@ func _use_backpack_selection() -> void:
 			max_stamina += 20.0
 			stamina = max_stamina
 			hud.add_feed("炼成精力药剂：精力全满，上限 +20（60 秒）")
+			_cook_feedback()
 		else:
 			hud.add_feed("炼药需要蘑菇或兽肉做药引")
 			return
@@ -1748,6 +1759,7 @@ func _use_backpack_selection() -> void:
 		damage_mult = 1.25
 		if hud:
 			hud.add_feed("烤了肉串：90 秒攻击 +25%")
+		_cook_feedback()
 		backpack_changed.emit()
 		_refresh_backpack()
 		return
@@ -1757,6 +1769,7 @@ func _use_backpack_selection() -> void:
 		backpack_items[cooked] = int(backpack_items[cooked]) + 1
 		if hud:
 			hud.add_feed("烤制成功：%s" % ("烤兽肉" if key == "meat" else "烤蘑菇"))
+		_cook_feedback()
 		backpack_changed.emit()
 		_refresh_backpack()
 		return

@@ -327,6 +327,13 @@ func flower_region_factor(x: float, z: float, y: float) -> float:
 	return maxf(snow, vol)
 
 
+## 纯雪原地区权重（与 _vertex_color 的 snowland 公式同源；y0/y1 可调海拔坡，
+## 供松树雪挂等与地表染色高度不同的消费者使用）。
+func snowland_factor(x: float, z: float, y: float, y0: float = 24.0, y1: float = 48.0) -> float:
+	var d := Vector2(x, z).distance_to(Vector2(-166, -142))
+	return (1.0 - smoothstep(55.0, 125.0, d)) * smoothstep(y0, y1, y)
+
+
 # 48^2 道路邻近掩码：顶点着色前 O(1) 预判，只有可能贴近道路的格子才做精确线段距离。
 func _build_road_mask() -> void:
 	_road_mask.resize(ROAD_MASK_GRID * ROAD_MASK_GRID)

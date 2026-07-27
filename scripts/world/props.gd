@@ -14,6 +14,7 @@ const ROCK_COLOR := Color(0.52, 0.55, 0.58)
 var _rng := RandomNumberGenerator.new()
 var _canopy_shader_mat: ShaderMaterial
 var _pine_shader_mat: ShaderMaterial
+var _pine_snow_shader_mat: ShaderMaterial
 var _grass_shader_mat: ShaderMaterial
 var _flower_instance: MultiMeshInstance3D
 var _card_mesh: ArrayMesh
@@ -21,9 +22,13 @@ var _card_dirs: Array[Vector3] = []
 var _broadleaf_transforms: Array[Transform3D] = []
 var _broadleaf_colors: Array[Color] = []
 var _pine_transforms: Array[Transform3D] = []
+var _pine_snow_transforms: Array[Transform3D] = []
+var _pine_snow_colors: Array[Color] = []
 var _pine_colors: Array[Color] = []
 var _broad_mm: MultiMesh
 var _pine_mm: MultiMesh
+var _pine_snow_mm: MultiMesh
+var _terrain: Terrain
 var _canopy_ranges: Dictionary = {}   # Tree node -> [broad_start, broad_count, pine_start, pine_count]
 
 const CANOPY_CARDS := 12
@@ -31,6 +36,7 @@ const CANOPY_CARDS := 12
 
 func generate(terrain: Terrain, rng_seed: int = 20260718) -> void:
 	_rng.seed = rng_seed
+	_terrain = terrain
 	var t0 := Time.get_ticks_msec()
 	# 阔叶树冠/灌木：程序化叶簇贴图 + 广告牌卡片 shader
 	_canopy_shader_mat = ShaderMaterial.new()
@@ -43,6 +49,13 @@ func generate(terrain: Terrain, rng_seed: int = 20260718) -> void:
 	_pine_shader_mat.set_shader_parameter("color_shadow", Color(0.05, 0.16, 0.13))
 	_pine_shader_mat.set_shader_parameter("color_mid", Color(0.12, 0.32, 0.24))
 	_pine_shader_mat.set_shader_parameter("color_high", Color(0.24, 0.48, 0.30))
+	# 雪挂松树专用：雪原高海拔卡片换浅蓝白配色，不受季节调色影响。
+	_pine_snow_shader_mat = ShaderMaterial.new()
+	_pine_snow_shader_mat.shader = load("res://assets/shaders/canopy.gdshader")
+	_pine_snow_shader_mat.set_shader_parameter("u_leaf", TexGen.leaf_cluster(77))
+	_pine_snow_shader_mat.set_shader_parameter("color_shadow", Color(0.50, 0.58, 0.62))
+	_pine_snow_shader_mat.set_shader_parameter("color_mid", Color(0.68, 0.75, 0.79))
+	_pine_snow_shader_mat.set_shader_parameter("color_high", Color(0.86, 0.91, 0.95))
 	_build_card_mesh()
 	_scatter_forest(terrain)
 	print("[props_t] forest %dms" % (Time.get_ticks_msec() - t0))
@@ -50,6 +63,7 @@ func generate(terrain: Terrain, rng_seed: int = 20260718) -> void:
 	_scatter(terrain, BUSH_COUNT, Callable(self, "_make_bush"), 0.78, 1.35)
 	_build_card_multimesh("BroadleafCards", _broadleaf_transforms, _broadleaf_colors, _canopy_shader_mat)
 	_build_card_multimesh("PineCards", _pine_transforms, _pine_colors, _pine_shader_mat)
+	_build_card_multimesh("PineSnowCards", _pine_snow_transforms, _pine_snow_colors, _pine_snow_shader_mat)
 	print("[props_t] rocks+bushes+cards +%dms" % (Time.get_ticks_msec() - t0))
 	_scatter_grass(terrain)
 	print("[props_t] grass +%dms" % (Time.get_ticks_msec() - t0))
@@ -102,8 +116,10 @@ func _collect_leaf_cards(node: Node3D) -> void:
 	var cards: Array = node.get_meta("leaf_cards")
 	var broad_start := _broadleaf_transforms.size()
 	var pine_start := _pine_transforms.size()
+	var psnow_start := _pine_snow_transforms.size()
 	var broad_count := 0
 	var pine_count := 0
+	var psnow_count := 0
 	for card in cards:
 		var pos: Vector3 = card["position"]
 		var scale_value: float = card["scale"]
@@ -113,16 +129,23 @@ func _collect_leaf_cards(node: Node3D) -> void:
 		var world_dir := (node.transform.basis * dir).normalized()
 		var light := clampf(world_dir.dot(_sun_dir_to()) * 0.5 + 0.5, 0.0, 1.0)
 		if card["pine"]:
-			_pine_transforms.append(instance_transform)
-			_pine_colors.append(Color(light, light, light, 1.0))
-			pine_count += 1
+			# 逐卡片判定雪原权重：高海拔的冠层卡片挂雪，同棵树自然上白下绿。
+			var wp: Vector3 = instance_transform.origin
+			if _terrain != null and _terrain.snowland_factor(wp.x, wp.z, wp.y, 16.0, 34.0) > 0.35:
+				_pine_snow_transforms.append(instance_transform)
+				_pine_snow_colors.append(Color(light, light, light, 1.0))
+				psnow_count += 1
+			else:
+				_pine_transforms.append(instance_transform)
+				_pine_colors.append(Color(light, light, light, 1.0))
+				pine_count += 1
 		else:
 			_broadleaf_transforms.append(instance_transform)
 			_broadleaf_colors.append(Color(light, light, light, 1.0))
 			broad_count += 1
 	node.remove_meta("leaf_cards")
 	if node.name.begins_with("Tree"):
-		_canopy_ranges[node] = [broad_start, broad_count, pine_start, pine_count]
+		_canopy_ranges[node] = [broad_start, broad_count, pine_start, pine_count, psnow_start, psnow_count]
 
 
 # 砍树：把该树的所有树冠卡片实例缩放至 0（MultiMesh 不重建，开销固定）。
@@ -135,6 +158,9 @@ func chop_canopy(node: Node3D) -> void:
 		_broad_mm.set_instance_transform(int(r[0]) + i, zero)
 	for i in range(int(r[3])):
 		_pine_mm.set_instance_transform(int(r[2]) + i, zero)
+	if r.size() >= 6 and _pine_snow_mm != null:
+		for i in range(int(r[5])):
+			_pine_snow_mm.set_instance_transform(int(r[4]) + i, zero)
 
 
 # 倒伏完成：原地留木桩，旁边掉一根可拾取的木材。
@@ -171,6 +197,8 @@ func _build_card_multimesh(name: String, transforms: Array[Transform3D], colors:
 	add_child(mmi)
 	if name == "BroadleafCards":
 		_broad_mm = mm
+	elif name == "PineSnowCards":
+		_pine_snow_mm = mm
 	else:
 		_pine_mm = mm
 

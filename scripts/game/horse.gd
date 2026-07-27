@@ -519,7 +519,7 @@ func _physics_process(delta: float) -> void:
 		var normal := terrain.get_normal(global_position.x, global_position.z, 1.25)
 		var local_normal := global_transform.basis.inverse() * normal
 		var target_pitch := atan2(local_normal.z, local_normal.y)
-		var target_roll := -atan2(local_normal.x, local_normal.y) - _steer * speed_ratio * 0.08
+		var target_roll := -atan2(local_normal.x, local_normal.y) - _steer * speed_ratio * 0.14
 		_visual.rotation.x = lerp_angle(_visual.rotation.x, target_pitch, minf(1.0, delta * 6.0))
 		_visual.rotation.z = lerp_angle(_visual.rotation.z, target_roll, minf(1.0, delta * 6.0))
 

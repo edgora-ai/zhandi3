@@ -271,6 +271,9 @@ func _ready() -> void:
 			player._toggle_stasis()
 	if args.has("--flurrytest"):
 		player._start_flurry()
+	if args.has("--dragontest") and terrain:
+		player.global_position = Vector3(150, terrain.get_height(150, -128) + 1.0, -128)
+		player.rotation.y = atan2(164.0 - 150.0, -145.0 + 128.0) + PI
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:

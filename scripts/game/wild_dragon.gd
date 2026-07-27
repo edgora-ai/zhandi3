@@ -7,6 +7,7 @@ var center := Vector3.ZERO
 var alive := true
 var hp := 260.0
 var _enraged := false
+var _rage_light: OmniLight3D
 var display_name := "赤焰巨龙"
 var damage_mult := 1.0
 var kills := 0
@@ -190,6 +191,8 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		for i in range(4):
 			Loot.spawn(get_tree().current_scene, global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2)), "meat", "", 2, 2)
 		var scene := get_tree().current_scene
+		if scene and scene.get("hud") != null:
+			scene.hud.hide_boss_bar()
 		if scene and scene.has_method("_on_dragon_killed"):
 			scene._on_dragon_killed(from)
 		queue_free()
@@ -205,6 +208,21 @@ func _physics_process(delta: float) -> void:
 		if scene and scene.get("hud") != null:
 			scene.hud.add_feed("焚天者暴怒了！")
 		DamageNumber.spawn_at(scene, global_position, "暴怒!", Color(1.0, 0.35, 0.10))
+		# 暴怒红光大范围点亮火山口，夜空下尤其有压迫感。
+		_rage_light = OmniLight3D.new()
+		_rage_light.light_color = Color(1.0, 0.25, 0.08)
+		_rage_light.light_energy = 2.2
+		_rage_light.omni_range = 18.0
+		add_child(_rage_light)
+	# 顶部 Boss 血条：进入 130m 战区自动显示。
+	var hud_scene := get_tree().current_scene
+	if hud_scene and hud_scene.get("hud") != null:
+		if global_position.distance_to(player.global_position) < 130.0:
+			hud_scene.hud.show_boss_bar("焚天者", hp / 260.0)
+		else:
+			hud_scene.hud.hide_boss_bar()
+	if _rage_light:
+		_rage_light.light_energy = 1.8 + sin(_time * 6.0) * 0.5
 	_time += delta
 	_fire_cooldown -= delta
 	var rate := 0.26 if _enraged else 0.16

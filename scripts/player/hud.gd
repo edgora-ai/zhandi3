@@ -32,6 +32,8 @@ var _pause_panel: Control
 var _backpack_panel: Control
 var _shop_panel: Control
 var _flurry_overlay: ColorRect
+var _boss_bar: Control
+var _boss_fill: ColorRect
 var _map_panel: Control
 var _spread_px := 8.0
 
@@ -608,6 +610,33 @@ func hide_shop() -> void:
 
 
 # ---------- 林克时间 ----------
+
+# ---------- Boss 血条 ----------
+
+# Boss 战血条：屏幕顶部居中的大型名条（进入战区自动显示，离开或讨伐即撤）。
+func show_boss_bar(boss_name: String, ratio: float) -> void:
+	if _boss_bar == null:
+		_boss_bar = Control.new()
+		_boss_bar.set_anchors_preset(Control.PRESET_CENTER)
+		_boss_bar.position = Vector2(-240, -350)
+		_boss_bar.size = Vector2(480, 60)
+		_ui.add_child(_boss_bar)
+		_mk_rect(_boss_bar, Vector2.ZERO, Vector2(480, 60), Color(0.02, 0.02, 0.03, 0.72))
+		_mk_rect(_boss_bar, Vector2(4, 4), Vector2(472, 52), Color(0.10, 0.05, 0.06, 0.85))
+		var name_l := _mk_label(_boss_bar, boss_name, 22, Color(1.0, 0.80, 0.35))
+		name_l.position = Vector2(18, 8)
+		_mk_rect(_boss_bar, Vector2(18, 38), Vector2(444, 12), Color(0.28, 0.10, 0.10, 0.9))
+		_boss_fill = _mk_rect(_boss_bar, Vector2(18, 38), Vector2(444, 12), Color(0.90, 0.22, 0.12, 0.95))
+	_boss_fill.size.x = 444.0 * clampf(ratio, 0.0, 1.0)
+
+
+func hide_boss_bar() -> void:
+	if _boss_bar:
+		_boss_bar.queue_free()
+		_boss_bar = null
+		_boss_fill = null
+
+
 
 # 完美闪避触发的慢动作：全屏蓝色渐晕，结束即撤。
 func set_flurry_overlay(on: bool) -> void:

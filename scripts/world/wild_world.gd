@@ -106,6 +106,10 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	WarpBeacon.create(self, _ground(Vector3(72, 0, 116)) + Vector3(0, 19.0, 0), "双子塔")
 	WarpBeacon.create(self, _ground(Vector3(-132, 0, -78)) + Vector3(0, 18.0, 0), "雪原塔")
 	# 桥西码头木筏。
+	# 裂岩洞窟与两块碎石：双子谷口岩壁上的炸岩秘宝（精灵宝珠），另两处材料小奖励。
+	CrackedWall.create(self, _ground(Vector3(-95, 0, 92)), PI * 0.5, Vector3(4.5, 3.2, 1.0), "orb")
+	CrackedWall.create(self, _ground(Vector3(22, 0, -82)), 0.9, Vector3(2.4, 1.8, 1.6), "monster_part")
+	CrackedWall.create(self, _ground(Vector3(-38, 0, 58)), 2.2, Vector3(2.2, 1.6, 1.5), "meat")
 	var raft := Raft.new()
 	add_child(raft)
 	var raft_z := 18.0

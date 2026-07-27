@@ -275,6 +275,12 @@ func _ready() -> void:
 	if args.has("--dietest"):
 		player.fairies = 0
 		player.take_damage(9999.0, null)
+	if args.has("--cracktest") and terrain:
+		player.global_position = Vector3(-88, terrain.get_height(-88, 92) + 0.5, 92)
+		var cdir := (Vector3(-95, terrain.get_height(-95, 92) + 1.0, 92) - player.global_position).normalized()
+		player.rotation.y = atan2(cdir.x, cdir.z) + PI
+		player._place_bomb()
+		get_tree().create_timer(1.2).timeout.connect(player._detonate_bombs)
 	if args.has("--dragontest") and terrain:
 		player.global_position = Vector3(150, terrain.get_height(150, -128) + 1.0, -128)
 		player.rotation.y = atan2(164.0 - 150.0, -145.0 + 128.0) + PI

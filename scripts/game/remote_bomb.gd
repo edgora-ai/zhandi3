@@ -79,6 +79,13 @@ func detonate() -> void:
 				continue
 			if target.has_method("take_damage"):
 				target.take_damage(DAMAGE * clampf(1.0 - d / RADIUS, 0.25, 1.0), self, "body")
+	# 可炸物：裂岩等可破坏物按全额伤害结算。
+	for target in get_tree().get_nodes_in_group("crackable"):
+		var cd: float = target.global_position.distance_to(pos)
+		if cd > RADIUS:
+			continue
+		if target.has_method("take_damage"):
+			target.take_damage(DAMAGE, self, "body")
 	# 玩家：近距小伤 + 大击退（炸弹跳）。
 	var player: Player = null
 	if scene and scene.get("player") != null:

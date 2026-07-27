@@ -97,6 +97,9 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	LootChest.create(self, _ground(Vector3(4, 0, -116), 0.0), "armor_soldier", 0.4)
 	LootChest.create(self, _ground(Vector3(-128, 0, 106), 0.0), "armor_climber", -0.6)
 	LootChest.create(self, _ground(Vector3(152, 0, -138), 0.0), "armor_barbarian", 2.2)
+	# 西诺克斯两头：双子山谷与北林缘（沉睡巨人，靠近惊醒）。
+	Hinox.create(self, terrain, player, _ground(Vector3(70, 0, 45), 0.0))
+	Hinox.create(self, terrain, player, _ground(Vector3(-80, 0, -60), 0.0))
 	# 桥西码头木筏。
 	var raft := Raft.new()
 	add_child(raft)

@@ -1241,6 +1241,33 @@ func _update_wild_test() -> void:
 				player._whistle_horse()
 				recall_ok = rc_horse._call_target == player
 			print("[wildtest] sell_meat=%s bonded_recall=%s" % [str(sell_ok), str(recall_ok)])
+			# 巨人回归：惊醒、跺地 AOE、眼睛双倍+硬直、远程投石。
+			var hx := Hinox.create(self, terrain, player, player.global_position + Vector3(6, 0, 0))
+			player.alive = true
+			hx._physics_process(0.1)
+			var woke := hx._state == "wake"
+			hx._physics_process(1.1)
+			var act2 := hx._state == "active"
+			player.global_position = hx.global_position + Vector3(2, 0, 0)
+			hx._attack_cd = 0.0
+			hx._physics_process(0.05)
+			var stomping := hx._strike_kind == "stomp" and hx._strike_t > 0.0
+			var hhp := player.hp
+			hx._physics_process(0.45)
+			var stomped := player.hp < hhp
+			var ehp := hx.hp
+			hx.take_damage(10.0, player, "eye")
+			var eye_mult := absf(ehp - hx.hp - 20.0) < 0.01
+			var stag := hx._state == "stagger"
+			hx._state = "active"
+			player.global_position = hx.global_position + Vector3(15, 0, 0)
+			hx._throw_cd = 0.0
+			var p_before := get_tree().get_nodes_in_group("wild_projectile").size()
+			hx._physics_process(0.05)
+			hx._physics_process(0.6)
+			var thrown := get_tree().get_nodes_in_group("wild_projectile").size() > p_before
+			hx.take_damage(9999.0, player)
+			print("[wildtest] hinox woke=%s active=%s stomp=%s->%s eye2x=%s stag=%s throw=%s" % [str(woke), str(act2), str(stomping), str(stomped), str(eye_mult), str(stag), str(thrown)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

@@ -60,6 +60,8 @@ func _try_glb_visual() -> bool:
 	_glb = scene_res.instantiate()
 	add_child(_glb)
 	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _ap != null:
+		_ap.playback_default_blend_time = 0.12
 	if _ap == null:
 		_glb.queue_free()
 		_glb = null

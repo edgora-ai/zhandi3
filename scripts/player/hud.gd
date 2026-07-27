@@ -520,23 +520,37 @@ func hide_backpack() -> void:
 
 # ---------- 商店 ----------
 
-func show_shop(lines: Array[String], rupees: int) -> void:
+func show_shop(lines: Array, rupees: int) -> void:
 	if _shop_panel:
 		_shop_panel.queue_free()
 	_shop_panel = Control.new()
 	_shop_panel.set_anchors_preset(Control.PRESET_CENTER)
-	_shop_panel.position = Vector2(-280, -190)
-	_shop_panel.size = Vector2(560, 380)
+	_shop_panel.position = Vector2(-280, -215)
+	_shop_panel.size = Vector2(560, 430)
 	_ui.add_child(_shop_panel)
-	_mk_rect(_shop_panel, Vector2.ZERO, Vector2(560, 380), Color(0.075, 0.045, 0.02, 0.94))
-	_mk_rect(_shop_panel, Vector2(8, 8), Vector2(544, 364), Color(0.17, 0.11, 0.05, 0.88))
+	_mk_rect(_shop_panel, Vector2.ZERO, Vector2(560, 430), Color(0.075, 0.045, 0.02, 0.94))
+	_mk_rect(_shop_panel, Vector2(8, 8), Vector2(544, 414), Color(0.17, 0.11, 0.05, 0.88))
 	var title := _mk_label(_shop_panel, "多戈商店", 30, Color(0.97, 0.80, 0.40))
 	title.position = Vector2(30, 24)
-	var sub := _mk_label(_shop_panel, "持有卢比：%d    按 1/2/3 购买    E / Esc 离开" % rupees, 16, Color(0.85, 0.92, 0.70))
+	var sub := _mk_label(_shop_panel, "持有卢比：%d    按 1/2/3 购买、4/5 出售    E / Esc 离开" % rupees, 16, Color(0.85, 0.92, 0.70))
 	sub.position = Vector2(30, 72)
+	# 结构化条目：图标色块 + 名称 + 价格栏；买不起的整行压暗。
+	var row := 104
 	for i in range(lines.size()):
-		var label := _mk_label(_shop_panel, lines[i], 20, Color(0.92, 0.90, 0.76))
-		label.position = Vector2(42, 122 + i * 56)
+		if i == 0 or i == 3:
+			var head := _mk_label(_shop_panel, "— 购 买 —" if i == 0 else "— 出 售 —", 15, Color(0.72, 0.62, 0.42))
+			head.position = Vector2(34, row - 4)
+			row += 24
+		var it: Dictionary = lines[i]
+		var cost := int(it.get("cost", -1))
+		var afford := cost < 0 or rupees >= cost
+		var icon_col: Color = it.get("color", Color(0.9, 0.88, 0.7))
+		_mk_rect(_shop_panel, Vector2(38, row + 4), Vector2(20, 20), icon_col if afford else icon_col.darkened(0.55))
+		var label := _mk_label(_shop_panel, str(it.get("text", "")), 20, Color(0.92, 0.90, 0.76) if afford else Color(0.52, 0.50, 0.44))
+		label.position = Vector2(70, row)
+		var price_label := _mk_label(_shop_panel, str(it.get("price", "")), 18, Color(0.97, 0.83, 0.42) if afford else Color(0.52, 0.48, 0.38))
+		price_label.position = Vector2(400, row + 2)
+		row += 52
 	_ignore_mouse(_shop_panel)
 
 

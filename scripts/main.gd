@@ -197,6 +197,9 @@ func _ready() -> void:
 		player.give_item("meat", 3)
 		player.give_item("dragon_scale", 1)
 		call_deferred("_open_backpack_test")
+	if args.has("--shoptest"):
+		player.rupees = 65
+		call_deferred("_open_shop_test")
 	if args.has("--endtest"):
 		hud.show_end(false, 12, 3, 24)
 	if args.has("--ridertest") and _map_id == "wild":
@@ -324,6 +327,11 @@ func _resolve_map(args: PackedStringArray) -> String:
 func _open_backpack_test() -> void:
 	if player and not player.backpack_open:
 		player._toggle_backpack()
+
+
+func _open_shop_test() -> void:
+	if player:
+		player.open_shop()
 
 
 func _acquire_instance_lock() -> bool:

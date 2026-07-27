@@ -109,6 +109,8 @@ func _die(from: Variant) -> void:
 	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
+	if from and from.has_method("give_rupees"):
+		from.give_rupees(1 if small else 2)
 	var scene := get_tree().current_scene
 	if small:
 		Loot.spawn(scene, global_position + Vector3(0, 0.3, 0), "mushroom", "", 1, 1)

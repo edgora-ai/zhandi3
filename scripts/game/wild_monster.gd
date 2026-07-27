@@ -132,8 +132,10 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
 	if hp <= 0.0:
 		alive = false
-		if from and from.get("kills") != null:
-			from.kills += 1
+	if from and from.get("kills") != null:
+		from.kills += 1
+	if from and from.has_method("give_rupees"):
+		from.give_rupees(2)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 1, 1)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "mushroom", "", 1, 1)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.4, 0), "击败!", Color(1.0, 0.55, 0.20))

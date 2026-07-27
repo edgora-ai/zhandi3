@@ -265,6 +265,8 @@ func _die(from: Variant) -> void:
 	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
+	if from and from.has_method("give_rupees"):
+		from.give_rupees(5 if species == "bear" else 2 if species == "wolf" else 1)
 	var meat_count := 1 if species == "bird" else 4 if species == "bear" else 2
 	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.25, 0), "meat", "", meat_count, 1)
 	if _ap:

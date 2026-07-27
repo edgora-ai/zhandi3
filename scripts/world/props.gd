@@ -31,6 +31,7 @@ const CANOPY_CARDS := 12
 
 func generate(terrain: Terrain, rng_seed: int = 20260718) -> void:
 	_rng.seed = rng_seed
+	var t0 := Time.get_ticks_msec()
 	# 阔叶树冠/灌木：程序化叶簇贴图 + 广告牌卡片 shader
 	_canopy_shader_mat = ShaderMaterial.new()
 	_canopy_shader_mat.shader = load("res://assets/shaders/canopy.gdshader")
@@ -44,12 +45,16 @@ func generate(terrain: Terrain, rng_seed: int = 20260718) -> void:
 	_pine_shader_mat.set_shader_parameter("color_high", Color(0.24, 0.48, 0.30))
 	_build_card_mesh()
 	_scatter_forest(terrain)
+	print("[props_t] forest %dms" % (Time.get_ticks_msec() - t0))
 	_scatter(terrain, ROCK_COUNT, Callable(self, "_make_rock"), 0.70, 1.4)
 	_scatter(terrain, BUSH_COUNT, Callable(self, "_make_bush"), 0.78, 1.35)
 	_build_card_multimesh("BroadleafCards", _broadleaf_transforms, _broadleaf_colors, _canopy_shader_mat)
 	_build_card_multimesh("PineCards", _pine_transforms, _pine_colors, _pine_shader_mat)
+	print("[props_t] rocks+bushes+cards +%dms" % (Time.get_ticks_msec() - t0))
 	_scatter_grass(terrain)
+	print("[props_t] grass +%dms" % (Time.get_ticks_msec() - t0))
 	_scatter_flowers(terrain)
+	print("[props_t] flowers +%dms" % (Time.get_ticks_msec() - t0))
 
 
 # 指向太阳的方向（与 main.gd 主光一致：rotation -48°, -35°）
@@ -198,7 +203,7 @@ func _scatter_forest(terrain: Terrain) -> void:
 func _rand_point(terrain: Terrain, margin: float = 0.88) -> Vector3:
 	var x := _rng.randf_range(-Terrain.HALF * margin, Terrain.HALF * margin)
 	var z := _rng.randf_range(-Terrain.HALF * margin, Terrain.HALF * margin)
-	return Vector3(x, terrain.get_height(x, z), z)
+	return Vector3(x, terrain.get_height_baked(x, z), z)
 
 
 func _usable(terrain: Terrain, p: Vector3, min_ny: float) -> bool:
@@ -207,7 +212,7 @@ func _usable(terrain: Terrain, p: Vector3, min_ny: float) -> bool:
 	# 树线：高山带（>26m 灰岩雪线）不长植被；初始高原与丘陵都有树
 	if p.y > 26.0:
 		return false
-	return terrain.get_normal(p.x, p.z).y > min_ny
+	return terrain.get_normal_baked(p.x, p.z).y > min_ny
 
 
 func _scatter(terrain: Terrain, count: int, factory: Callable, min_ny: float, max_scale: float) -> void:
@@ -483,16 +488,29 @@ func _scatter_grass(terrain: Terrain) -> void:
 	mm.use_colors = true
 	mm.mesh = tuft
 	mm.instance_count = GRASS_COUNT
+	# 预筛可长草网格：坡度/树线/水线/草甸噪声一次过，之后只从合格点抽样，不再大规模拒绝采样。
+	var spots: Array[Vector3] = []
+	var step := 2.0
+	var half := Terrain.HALF * 0.90
+	var gx := -half
+	while gx < half:
+		var gz := -half
+		while gz < half:
+			var px := gx + _rng.randf_range(0.0, step)
+			var pz := gz + _rng.randf_range(0.0, step)
+			var py := terrain.get_height_baked(px, pz)
+			gz += step
+			if py < Terrain.WATER_LEVEL + 0.8 or py > 26.0:
+				continue
+			if terrain.get_patch_baked(px, pz) < -0.05:
+				continue
+			if terrain.get_normal_baked(px, pz).y <= 0.78:
+				continue
+			spots.append(Vector3(px, py, pz))
+		gx += step
 	var placed := 0
-	var attempts := 0
-	while placed < GRASS_COUNT and attempts < GRASS_COUNT * 8:
-		attempts += 1
-		var p := _rand_point(terrain, 0.90)
-		if not _usable(terrain, p, 0.78):
-			continue
-		# 草丛成草甸分布：噪声低的区域留白，高的区域浓密
-		if terrain.patch_noise.get_noise_2d(p.x, p.z) < -0.05:
-			continue
+	while placed < GRASS_COUNT and placed < spots.size():
+		var p: Vector3 = spots[_rng.randi_range(0, spots.size() - 1)]
 		# 3 片交叉卡片各向同性，无需 Y 旋转；只保留倾斜与缩放
 		var basis := Basis(Vector3.UP, _rng.randf_range(0.0, TAU))
 		basis = basis.scaled(Vector3.ONE * _rng.randf_range(0.8, 1.35))

@@ -36,6 +36,66 @@ var patch_noise := FastNoiseLite.new()
 var detail_noise := FastNoiseLite.new()
 var profile := "battlefield"
 var grid_resolution := GRID
+var _height_grid := PackedFloat32Array()
+var _patch_grid := PackedFloat32Array()
+
+
+# 一次性烘焙全图高度网格：散射/贴地采样从逐点 fBm 解析求值降为 O(1) 双线性查表。
+func bake_height_grid() -> void:
+	_height_grid.resize((grid_resolution + 1) * (grid_resolution + 1))
+	_patch_grid.resize((grid_resolution + 1) * (grid_resolution + 1))
+	var step := SIZE / grid_resolution
+	var i := 0
+	for gz in range(grid_resolution + 1):
+		for gx in range(grid_resolution + 1):
+			_height_grid[i] = get_height(-HALF + gx * step, -HALF + gz * step)
+			_patch_grid[i] = patch_noise.get_noise_2d(-HALF + gx * step, -HALF + gz * step)
+			i += 1
+
+
+func get_height_baked(x: float, z: float) -> float:
+	if _height_grid.is_empty():
+		return get_height(x, z)
+	var step := SIZE / grid_resolution
+	var fx := clampf((x + HALF) / step, 0.0, float(grid_resolution) - 0.001)
+	var fz := clampf((z + HALF) / step, 0.0, float(grid_resolution) - 0.001)
+	var ix := int(fx)
+	var iz := int(fz)
+	var tx := fx - ix
+	var tz := fz - iz
+	var w := grid_resolution + 1
+	var h00 := _height_grid[iz * w + ix]
+	var h10 := _height_grid[iz * w + ix + 1]
+	var h01 := _height_grid[(iz + 1) * w + ix]
+	var h11 := _height_grid[(iz + 1) * w + ix + 1]
+	return lerpf(lerpf(h00, h10, tx), lerpf(h01, h11, tx), tz)
+
+
+func get_patch_baked(x: float, z: float) -> float:
+	if _patch_grid.is_empty():
+		return patch_noise.get_noise_2d(x, z)
+	var step := SIZE / grid_resolution
+	var fx := clampf((x + HALF) / step, 0.0, float(grid_resolution) - 0.001)
+	var fz := clampf((z + HALF) / step, 0.0, float(grid_resolution) - 0.001)
+	var ix := int(fx)
+	var iz := int(fz)
+	var tx := fx - ix
+	var tz := fz - iz
+	var w := grid_resolution + 1
+	var p00 := _patch_grid[iz * w + ix]
+	var p10 := _patch_grid[iz * w + ix + 1]
+	var p01 := _patch_grid[(iz + 1) * w + ix]
+	var p11 := _patch_grid[(iz + 1) * w + ix + 1]
+	return lerpf(lerpf(p00, p10, tx), lerpf(p01, p11, tx), tz)
+
+
+func get_normal_baked(x: float, z: float) -> Vector3:
+	if _height_grid.is_empty():
+		return get_normal(x, z)
+	var e := SIZE / grid_resolution
+	var hx := get_height_baked(x + e, z) - get_height_baked(x - e, z)
+	var hz := get_height_baked(x, z + e) - get_height_baked(x, z - e)
+	return Vector3(-hx, 2.0 * e, -hz).normalized()
 var mesh_instance: MeshInstance3D
 var _ground_material: ShaderMaterial
 var _water_material: ShaderMaterial
@@ -67,6 +127,7 @@ func configure(p_profile: String) -> void:
 
 func _ready() -> void:
 	_build()
+	bake_height_grid()
 
 
 func get_height(x: float, z: float) -> float:
@@ -290,5 +351,5 @@ func _bake_heightmap() -> ImageTexture:
 		for gx in range(grid_resolution + 1):
 			var x := -HALF + gx * step
 			var z := -HALF + gz * step
-			img.set_pixel(gx, gz, Color(get_height(x, z), 0, 0))
+			img.set_pixel(gx, gz, Color(get_height_baked(x, z), 0, 0))
 	return ImageTexture.create_from_image(img)

@@ -145,6 +145,8 @@ func _die(from: Variant) -> void:
 	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
+	if from and from.has_method("give_rupees"):
+		from.give_rupees(2 if mode == "skull" else 3)
 	var scene := get_tree().current_scene
 	if mode == "skull":
 		Loot.spawn(scene, global_position, "wood", "", 2, 1)

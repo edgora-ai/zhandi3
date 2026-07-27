@@ -70,6 +70,8 @@ var damage_taken_mult := 1.0
 var climb_speed_mult := 1.0
 var climb_stamina_mult := 1.0
 var armor_melee_mult := 1.0
+var rupees := 0
+var shop_open := false
 var input_locked := false    # 结算画面锁定：禁止点击重捕获鼠标
 var debug_move := 0.0        # 自动化测试用：强制前进输入
 var debug_glide := false     # 自动化测试用：强制展开斗篷
@@ -214,6 +216,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				# 捕获丢失（Esc/焦点切换）后点击左键重新捕获，这次点击不开枪
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventKey and event.pressed and not event.echo:
+		if shop_open:
+			match event.physical_keycode:
+				KEY_1:
+					_buy(0)
+				KEY_2:
+					_buy(1)
+				KEY_3:
+					_buy(2)
+				KEY_E, KEY_ESCAPE, KEY_B:
+					close_shop()
+			return
 		if vehicle and event.physical_keycode != KEY_F:
 			return  # 驾驶中只响应下车
 		match event.physical_keycode:
@@ -816,6 +829,53 @@ func give_ammo(amount: int) -> void:
 	if slot_index >= 0:
 		weapon.reserve = reserves[weapon_slots[slot_index]]
 		weapon.ammo_changed.emit(weapon.mag_left, weapon.reserve)
+
+
+# 卢比：敌人掉落，行商处消费。
+func give_rupees(n: int) -> void:
+	rupees += n
+	if hud:
+		hud.set_rupees(rupees)
+
+
+# 多戈商店：箭矢/烤肉/生命药水三样。
+func open_shop() -> void:
+	shop_open = true
+	if hud:
+		hud.show_shop([
+			"1 · 箭矢 ×10 —— 15 卢比",
+			"2 · 烤兽肉 ×1 —— 12 卢比",
+			"3 · 生命药水（回满血）—— 25 卢比",
+		], rupees)
+
+
+func close_shop() -> void:
+	shop_open = false
+	if hud:
+		hud.hide_shop()
+
+
+func _buy(idx: int) -> void:
+	var prices := [15, 12, 25]
+	if rupees < prices[idx]:
+		if hud:
+			hud.add_feed("卢比不够了……")
+		return
+	rupees -= prices[idx]
+	match idx:
+		0:
+			give_ammo(10)
+			hud.add_feed("买了 10 支箭")
+		1:
+			give_item("roast_meat", 1)
+			hud.add_feed("买了烤兽肉")
+			_refresh_backpack()
+		2:
+			hp = max_hp
+			health_changed.emit(hp, armor)
+			hud.add_feed("喝下药水，血回满了")
+	hud.set_rupees(rupees)
+	open_shop()
 
 
 func give_item(kind: String, amount: int) -> void:

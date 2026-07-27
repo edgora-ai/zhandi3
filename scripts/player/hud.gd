@@ -15,6 +15,7 @@ var _weapon_label: Label
 var _zone_label: Label
 var _alive_label: Label
 var _kills_label: Label
+var _rupees_label: Label
 var _world_state_label: Label
 var _feed_box: VBoxContainer
 var _interact_label: Label
@@ -29,6 +30,7 @@ var _vignette: TextureRect
 var _end_panel: Control
 var _pause_panel: Control
 var _backpack_panel: Control
+var _shop_panel: Control
 var _map_panel: Control
 var _spread_px := 8.0
 
@@ -276,6 +278,8 @@ func _build_top() -> void:
 	_alive_label = _mk_label(rw, "存活 24", 20)
 	_kills_label = _mk_label(rw, "击杀 0", 20, Color(1.0, 0.85, 0.4))
 	_kills_label.position = Vector2(0, 26)
+	_rupees_label = _mk_label(rw, "卢比 0", 20, Color(0.45, 0.95, 0.55))
+	_rupees_label.position = Vector2(0, 52)
 
 	_world_state_label = _mk_label(_ui, "", 17, Color(0.86, 0.95, 0.76))
 	_world_state_label.position = Vector2(22, 18)
@@ -308,6 +312,10 @@ func set_alive_text(text: String) -> void:
 
 func set_kills(n: int) -> void:
 	_kills_label.text = "击杀 %d" % n
+
+
+func set_rupees(n: int) -> void:
+	_rupees_label.text = "卢比 %d" % n
 
 
 func set_world_state(text: String) -> void:
@@ -508,6 +516,34 @@ func hide_backpack() -> void:
 	if _backpack_panel:
 		_backpack_panel.queue_free()
 		_backpack_panel = null
+
+
+# ---------- 商店 ----------
+
+func show_shop(lines: Array[String], rupees: int) -> void:
+	if _shop_panel:
+		_shop_panel.queue_free()
+	_shop_panel = Control.new()
+	_shop_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_shop_panel.position = Vector2(-280, -190)
+	_shop_panel.size = Vector2(560, 380)
+	_ui.add_child(_shop_panel)
+	_mk_rect(_shop_panel, Vector2.ZERO, Vector2(560, 380), Color(0.075, 0.045, 0.02, 0.94))
+	_mk_rect(_shop_panel, Vector2(8, 8), Vector2(544, 364), Color(0.17, 0.11, 0.05, 0.88))
+	var title := _mk_label(_shop_panel, "多戈商店", 30, Color(0.97, 0.80, 0.40))
+	title.position = Vector2(30, 24)
+	var sub := _mk_label(_shop_panel, "持有卢比：%d    按 1/2/3 购买    E / Esc 离开" % rupees, 16, Color(0.85, 0.92, 0.70))
+	sub.position = Vector2(30, 72)
+	for i in range(lines.size()):
+		var label := _mk_label(_shop_panel, lines[i], 20, Color(0.92, 0.90, 0.76))
+		label.position = Vector2(42, 122 + i * 56)
+	_ignore_mouse(_shop_panel)
+
+
+func hide_shop() -> void:
+	if _shop_panel:
+		_shop_panel.queue_free()
+		_shop_panel = null
 
 
 # ---------- 地图选择 ----------

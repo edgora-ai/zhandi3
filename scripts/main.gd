@@ -73,6 +73,7 @@ var _wild_test_hp := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	var boot_t0 := Time.get_ticks_msec()
 	if not _acquire_instance_lock():
 		get_tree().quit()
 		return
@@ -83,15 +84,18 @@ func _ready() -> void:
 	_show_initial_map_menu = args.has("--mapmenutest") or (not args.has("--wildtest") and not _map_from_cli and not FileAccess.file_exists(MAP_SELECTION) and DisplayServer.get_name() != "headless")
 	total_combatants = 9 if _map_id == "wild" else BOT_COUNT + 1
 	_setup_environment()
+	print("[boot_t] environment %dms" % (Time.get_ticks_msec() - boot_t0))
 	terrain = Terrain.new()
 	terrain.name = "Terrain"
 	terrain.configure(_map_id)
 	add_child(terrain)
+	print("[boot_t] terrain +%dms" % (Time.get_ticks_msec() - boot_t0))
 	props = Props.new()
 	props.name = "Props"
 	add_child(props)
 	if not args.has("--noveg"):
 		props.generate(terrain)
+	print("[boot_t] env+terrain+props %dms" % (Time.get_ticks_msec() - boot_t0))
 	buildings = Buildings.new()
 	buildings.name = "Buildings"
 	add_child(buildings)
@@ -159,6 +163,7 @@ func _ready() -> void:
 		wild_world.name = "WildWorld"
 		add_child(wild_world)
 		wild_world.generate(terrain, player)
+		print("[boot_t] wild_world.generate +%dms" % (Time.get_ticks_msec() - boot_t0))
 		_spawn_wild_bots(rng)
 	if _map_id == "battlefield":
 		zone.start(10.0)
@@ -596,6 +601,9 @@ func _on_npc_talk(npc: Node) -> void:
 					hud.add_feed("%s：跟紧我，过了桥就安全了。" % npc_name)
 				3:
 					hud.add_feed("%s：一路顺风，朋友。" % npc_name)
+			# 护送任务接过后，行商随时开店。
+			if quest_states[qid] >= 1:
+				player.open_shop()
 
 
 func _on_moblin_killed(from: Variant) -> void:
@@ -1197,6 +1205,26 @@ func _update_wild_test() -> void:
 			player._use_backpack_selection()
 			var barb_ok := player.equipped_armor == "armor_barbarian" and player.armor_melee_mult > 1.1 and player.damage_taken_mult > 0.9
 			print("[wildtest] armor_chest got=%d soldier=%s barbarian=%s" % [got_armor, str(soldier_ok), str(barb_ok)])
+			# 经济回归：杀怪掉卢比、商店购买扣款发货、余额不足拒售。
+			var rp0 := player.rupees
+			var rp_mob: WildMoblin = null
+			for e in get_tree().get_nodes_in_group("wild_enemy"):
+				if e is WildMoblin and e.alive:
+					rp_mob = e as WildMoblin
+					break
+			if rp_mob:
+				rp_mob.take_damage(999.0, player)
+			var rp1 := player.rupees
+			player.rupees = 20
+			var ammo0 := 0
+			for wid in player.weapon_slots:
+				ammo0 += int(player.reserves.get(wid, 0))
+			player._buy(0)
+			var ammo1 := 0
+			for wid2 in player.weapon_slots:
+				ammo1 += int(player.reserves.get(wid2, 0))
+			player._buy(2)
+			print("[wildtest] shop rupees %d->%d(+kill) ammo +%d spent=%d->%d reject=%s" % [rp0, rp1, ammo1 - ammo0, 20, player.rupees, str(player.rupees == 5)])
 			var jeep := Vehicle.new()
 			jeep.terrain = terrain
 			add_child(jeep)

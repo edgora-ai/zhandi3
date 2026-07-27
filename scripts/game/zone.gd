@@ -38,11 +38,8 @@ func _ready() -> void:
 	cm.cap_bottom = false
 	_wall = MeshInstance3D.new()
 	_wall.mesh = cm
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(0.25, 0.75, 1.0, 0.16)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var m := ShaderMaterial.new()
+	m.shader = load("res://assets/shaders/zone.gdshader")
 	_wall.material_override = m
 	_wall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if OS.get_cmdline_user_args().has("--nozonewall"):

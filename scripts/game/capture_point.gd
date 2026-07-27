@@ -55,7 +55,10 @@ func _build() -> void:
 	bc.cap_top = false
 	bc.cap_bottom = false
 	_beam.mesh = bc
-	_beam_mat = _flat_material(COLOR_NEUTRAL, 0.10)
+	_beam_mat = _flat_material(COLOR_NEUTRAL, 0.24)
+	_beam_mat.emission_enabled = true
+	_beam_mat.emission = Color(COLOR_NEUTRAL)
+	_beam_mat.emission_energy_multiplier = 1.5
 	_beam.material_override = _beam_mat
 	_beam.position.y = 30.0
 	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -123,7 +126,8 @@ func _set_owner(c: CharacterBody3D) -> void:
 	var col := COLOR_PLAYER if c is Player else COLOR_BOT
 	_flag_mat.albedo_color = col
 	_ring_mat.albedo_color = Color(col.r, col.g, col.b, 0.30)
-	_beam_mat.albedo_color = Color(col.r, col.g, col.b, 0.10)
+	_beam_mat.albedo_color = Color(col.r, col.g, col.b, 0.24)
+	_beam_mat.emission = col
 	owner_changed.emit(self, c)
 
 

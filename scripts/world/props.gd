@@ -191,7 +191,7 @@ func _scatter_forest(terrain: Terrain) -> void:
 			var c: Vector3 = centers[_rng.randi_range(0, centers.size() - 1)]
 			var off := Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1)).normalized() * _rng.randf_range(4.0, 26.0)
 			p = c + off
-			p.y = terrain.get_height(p.x, p.z)
+			p.y = terrain.get_height_baked(p.x, p.z)
 		else:
 			p = _rand_point(terrain)
 		if not _usable(terrain, p, 0.86):

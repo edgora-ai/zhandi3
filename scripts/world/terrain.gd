@@ -5,6 +5,7 @@ extends Node3D
 const SIZE := 500.0
 const HALF := SIZE * 0.5
 const GRID := 160               ## 每边四边形数（顶点 (GRID+1)^2）
+const ROAD_MASK_GRID := 48      ## 道路邻近掩码每边格数
 const HEIGHT_AMP := 13.0
 const HEIGHT_BASE := 6.0
 const RIM_HEIGHT := 50.0        ## 地图边缘抬升，形成天然边界
@@ -38,6 +39,7 @@ var profile := "battlefield"
 var grid_resolution := GRID
 var _height_grid := PackedFloat32Array()
 var _patch_grid := PackedFloat32Array()
+var _road_mask := PackedByteArray()
 
 
 # 一次性烘焙全图高度网格：散射/贴地采样从逐点 fBm 解析求值降为 O(1) 双线性查表。
@@ -126,8 +128,8 @@ func configure(p_profile: String) -> void:
 
 
 func _ready() -> void:
-	_build()
 	bake_height_grid()
+	_build()
 
 
 func get_height(x: float, z: float) -> float:
@@ -216,16 +218,25 @@ func _build() -> void:
 	verts.resize((grid_resolution + 1) * (grid_resolution + 1))
 	normals.resize((grid_resolution + 1) * (grid_resolution + 1))
 	colors.resize((grid_resolution + 1) * (grid_resolution + 1))
-	for gz in range(grid_resolution + 1):
-		for gx in range(grid_resolution + 1):
-			var i := gz * (grid_resolution + 1) + gx
+	if profile == "wild":
+		_build_road_mask()
+	var w: int = grid_resolution + 1
+	for gz in range(w):
+		for gx in range(w):
+			var i := gz * w + gx
 			var x := -HALF + gx * step
 			var z := -HALF + gz * step
-			var y := get_height(x, z)
+			var y: float = _height_grid[i]
 			verts[i] = Vector3(x, y, z)
-			var n := get_normal(x, z, step * 0.5)
+			var gx0 := maxi(gx - 1, 0)
+			var gx1 := mini(gx + 1, grid_resolution)
+			var gz0 := maxi(gz - 1, 0)
+			var gz1 := mini(gz + 1, grid_resolution)
+			var hx: float = _height_grid[gz * w + gx1] - _height_grid[gz * w + gx0]
+			var hz: float = _height_grid[gz1 * w + gx] - _height_grid[gz0 * w + gx]
+			var n := Vector3(-hx / ((gx1 - gx0) * step), 1.0, -hz / ((gz1 - gz0) * step)).normalized()
 			normals[i] = n
-			colors[i] = _vertex_color(x, y, z, n)
+			colors[i] = _vertex_color(x, y, z, n, _patch_grid[i])
 	for gz in range(grid_resolution):
 		for gx in range(grid_resolution):
 			var i0 := gz * (grid_resolution + 1) + gx
@@ -252,8 +263,12 @@ func _build() -> void:
 	var body := StaticBody3D.new()
 	body.collision_layer = 1
 	var col := CollisionShape3D.new()
-	col.shape = mesh.create_trimesh_shape()
-	col.shape.backface_collision = true
+	var hm := HeightMapShape3D.new()
+	hm.map_width = w
+	hm.map_depth = w
+	hm.map_data = _height_grid
+	col.shape = hm
+	body.scale = Vector3(step, 1.0, step)
 	body.add_child(col)
 	add_child(body)
 
@@ -261,8 +276,7 @@ func _build() -> void:
 		_build_water()
 
 
-func _vertex_color(x: float, y: float, z: float, n: Vector3) -> Color:
-	var p := patch_noise.get_noise_2d(x, z)
+func _vertex_color(x: float, y: float, z: float, n: Vector3, p: float) -> Color:
 	var deep := Color(0.24, 0.46, 0.10) if profile == "wild" else GRASS_DEEP
 	var light := Color(0.57, 0.75, 0.21) if profile == "wild" else GRASS_LIGHT
 	var c := deep.lerp(light, clampf(p * 0.5 + 0.5, 0.0, 1.0))
@@ -279,7 +293,7 @@ func _vertex_color(x: float, y: float, z: float, n: Vector3) -> Color:
 		c = c.lerp(high_color, smoothstep(18.0, 34.0, y))
 	if profile == "wild":
 		# 道路网：距离路径 4.2m 以内混入干燥土色，形成可远看可行走的路。
-		if y > WATER_LEVEL + 0.4:
+		if y > WATER_LEVEL + 0.4 and _road_near(x, z):
 			var road_d := _wild_road_distance(x, z)
 			if road_d < 4.2:
 				c = c.lerp(Color(0.58, 0.47, 0.28), smoothstep(4.2, 2.0, road_d) * 0.85)
@@ -301,6 +315,33 @@ func _wild_road_distance(x: float, z: float) -> float:
 		var t := clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
 		best = minf(best, p.distance_to(a + ab * t))
 	return best
+
+
+# 48^2 道路邻近掩码：顶点着色前 O(1) 预判，只有可能贴近道路的格子才做精确线段距离。
+func _build_road_mask() -> void:
+	_road_mask.resize(ROAD_MASK_GRID * ROAD_MASK_GRID)
+	var cell := SIZE / ROAD_MASK_GRID
+	var reach := 4.2 + cell * 0.71
+	for gz in range(ROAD_MASK_GRID):
+		for gx in range(ROAD_MASK_GRID):
+			var c := Vector2(-HALF + (gx + 0.5) * cell, -HALF + (gz + 0.5) * cell)
+			for segment in WILD_ROADS:
+				var a: Vector2 = segment[0]
+				var b: Vector2 = segment[1]
+				var ab := b - a
+				var t := clampf((c - a).dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+				if c.distance_to(a + ab * t) < reach:
+					_road_mask[gz * ROAD_MASK_GRID + gx] = 1
+					break
+
+
+func _road_near(x: float, z: float) -> bool:
+	if _road_mask.is_empty():
+		return true
+	var cell := SIZE / ROAD_MASK_GRID
+	var gx := clampi(int((x + HALF) / cell), 0, ROAD_MASK_GRID - 1)
+	var gz := clampi(int((z + HALF) / cell), 0, ROAD_MASK_GRID - 1)
+	return _road_mask[gz * ROAD_MASK_GRID + gx] == 1
 
 
 func _build_water() -> void:

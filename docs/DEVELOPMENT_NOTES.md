@@ -538,6 +538,18 @@ handle_crash: Program crashed with signal 11
 - 水位高度图烘焙复用同一网格，不重复求值；双线性值与地形网格一致（同源网格），视觉无差异。
 - 教训：性能问题先分段计时再动手，根因常在反直觉处（新角色加载 vs 老植被采样）；大数量拒绝采样要算“尝试次数×单次成本”，而不是只看成功次数。
 
+### 5.38 第三十三轮：启动再提速（复用烘焙网格 + 高度图碰撞 + 贴图磁盘缓存）
+
+- 症状：5.37 优化后用户又感觉“启动越来越慢”。临时打点（[terr_t]/[wild_t]）定位：地形网格顶点循环 790ms（每顶点 5 次解析高度求值：高度 1 次 + 法线差分 4 次）+ 顶点色道路距离每点遍历全部路段；trimesh 碰撞烹饪 156ms；四张程序化贴图约 110ms（GDScript 逐像素光栅化）；props 树聚类偏移路径误用解析 get_height。
+- 修法：
+  1. _ready 先 bake_height_grid 再 _build；网格顶点的高度/法线/patch 直接读烘焙网格（顶点即格点，无双线性误差），法线用格点中心差分。vertloop 790→47ms。
+  2. 48² 道路邻近掩码：只在可能贴路的格子做精确线段距离。
+  3. 碰撞从 create_trimesh_shape 换成 HeightMapShape3D（map_data 直接复用 _height_grid，body.scale=(step,1,step)）：烹饪 156→0ms，运行时射线查询同样受益。Godot Physics 支持非均匀缩放的高度图（movetest/wildtest 全绿实证）。
+  4. TexGen 贴图走 user://texcache PNG 磁盘缓存（TEX_CACHE_VERSION 控制失效，改生成算法时递增）：forest 146→37ms。
+  5. props 树聚类偏移 get_height→get_height_baked。
+- 结果：wild 图游戏内生成 1771→466ms；headless 整进程 3.35→2.05s；窗口模式到可玩约 4.8→1.9s（--quit-after 的耗时含 vsync 帧时间，勿当启动耗时）。
+- 教训：5.37 只优化了“调用方”（草地采样），没动“被调方”（地形自身的网格生成仍走解析路径）；解析高度是公共热点，所有高频调用都应走烘焙网格。纯种子函数的程序化资产上磁盘缓存零风险，版本号常量防失效。
+
 ## 6. 音频生命周期
 
 - 背景音乐和环境音由脚本生成的 WAV 提供，运行时设置循环区间。

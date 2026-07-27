@@ -265,7 +265,10 @@ func _build_shrine(world_pos: Vector3, yaw: float, trial_mode: Variant = "rune")
 	_staircase(shrine, body, Vector3(0, 0.30, -7.6), 3.0, 4.4, 0.8, 0.0, _stone, 4)
 	# 十二边石室与椭圆穹顶取代方盒主体，远处也能辨认古代神庙轮廓。
 	_cylinder(3.55, 4.5, _stone, Vector3(0, 2.9, 0.35), shrine, Vector3.ZERO, 12)
-	_sphere(3.48, _stone, Vector3(0, 5.15, 0.35), shrine, Vector3(1.0, 0.46, 1.0))
+	# 穹顶用三段圆台堆出圆弧：法线干净受光均匀，远看是浅色石殿而不是黑块。
+	_frustum(2.95, 3.52, 0.56, _stone, Vector3(0, 5.42, 0.35), shrine, 16)
+	_frustum(2.05, 2.95, 0.50, _stone, Vector3(0, 5.94, 0.35), shrine, 16)
+	_frustum(0.70, 2.05, 0.42, _stone, Vector3(0, 6.38, 0.35), shrine, 16)
 	_box_collision(body, Vector3(6.4, 4.2, 6.8), Vector3(0, 2.75, 0.35))
 	for sx in [-1.0, 1.0]:
 		_part(Vector3(1.1, 3.8, 6.9), _stone_dark, Vector3(sx * 3.45, 2.65, 0.35), shrine, Vector3(0, 0, sx * -10.0))
@@ -291,14 +294,16 @@ func _build_shrine(world_pos: Vector3, yaw: float, trial_mode: Variant = "rune")
 	shrine.add_child(trial)
 	trials.append(trial)
 	# 顶部同心圆盘和四根弯角用圆柱与斜梁组合。
-	_cylinder(2.25, 0.28, _stone_dark, Vector3(0, 6.42, 0.3), shrine)
-	_cylinder(1.72, 0.16, _ancient, Vector3(0, 6.59, 0.3), shrine)
-	for i in range(8):
-		var angle := i * TAU / 8.0
-		var p := Vector3(sin(angle) * 2.4, 7.12, cos(angle) * 2.4 + 0.3)
-		var fin := _part(Vector3(0.28, 1.65, 0.18), _stone_dark, p, shrine)
-		fin.rotation.y = angle
-		fin.rotation.z = sin(angle) * 0.24
+	_cylinder(2.25, 0.28, _stone_dark, Vector3(0, 6.68, 0.3), shrine)
+	_cylinder(1.72, 0.16, _ancient, Vector3(0, 6.85, 0.3), shrine)
+	# 四根浅色石角向外张开、角尖带青光：剪影是张开的古代花冠，而不是实心黑塔尖。
+	for i in range(4):
+		var angle := i * TAU / 4.0
+		var p := Vector3(sin(angle) * 2.55, 7.38, cos(angle) * 2.55 + 0.3)
+		var fin := _part(Vector3(0.34, 1.95, 0.24), _stone, p, shrine)
+		fin.rotation = Vector3(0.38, angle, 0.0)
+		var tip := _part(Vector3(0.36, 0.26, 0.26), _ancient, p + Vector3(sin(angle) * 0.40, 0.92, cos(angle) * 0.40), shrine)
+		tip.rotation = Vector3(0.38, angle, 0.0)
 	var light := OmniLight3D.new()
 	light.light_color = Color(0.04, 0.95, 0.83)
 	light.light_energy = 1.5
@@ -354,16 +359,19 @@ func _build_stable(world_pos: Vector3) -> void:
 	_cylinder(12.88, 0.20, _roof_trim, Vector3(0, 4.10, 0), stable, Vector3.ZERO, 24)
 	_cylinder(3.65, 0.28, _roof_trim, Vector3(0, 8.42, 0), stable, Vector3.ZERO, 18)
 	_frustum(0.55, 3.20, 1.45, _roof_trim, Vector3(0, 9.12, 0), stable, 16)
-	# 顶部马首招牌具有颈、长脸、鼻口、耳朵和鬃毛，成为驿站导航剪影。
+	# 顶部马首招牌放大到两层楼高：奶白长脸 + 深色鬃毛鼻口，百米外也是导航剪影。
 	var crest := Node3D.new()
-	crest.position = Vector3(0, 10.0, -0.15)
+	crest.position = Vector3(0, 10.1, -0.15)
 	stable.add_child(crest)
-	var crest_neck := _part(Vector3(0.72, 1.45, 0.78), _wood_dark, Vector3(0, 0.45, 0), crest, Vector3(-38, 0, 0))
+	var crest_neck := _part(Vector3(1.50, 3.05, 1.62), _wood_dark, Vector3(0, 0.95, 0), crest, Vector3(-38, 0, 0))
 	crest_neck.rotation_degrees.x = -38.0
-	_sphere(0.68, _cloth, Vector3(0, 1.18, -0.72), crest, Vector3(0.82, 0.70, 1.52))
-	_sphere(0.37, _wood, Vector3(0, 1.02, -1.48), crest, Vector3(0.95, 0.62, 1.28))
+	_sphere(1.42, _cloth, Vector3(0, 2.48, -1.50), crest, Vector3(0.82, 0.70, 1.52))
+	_sphere(0.78, _cloth, Vector3(0, 2.14, -3.08), crest, Vector3(0.95, 0.62, 1.28))
+	_sphere(0.42, _wood_dark, Vector3(0, 2.02, -3.62), crest, Vector3(0.90, 0.55, 0.90))
+	var mane := _part(Vector3(0.42, 1.15, 1.35), _wood_dark, Vector3(0, 3.10, -0.55), crest, Vector3(-32, 0, 0))
+	mane.rotation_degrees.x = -32.0
 	for sx in [-1.0, 1.0]:
-		var ear := _part(Vector3(0.15, 0.40, 0.13), _wood, Vector3(sx * 0.27, 1.84, -0.62), crest)
+		var ear := _part(Vector3(0.31, 0.84, 0.27), _wood_dark, Vector3(sx * 0.57, 3.85, -1.28), crest)
 		ear.rotation_degrees.z = sx * -13.0
 
 	# 马槽、拴马栏、长凳、货箱与灯笼让廊下具备功能，而不是空壳。

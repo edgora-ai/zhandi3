@@ -23,6 +23,7 @@ var _cur_anim := ""
 var _anim_hold := 0.0
 var _snore_t := 0.0
 var _breath_t := 0.0
+var _bar_shown := false
 
 
 static func create(parent: Node, p_terrain: Terrain, p_player: Player, pos: Vector3) -> Hinox:
@@ -108,6 +109,11 @@ func take_damage(amount: float, from: Variant = null, part_name: String = "body"
 		_state = "die"
 		_play(&"die")
 		collision_layer = 0
+		if _bar_shown:
+			var scene := get_tree().current_scene
+			if scene and scene.get("hud") != null:
+				scene.hud.hide_boss_bar()
+			_bar_shown = false
 		Loot.spawn(get_tree().current_scene, global_position, "meat", "", 5, 2)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(1.2, 0, 0), "seed", "", 2, 2)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(-1.2, 0, 0.5), "monster_part", "", 4, 1)
@@ -153,6 +159,15 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	to_player.y = 0.0
 	var dist := to_player.length()
+	# 顶部 Boss 血条：惊醒后 30m 内显示（只在自己持有血条时撤，两头巨人互不干扰）。
+	var hud_scene := get_tree().current_scene
+	if hud_scene and hud_scene.get("hud") != null:
+		if _state != "sleep" and _state != "die" and dist < 30.0:
+			hud_scene.hud.show_boss_bar("西诺克斯", hp / 320.0)
+			_bar_shown = true
+		elif _bar_shown:
+			hud_scene.hud.hide_boss_bar()
+			_bar_shown = false
 	# 出手结算：跺地/投石到点执行。
 	if _strike_t >= 0.0:
 		_strike_t -= delta

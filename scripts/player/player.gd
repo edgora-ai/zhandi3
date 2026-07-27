@@ -564,6 +564,7 @@ func _start_flurry() -> void:
 	_flurry_end_ms = Time.get_ticks_msec() + 1600
 	if hud:
 		hud.add_feed("完美闪避！林克时间")
+		hud.set_flurry_overlay(true)
 
 
 func _end_flurry() -> void:
@@ -571,6 +572,8 @@ func _end_flurry() -> void:
 		return
 	flurry = false
 	Engine.time_scale = 1.0
+	if hud:
+		hud.set_flurry_overlay(false)
 
 
 func _physics_process(delta: float) -> void:

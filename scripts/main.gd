@@ -269,6 +269,8 @@ func _ready() -> void:
 			player.pitch = -0.05
 			player.camera.rotation.x = -0.05
 			player._toggle_stasis()
+	if args.has("--flurrytest"):
+		player._start_flurry()
 	if args.has("--pilottest") and terrain:
 		var pilot_scene: PackedScene = load("res://assets/models/pilot_npc.glb")
 		if pilot_scene:

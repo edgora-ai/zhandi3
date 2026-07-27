@@ -31,6 +31,7 @@ var _end_panel: Control
 var _pause_panel: Control
 var _backpack_panel: Control
 var _shop_panel: Control
+var _flurry_overlay: ColorRect
 var _map_panel: Control
 var _spread_px := 8.0
 
@@ -604,6 +605,24 @@ func hide_shop() -> void:
 	if _shop_panel:
 		_shop_panel.queue_free()
 		_shop_panel = null
+
+
+# ---------- 林克时间 ----------
+
+# 完美闪避触发的慢动作：全屏蓝色渐晕，结束即撤。
+func set_flurry_overlay(on: bool) -> void:
+	if on:
+		if _flurry_overlay == null:
+			_flurry_overlay = ColorRect.new()
+			_flurry_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+			var sm := ShaderMaterial.new()
+			sm.shader = load("res://assets/shaders/flurry.gdshader")
+			_flurry_overlay.material = sm
+			_flurry_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_ui.add_child(_flurry_overlay)
+		_flurry_overlay.visible = true
+	elif _flurry_overlay:
+		_flurry_overlay.visible = false
 
 
 # ---------- 地图选择 ----------

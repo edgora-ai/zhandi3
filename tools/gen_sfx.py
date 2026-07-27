@@ -235,4 +235,35 @@ for j, x in enumerate(noise_burst(0.7, 0.5, 0.20)):
         cook[off] += x
 write_wav("cook.wav", cook)
 
+# Boss 战：驱动鼓点循环（12 秒 100BPM 整网格，所有素材尾音都在 12 秒内衰减完，天然无缝）
+# + 暗黑号角动机。底鼓/低音脉冲/反拍军鼓/八分镲/末拍通鼓。
+boss = [0.0] * int(SR * 12.0)
+for beat in range(20):
+    off = int(SR * 0.6 * beat)
+    for j, x in enumerate(sweep(0.26, 130, 40, 0.16, 0.9)):
+        if off + j < len(boss):
+            boss[off + j] += x
+    for j, x in enumerate(tone(0.3, 55.0, 0.22, 0.30)):
+        if off + j < len(boss):
+            boss[off + j] += x
+    if beat % 2 == 1:
+        for j, x in enumerate(noise_burst(0.14, 0.05, 0.38, 0.30)):
+            if off + j < len(boss):
+                boss[off + j] += x
+    for half in range(2):
+        hoff = off + int(SR * 0.3 * half)
+        for j, x in enumerate(noise_burst(0.06, 0.02, 0.16)):
+            if hoff + j < len(boss):
+                boss[hoff + j] += x
+    if beat % 4 == 3:
+        for j, x in enumerate(sweep(0.3, 200, 85, 0.22, 0.40)):
+            if off + j < len(boss):
+                boss[off + j] += x
+for toff, f in [(0.15, 220.0), (0.75, 261.63), (6.15, 220.0), (6.75, 293.66)]:
+    off = int(SR * toff)
+    for j, x in enumerate(tone(1.5, f, 1.1, 0.15, "square")):
+        if off + j < len(boss):
+            boss[off + j] += x
+write_wav("boss.wav", boss)
+
 print("done")

@@ -627,6 +627,9 @@ func show_boss_bar(boss_name: String, ratio: float) -> void:
 		name_l.position = Vector2(18, 8)
 		_mk_rect(_boss_bar, Vector2(18, 38), Vector2(444, 12), Color(0.28, 0.10, 0.10, 0.9))
 		_boss_fill = _mk_rect(_boss_bar, Vector2(18, 38), Vector2(444, 12), Color(0.90, 0.22, 0.12, 0.95))
+		var sfx := get_tree().get_first_node_in_group("sfx_bank")
+		if sfx:
+			sfx.set_boss_music(true)
 	_boss_fill.size.x = 444.0 * clampf(ratio, 0.0, 1.0)
 
 
@@ -635,6 +638,9 @@ func hide_boss_bar() -> void:
 		_boss_bar.queue_free()
 		_boss_bar = null
 		_boss_fill = null
+		var sfx := get_tree().get_first_node_in_group("sfx_bank")
+		if sfx:
+			sfx.set_boss_music(false)
 
 
 

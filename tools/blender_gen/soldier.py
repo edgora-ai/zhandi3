@@ -28,6 +28,9 @@ SKIN = mat("soldier_skin", (0.87, 0.70, 0.55))
 JACKET = mat("soldier_jacket", (0.40, 0.45, 0.30))
 PANTS = mat("soldier_pants", (0.28, 0.31, 0.20))
 GEAR = mat("soldier_gear", (0.22, 0.24, 0.16))
+VEST = mat("soldier_vest", (0.55, 0.46, 0.30))
+PACK = mat("soldier_pack", (0.36, 0.34, 0.26))
+HELMET = mat("soldier_helmet", (0.30, 0.33, 0.26))
 DARK = mat("soldier_dark", (0.14, 0.15, 0.17))
 BOOTS = mat("soldier_boots", (0.16, 0.14, 0.12))
 WHITE = mat("soldier_white", (0.96, 0.96, 0.94))
@@ -65,10 +68,10 @@ def cone(name, loc, r1, r2, depth, material, rot=(0, 0, 0)):
 parts = []
 parts.append(box("pelvis", (0, 0, 0.76), (0.34, 0.27, 0.24), PANTS))
 parts.append(sphere("torso", (0, 0, 1.10), (0.29, 0.26, 0.36), JACKET))
-parts.append(box("vest", (0, -0.02, 1.16), (0.42, 0.33, 0.42), GEAR))
+parts.append(box("vest", (0, -0.02, 1.16), (0.42, 0.33, 0.42), VEST))
 for i in range(3):
 	parts.append(box("mag", (-0.11 + i * 0.11, -0.19, 1.13), (0.09, 0.06, 0.13), DARK))
-parts.append(box("backpack", (0, 0.28, 1.18), (0.36, 0.18, 0.44), GEAR))
+parts.append(box("backpack", (0, 0.28, 1.18), (0.36, 0.18, 0.44), PACK))
 parts.append(box("pack_flap", (0, 0.28, 1.43), (0.30, 0.16, 0.10), DARK))
 parts.append(box("belt", (0, 0, 0.86), (0.40, 0.32, 0.09), DARK))
 parts.append(sphere("head", (0, 0, 1.58), (0.21, 0.20, 0.23), SKIN))
@@ -77,8 +80,9 @@ for sx in [-1, 1]:
 	parts.append(sphere("eye", (sx * 0.078, -0.175, 1.595), (0.024, 0.013, 0.032), DARK))
 	parts.append(box("brow", (sx * 0.078, -0.165, 1.685), (0.075, 0.02, 0.018), DARK))
 parts.append(sphere("nose", (0, -0.20, 1.55), (0.04, 0.03, 0.05), SKIN))
-parts.append(sphere("helmet", (0, 0, 1.68), (0.25, 0.24, 0.19), JACKET))
-parts.append(cone("brim", (0, 0, 1.615), 0.265, 0.265, 0.035, GEAR))
+parts.append(sphere("helmet", (0, 0, 1.68), (0.25, 0.24, 0.19), HELMET))
+parts.append(box("helm_band", (0, 0, 1.635), (0.27, 0.26, 0.032), DARK))
+parts.append(cone("brim", (0, 0, 1.615), 0.265, 0.265, 0.035, HELMET))
 for sx in [-1, 1]:
 	parts.append(sphere("shoulder", (sx * 0.43, 0, 1.36), (0.09, 0.09, 0.08), GEAR))
 	parts.append(cone("upperarm", (sx * 0.43, 0, 1.18), 0.080, 0.065, 0.34, JACKET))
@@ -92,7 +96,7 @@ for sx in [-1, 1]:
 parts.append(box("receiver", (0.43, -0.14, 0.82), (0.07, 0.44, 0.11), DARK))
 parts.append(cone("barrel", (0.43, -0.46, 0.84), 0.018, 0.018, 0.24, DARK, rot=(math.radians(90), 0, 0)))
 parts.append(box("mag_rifle", (0.43, -0.04, 0.72), (0.05, 0.06, 0.13), GEAR))
-parts.append(box("stock", (0.43, 0.13, 0.80), (0.06, 0.14, 0.09), GEAR))
+parts.append(box("stock", (0.43, 0.13, 0.80), (0.06, 0.14, 0.09), PACK))
 
 for p in parts:
 	p.select_set(True)

@@ -678,6 +678,20 @@ func hide_journal() -> void:
 		_journal_panel = null
 
 
+# 黑场过渡：0.22s 淡出 → 回调 → 0.32s 淡入（神庙进出传送用）。
+func fade_transition(cb: Callable) -> void:
+	var f := ColorRect.new()
+	f.set_anchors_preset(Control.PRESET_FULL_RECT)
+	f.color = Color(0, 0, 0, 0.0)
+	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui.add_child(f)
+	var tw := create_tween()
+	tw.tween_property(f, "color:a", 1.0, 0.22)
+	tw.tween_callback(cb)
+	tw.tween_property(f, "color:a", 0.0, 0.32)
+	tw.tween_callback(f.queue_free)
+
+
 
 # Boss 战血条：屏幕顶部居中的大型名条（进入战区自动显示，离开或讨伐即撤）。
 func show_boss_bar(boss_name: String, ratio: float) -> void:

@@ -136,8 +136,7 @@ func _complete() -> void:
 	_active = false
 	var scene := get_tree().current_scene
 	if scene and scene.get("hud") != null:
-		scene.hud.add_feed("神庙试炼完成！获得精灵宝珠")
-	Loot.spawn(scene, global_position + Vector3(0, 1.2, -5.2), "orb", "", 1, 3)
+		scene.hud.add_feed("神庙试炼完成！石门开启")
 	# 完成时刻全符文强光脉冲。
 	var light := OmniLight3D.new()
 	light.light_color = Color(0.5, 1.0, 0.85)
@@ -180,8 +179,7 @@ func _process(delta: float) -> void:
 				completed = true
 				var scene := get_tree().current_scene
 				if scene and scene.get("hud") != null:
-					scene.hud.add_feed("机关启动！获得精灵宝珠")
-				Loot.spawn(scene, global_position + Vector3(0, 1.2, -5.2), "orb", "", 1, 3)
+					scene.hud.add_feed("机关启动！石门开启")
 		else:
 			_plate_t = maxf(0.0, _plate_t - delta * 2.0)
 		return
@@ -191,8 +189,7 @@ func _process(delta: float) -> void:
 			_ball.freeze = true
 			var scene := get_tree().current_scene
 			if scene and scene.get("hud") != null:
-				scene.hud.add_feed("石球归位！获得精灵宝珠")
-			Loot.spawn(scene, global_position + Vector3(0, 1.2, -5.2), "orb", "", 1, 3)
+				scene.hud.add_feed("石球归位！石门开启")
 		return
 	var dist := global_position.distance_to(player.global_position)
 	if not _active and dist < START_DIST:

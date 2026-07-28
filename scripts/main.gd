@@ -281,6 +281,14 @@ func _ready() -> void:
 		player.take_damage(9999.0, null)
 	if args.has("--journaltest"):
 		player._toggle_journal()
+	if args.has("--shrineintest") and wild_world:
+		var st: ShrineTrial = wild_world.trials[0]
+		for rune in st._runes:
+			rune.take_damage(10.0, player)
+		var sdoor := get_tree().get_first_node_in_group("shrine_door") as ShrineDoor
+		if sdoor:
+			sdoor.enter(player)
+			get_tree().create_timer(1.0).timeout.connect(func() -> void: sdoor.interior.leave(player))
 	if args.has("--cracktest") and terrain:
 		player.global_position = Vector3(-88, terrain.get_height(-88, 92) + 0.5, 92)
 		var cdir := (Vector3(-95, terrain.get_height(-95, 92) + 1.0, 92) - player.global_position).normalized()
@@ -1056,6 +1064,10 @@ func _process(delta: float) -> void:
 		hud.set_interact("按 E 抓鱼")
 	elif player.nearby_bed:
 		hud.set_interact("按 E 睡到天亮")
+	elif player.nearby_shrine_door:
+		hud.set_interact("按 E 进入神庙")
+	elif player.nearby_shrine_exit:
+		hud.set_interact("按 E 离开神庙")
 	else:
 		hud.set_interact("")
 	hud.set_weapon_name(player.weapon.label())

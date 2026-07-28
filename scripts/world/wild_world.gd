@@ -33,10 +33,14 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	terrain = p_terrain
 	player = p_player
 	_build_materials()
-	_build_shrine(Vector3(-112, terrain.get_height(-112, 92), 92), 0.15)
-	_build_shrine(_ground(Vector3(105, 0, 25)), -0.8, true)
-	_build_shrine(_ground(Vector3(-140, 0, -110)), 2.2, "plate")
-	_build_shrine(_ground(Vector3(55, 0, -30)), -0.4, "ball")
+	var shrine0 := _build_shrine(Vector3(-112, terrain.get_height(-112, 92), 92), 0.15)
+	_link_shrine_interior(shrine0, 0)
+	var shrine1 := _build_shrine(_ground(Vector3(105, 0, 25)), -0.8, true)
+	_link_shrine_interior(shrine1, 1)
+	var shrine2 := _build_shrine(_ground(Vector3(-140, 0, -110)), 2.2, "plate")
+	_link_shrine_interior(shrine2, 2)
+	var shrine3 := _build_shrine(_ground(Vector3(55, 0, -30)), -0.4, "ball")
+	_link_shrine_interior(shrine3, 3)
 	_build_stable(Vector3(-72, terrain.get_height(-72, 21), 21))
 	_build_temple_ruins(Vector3(18, terrain.get_height(18, -94), -94))
 	_build_river_bridge(18.0)
@@ -254,7 +258,7 @@ func _cylinder_collision(body: StaticBody3D, radius: float, height: float, pos: 
 	body.add_child(col)
 
 
-func _build_shrine(world_pos: Vector3, yaw: float, trial_mode: Variant = "rune") -> void:
+func _build_shrine(world_pos: Vector3, yaw: float, trial_mode: Variant = "rune") -> Node3D:
 	var shrine := Node3D.new()
 	shrine.name = "AncientShrine"
 	shrine.position = world_pos
@@ -315,6 +319,15 @@ func _build_shrine(world_pos: Vector3, yaw: float, trial_mode: Variant = "rune")
 	light.omni_range = 13.0
 	light.position = Vector3(0, 3.2, -2.7)
 	shrine.add_child(light)
+	return shrine
+
+
+# 每座神庙挂一间地底石室：试炼完成开门，精灵宝珠在室内的导师台座上。
+func _link_shrine_interior(shrine: Node3D, idx: int) -> void:
+	var trial: ShrineTrial = trials[idx]
+	var door_world: Vector3 = shrine.global_transform * Vector3(0, 0.4, -5.6)
+	var interior := ShrineInterior.create(self, Vector3(700.0 + idx * 40.0, -60.0, 700.0), trial, door_world)
+	ShrineDoor.create(shrine, Vector3(0, 0.6, -4.6), trial, interior)
 
 
 func _build_stable(world_pos: Vector3) -> void:

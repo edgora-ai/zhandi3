@@ -92,6 +92,8 @@ var is_gliding := false
 var is_climbing := false
 var backpack_open := false
 var journal_open := false
+var nearby_shrine_door: ShrineDoor = null
+var nearby_shrine_exit: Area3D = null
 var backpack_index := 0
 var backpack_weapons: Array[Dictionary] = []
 var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0, "roast_meat": 0, "roast_mushroom": 0}
@@ -886,6 +888,12 @@ func _try_pickup() -> void:
 		nearby_bed.use(self)
 	elif nearby_chest:
 		nearby_chest.open(self)
+	elif nearby_shrine_door:
+		nearby_shrine_door.enter(self)
+	elif nearby_shrine_exit:
+		var si := nearby_shrine_exit.get_parent() as ShrineInterior
+		if si:
+			si.leave(self)
 	elif nearby_beacon:
 		nearby_beacon.activate(self)
 

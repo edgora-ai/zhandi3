@@ -91,6 +91,7 @@ var is_swimming := false
 var is_gliding := false
 var is_climbing := false
 var backpack_open := false
+var journal_open := false
 var backpack_index := 0
 var backpack_weapons: Array[Dictionary] = []
 var backpack_items := {"mushroom": 0, "meat": 0, "dragon_scale": 0, "wood": 0, "roast_meat": 0, "roast_mushroom": 0}
@@ -200,6 +201,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_backpack()
 			get_viewport().set_input_as_handled()
 			return
+		if event.physical_keycode == KEY_J:
+			_toggle_journal()
+			get_viewport().set_input_as_handled()
+			return
 		if backpack_open:
 			match event.physical_keycode:
 				KEY_UP, KEY_W:
@@ -214,6 +219,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					_store_current_weapon()
 				KEY_ESCAPE:
 					_toggle_backpack()
+			get_viewport().set_input_as_handled()
+			return
+		if journal_open:
+			match event.physical_keycode:
+				KEY_ESCAPE:
+					_toggle_journal()
 			get_viewport().set_input_as_handled()
 			return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -543,7 +554,7 @@ func _whistle_horse() -> void:
 
 
 func _dodge() -> void:
-	if dodge_cd > 0.0 or not is_on_floor() or vehicle or backpack_open:
+	if dodge_cd > 0.0 or not is_on_floor() or vehicle or backpack_open or journal_open:
 		return
 	dodge_cd = 0.8
 	# 闪身：沿输入方向（无输入则向后）短促位移，0.3s 无敌帧。
@@ -586,7 +597,7 @@ func _physics_process(delta: float) -> void:
 		_block_start = Time.get_ticks_msec() / 1000.0
 	if vehicle:
 		return  # 驾驶中：移动由车辆接管
-	if backpack_open:
+	if backpack_open or journal_open:
 		velocity.x = move_toward(velocity.x, 0.0, delta * ACCEL)
 		velocity.z = move_toward(velocity.z, 0.0, delta * ACCEL)
 		if not is_on_floor():
@@ -1440,7 +1451,7 @@ func _update_sword(delta: float) -> void:
 # ---------- 攀爬（树干 / 塔身 / 悬崖，一切陡面） ----------
 
 func _update_climbing(_delta: float, f: float, r: float) -> bool:
-	if _ladder != null or backpack_open or vehicle != null:
+	if _ladder != null or backpack_open or journal_open or vehicle != null:
 		is_climbing = false
 		return false
 	var space := get_world_3d().direct_space_state
@@ -1648,6 +1659,21 @@ func _glider_line(a: Vector3, b: Vector3, mat: Material) -> void:
 
 
 # ---------- 背包 ----------
+
+# J 键冒险日志：打开时展示任务面板并暂停移动（与背包同级）。
+func _toggle_journal() -> void:
+	journal_open = not journal_open
+	if journal_open:
+		if backpack_open:
+			_toggle_backpack()
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		var scene := get_tree().current_scene
+		if hud and scene and scene.has_method("get_journal_entries"):
+			hud.show_journal(scene.get_journal_entries())
+	elif hud:
+		hud.hide_journal()
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
 
 func _toggle_backpack() -> void:
 	backpack_open = not backpack_open

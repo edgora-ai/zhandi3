@@ -279,6 +279,8 @@ func _ready() -> void:
 	if args.has("--dietest"):
 		player.fairies = 0
 		player.take_damage(9999.0, null)
+	if args.has("--journaltest"):
+		player._toggle_journal()
 	if args.has("--cracktest") and terrain:
 		player.global_position = Vector3(-88, terrain.get_height(-88, 92) + 0.5, 92)
 		var cdir := (Vector3(-95, terrain.get_height(-95, 92) + 1.0, 92) - player.global_position).normalized()
@@ -737,6 +739,44 @@ func _on_dragon_killed(from: Variant) -> void:
 		"弹反  %d 次    击败  %d" % [player.parry_count, player.kills],
 	]
 	hud.show_quest_end("讨 伐 成 功", lines)
+
+
+# 冒险日志条目：主线/支线/试炼的静态描述 + 动态状态与进度（J 键面板的数据源）。
+func get_journal_entries() -> Array:
+	var entries: Array = []
+	var dragon_alive := false
+	for d in get_tree().get_nodes_in_group("wild_enemy"):
+		if d is WildDragon and d.get("alive"):
+			dragon_alive = true
+			break
+	entries.append({"name": "焚天之怒（主线）", "desc": "讨伐火山口的焚天巨龙", "state": 1 if dragon_alive else 3, "progress": "进行中" if dragon_alive else "已讨伐"})
+	entries.append({"name": "蘑菇茶歇", "desc": "驿站老板想要 3 朵海拉鲁蘑菇", "state": quest_states.get("mushroom3", 0), "progress": _quest_progress_text("mushroom3")})
+	entries.append({"name": "谷地除害", "desc": "讨伐 2 只莫布林（它们前摇长，盾反伺候）", "state": quest_states.get("moblin2", 0), "progress": _quest_progress_text("moblin2")})
+	entries.append({"name": "学者的样本", "desc": "给遗迹学者带回一片巨龙鳞", "state": quest_states.get("scale1", 0), "progress": _quest_progress_text("scale1")})
+	entries.append({"name": "一路顺风", "desc": "护送行商到海利亚大桥东头", "state": quest_states.get("escort", 0), "progress": _quest_progress_text("escort")})
+	var shrine_done := 0
+	if wild_world:
+		for t in wild_world.trials:
+			if t.completed:
+				shrine_done += 1
+	entries.append({"name": "神庙试炼", "desc": "解开四座古代神庙的试炼", "state": 3 if shrine_done >= 4 else (1 if shrine_done > 0 else 0), "progress": "%d/4" % shrine_done})
+	return entries
+
+
+func _quest_progress_text(qid: String) -> String:
+	match quest_states.get(qid, 0):
+		0:
+			return "未接取"
+		3:
+			return "已完成"
+	if qid == "mushroom3":
+		var got := int(player.backpack_items["mushroom"]) - _quest_mushroom_base
+		return "%d/3" % clampi(got, 0, 3)
+	if qid == "moblin2":
+		return "%d/2" % mini(_quest_moblin_kills, 2)
+	if qid == "scale1":
+		return "%d/1" % mini(int(player.backpack_items["dragon_scale"]), 1)
+	return "进行中"
 
 
 func quest_status_text() -> String:

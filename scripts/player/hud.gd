@@ -35,6 +35,7 @@ var _flurry_overlay: ColorRect
 var _boss_bar: Control
 var _boss_fill: ColorRect
 var _death_panel: Control
+var _journal_panel: Control
 var _map_panel: Control
 var _spread_px := 8.0
 
@@ -637,6 +638,44 @@ func hide_death_screen() -> void:
 	if _death_panel:
 		_death_panel.queue_free()
 		_death_panel = null
+
+
+# ---------- 冒险日志 ----------
+
+# J 键任务日志：状态圆点（灰未接/青进行/绿完成）+ 名称 + 描述 + 进度。
+func show_journal(entries: Array) -> void:
+	if _journal_panel:
+		_journal_panel.queue_free()
+	_journal_panel = Control.new()
+	_journal_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_journal_panel.position = Vector2(-300, -225)
+	_journal_panel.size = Vector2(600, 450)
+	_ui.add_child(_journal_panel)
+	_mk_rect(_journal_panel, Vector2.ZERO, Vector2(600, 450), Color(0.04, 0.05, 0.07, 0.94))
+	_mk_rect(_journal_panel, Vector2(8, 8), Vector2(584, 434), Color(0.10, 0.13, 0.16, 0.88))
+	var title := _mk_label(_journal_panel, "冒 险 日 志", 30, Color(0.97, 0.83, 0.42))
+	title.position = Vector2(30, 22)
+	var sub := _mk_label(_journal_panel, "J / Esc 关闭", 15, Color(0.70, 0.76, 0.82))
+	sub.position = Vector2(30, 64)
+	var row := 96
+	for e in entries:
+		var st := int(e.get("state", 0))
+		var bullet := Color(0.45, 0.48, 0.52) if st == 0 else (Color(0.35, 0.75, 0.85) if st == 1 else Color(0.45, 0.85, 0.45))
+		_mk_rect(_journal_panel, Vector2(34, row + 5), Vector2(15, 15), bullet)
+		var name_l := _mk_label(_journal_panel, str(e.get("name", "")), 21, Color(0.95, 0.92, 0.80) if st < 3 else Color(0.60, 0.80, 0.58))
+		name_l.position = Vector2(62, row)
+		var prog_l := _mk_label(_journal_panel, str(e.get("progress", "")), 17, Color(0.85, 0.80, 0.60))
+		prog_l.position = Vector2(468, row + 3)
+		var desc_l := _mk_label(_journal_panel, str(e.get("desc", "")), 16, Color(0.68, 0.72, 0.76))
+		desc_l.position = Vector2(62, row + 26)
+		row += 56
+	_ignore_mouse(_journal_panel)
+
+
+func hide_journal() -> void:
+	if _journal_panel:
+		_journal_panel.queue_free()
+		_journal_panel = null
 
 
 

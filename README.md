@@ -64,7 +64,7 @@
 - 阔野地图自带补给：地标与营地分布 5 把武器、9 处弹药、医疗包与护甲，测绘塔顶与城堡平台藏有攀爬奖励
 - 海利亚河岸为 20m 宽渐变滩涂：河床→沙滩→草坡可自然行走下水，怪物与野兽不会涉水追进河里
 - 通用自动上台阶：驿站石基、神庙平台、断柱等 0.68m 以内台基直接迈上去，不用蹦
-- 战斗反馈：命中有飘字伤害数字与受击缩放反馈，击败怪物有播报与倒地动画；小怪、野兽、飞行攻击器与巨龙全部可击杀并掉落兽肉/蘑菇/龙鳞/弹药
+- 战斗反馈：三段剑招带蓝/金动态剑光、近距软锁与踏步追击；敌人有脚下前摇环、可打断硬直和受击击退，命中有方向火花、飘字、顿帧与分层音效；非致命伤不会误计击杀或提前掉落
 - 马匹头部使用手工楔形网格塑造笔直长脸，鬃毛为立式脊冠；地图整体色阶为高饱和旷野绿，天空布置大朵扁平白云
 - 阔野地图是一套受开放世界卡通冒险启发的原创程序化实现，不包含外部游戏资产
 
@@ -198,7 +198,7 @@ tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 520 -- --w
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/map.png --mapmenutest
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/backpack.png --backpacktest --map wild
 # 射击链路自检（生成测试bot并开火，打印血量）
-# 视觉调试：--pilottest（Blender 小人）、--moblintest（前摇）、--ridertest/--biketest/--jeeptest（骑乘）、--koroktest（呀哈哈）
+# 视觉调试：--pilottest（Blender 小人）、--moblintest/--liztest（敌人前摇）、--ridertest/--biketest/--jeeptest（骑乘）、--koroktest（呀哈哈）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm
 # 失焦恢复自检（模拟漏收恢复通知，确认暂停外定时器能自动解锁）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --focusrecoverytest

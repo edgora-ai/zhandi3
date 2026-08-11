@@ -45,6 +45,58 @@ static func parry_flash(pos: Vector3) -> void:
 	_puff(pos, Color(1.0, 1.0, 0.9), 0.12, 3.0, 0.14)
 
 
+# 剑刃命中：中心闪光加放射状短芒，比通用枪击烟尘更清楚地表达斩击方向。
+static func melee_hit(pos: Vector3, attack_dir: Vector3, heavy: bool = false) -> void:
+	var tint := Color(1.0, 0.66, 0.22) if heavy else Color(0.62, 0.88, 1.0)
+	_puff(pos, tint, 0.11 if heavy else 0.08, 3.8, 0.16)
+	var forward := attack_dir.normalized()
+	var right := forward.cross(Vector3.UP).normalized()
+	if right.length_squared() < 0.01:
+		right = Vector3.RIGHT
+	for i in range(7 if heavy else 5):
+		var angle := TAU * float(i) / float(7 if heavy else 5)
+		var outward := (right * cos(angle) + Vector3.UP * sin(angle)).normalized()
+		var streak := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.025, 0.025, 0.34 if heavy else 0.24)
+		streak.mesh = mesh
+		streak.material_override = _unshaded(tint)
+		streak.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_scene().add_child(streak)
+		streak.global_position = pos + outward * 0.10
+		streak.look_at(pos + outward, Vector3.UP if absf(outward.dot(Vector3.UP)) < 0.95 else Vector3.FORWARD)
+		var tw := streak.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(streak, "global_position", pos + outward * (0.75 if heavy else 0.52), 0.15)
+		tw.tween_property(streak, "scale", Vector3(0.18, 0.18, 0.45), 0.15)
+		tw.chain().tween_callback(streak.queue_free)
+
+
+# 敌人脚下的攻击预警环。调用者保留节点并在前摇阶段控制 visible/scale。
+static func attack_ring(parent: Node3D, radius: float, color: Color) -> MeshInstance3D:
+	var ring := MeshInstance3D.new()
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = radius * 0.88
+	mesh.outer_radius = radius
+	mesh.rings = 24
+	mesh.ring_segments = 5
+	ring.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = color
+	mat.emission_enabled = true
+	mat.emission = Color(color.r, color.g, color.b)
+	mat.emission_energy_multiplier = 2.0
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	ring.material_override = mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.position.y = 0.08
+	ring.visible = false
+	parent.add_child(ring)
+	return ring
+
+
 static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: float) -> void:
 	var s := SphereMesh.new()
 	s.radius = radius

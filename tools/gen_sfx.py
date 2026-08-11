@@ -327,4 +327,18 @@ write_wav("snowwind.wav", wind)
 thun = mix(noise_burst(0.5, 0.10, 0.75), sweep(2.4, 90, 30, 1.4, 0.5))
 write_wav("thunder.wav", thun)
 
+# 新音效放在既有随机生成流程之后，避免改变旧音乐/环境音的固定种子序列。
+# 近战挥空：高频风切向下扫，三连击通过运行时 pitch_scale 区分。
+sword_whoosh = mix(sweep(0.19, 1750.0, 230.0, 0.11, 0.38), noise_burst(0.16, 0.055, 0.16, 0.18))
+write_wav("sword_whoosh.wav", sword_whoosh)
+
+# 近战命中：低频木石冲击叠一层短促金属亮音。
+heavy_impact = mix(noise_burst(0.22, 0.045, 0.52, 0.10), tone(0.18, 105.0, 0.07, 0.72))
+heavy_impact = mix(heavy_impact, sweep(0.10, 920.0, 310.0, 0.045, 0.24))
+write_wav("heavy_impact.wav", heavy_impact)
+
+# 敌人攻击前摇：短促上扬双音，提醒玩家准备闪避或举盾。
+enemy_charge = mix(sweep(0.30, 170.0, 520.0, 0.20, 0.34), [0.0] * int(SR * 0.11) + tone(0.18, 720.0, 0.12, 0.20))
+write_wav("enemy_charge.wav", enemy_charge)
+
 print("done")

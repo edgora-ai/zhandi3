@@ -26,6 +26,10 @@ var _glb: Node3D
 var _ap: AnimationPlayer
 var _cur_anim := ""
 var _anim_hold := 0.0
+var _attack_cue: MeshInstance3D
+var _stagger_t := 0.0
+var _knockback := Vector3.ZERO
+var _death_t := -1.0
 
 const WINDUP_TIME := 0.9
 const SMASH_RANGE := 2.8
@@ -53,6 +57,7 @@ func _ready() -> void:
 	add_child(col)
 	if not _try_glb_visual():
 		_build_model()
+	_attack_cue = FX.attack_ring(self, 1.45, Color(1.0, 0.24, 0.08, 0.78))
 
 
 # glb 视觉：Blender 管线生成的蒙皮模型与战斗动画；缺失时回退到程序化模型。
@@ -73,6 +78,23 @@ func _try_glb_visual() -> bool:
 		return false
 	_play(&"idle")
 	return true
+
+
+func apply_melee_impulse(direction: Vector3, strength: float, heavy: bool = false) -> void:
+	if not alive:
+		return
+	var push := direction
+	push.y = 0.0
+	if push.length_squared() < 0.01:
+		return
+	_stagger_t = 0.58 if heavy else 0.34
+	_knockback = push.normalized() * strength * (0.62 if heavy else 0.42)
+	_windup = -1.0
+	_recover = maxf(_recover, _stagger_t + 0.25)
+	if _attack_cue:
+		_attack_cue.visible = false
+	_play(&"hit")
+	_anim_hold = _stagger_t
 
 
 func _play(clip: StringName) -> void:
@@ -213,23 +235,36 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	_play(&"hit")
 	_anim_hold = 0.30
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.8, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
-	if hp <= 0.0:
-		alive = false
+	if hp > 0.0:
+		return
+	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
 	if from and from.has_method("give_rupees"):
 		from.give_rupees(5)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 3, 1)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.6, 0.2, 0.4), "wood", "", 2, 1)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.5, 0.2, 0.3), "monster_part", "", 2, 1)
-		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.8, 0), "击破!", Color(1.0, 0.55, 0.20))
-		var scene := get_tree().current_scene
-		if scene and scene.has_method("_on_moblin_killed"):
-			scene._on_moblin_killed(from)
-		queue_free()
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 3, 1)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0.6, 0.2, 0.4), "wood", "", 2, 1)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.5, 0.2, 0.3), "monster_part", "", 2, 1)
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.8, 0), "击破!", Color(1.0, 0.55, 0.20))
+	var scene := get_tree().current_scene
+	if scene and scene.has_method("_on_moblin_killed"):
+		scene._on_moblin_killed(from)
+	_play(&"die")
+	collision_layer = 0
+	collision_mask = 0
+	if _attack_cue:
+		_attack_cue.visible = false
+	_death_t = 0.0
 
 
 func _physics_process(delta: float) -> void:
+	if _death_t >= 0.0:
+		_death_t += delta
+		if _ap == null:
+			rotation.z = lerpf(rotation.z, 1.48, minf(1.0, delta * 5.0))
+		if _death_t > 1.25:
+			queue_free()
+		return
 	if not alive or player == null or terrain == null:
 		return
 	_anim += delta
@@ -239,9 +274,22 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	to_player.y = 0.0
 	var dist := to_player.length()
+	if _stagger_t > 0.0:
+		_stagger_t = maxf(0.0, _stagger_t - delta)
+		velocity.x = _knockback.x
+		velocity.z = _knockback.z
+		velocity.y = -4.0
+		_knockback = _knockback.move_toward(Vector3.ZERO, delta * 10.0)
+		move_and_slide()
+		global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
+		return
 	# 前摇：举棒定住、眼放红光，给玩家 0.9s 反应窗口。
 	if _windup >= 0.0:
 		_windup += delta
+		if _attack_cue:
+			_attack_cue.visible = true
+			var cue_phase := clampf(_windup / WINDUP_TIME, 0.0, 1.0)
+			_attack_cue.scale = Vector3.ONE * lerpf(1.30, 0.72, cue_phase) * (1.0 + sin(_anim * 18.0) * 0.05)
 		if _club_arm:
 			_club_arm.rotation.x = lerpf(_club_arm.rotation.x, -2.4, delta * 6.0)
 		if _eye_l:
@@ -252,6 +300,8 @@ func _physics_process(delta: float) -> void:
 			_windup = -1.0
 			_recover = 1.2
 	else:
+		if _attack_cue:
+			_attack_cue.visible = false
 		if _club_arm:
 			_club_arm.rotation.x = lerpf(_club_arm.rotation.x, 0.2, delta * 4.0)
 		if _eye_l:
@@ -262,6 +312,9 @@ func _physics_process(delta: float) -> void:
 			if dist < SMASH_RANGE * 0.75 and _recover <= 0.0:
 				_windup = 0.0
 				_play(&"windup")
+				var sfx := get_tree().get_first_node_in_group("sfx_bank")
+				if sfx:
+					sfx.play_at("enemy_charge", global_position + Vector3(0, 1.5, 0), -7.0, 0.82)
 			else:
 				var dir := to_player.normalized()
 				velocity.x = dir.x * 3.4
@@ -306,6 +359,8 @@ func _smash() -> void:
 		_club_arm.rotation.x = 0.8
 	_play(&"smash")
 	_anim_hold = 0.45
+	if _attack_cue:
+		_attack_cue.visible = false
 	# 猛击：范围内伤害+击退，可被格挡/闪避反制。
 	if player.global_position.distance_to(global_position) < SMASH_RANGE and player.alive:
 		player.take_damage(SMASH_DAMAGE, self)
@@ -314,3 +369,6 @@ func _smash() -> void:
 			push.y = 0.0
 			player.velocity += push.normalized() * 6.0 + Vector3(0, 3.0, 0)
 	FX.impact(global_position + Vector3(0, 0.2, 0) + -global_transform.basis.z * 1.8)
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play_at("heavy_impact", global_position, -3.0, 0.78)

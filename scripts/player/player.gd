@@ -125,6 +125,11 @@ var _magnet_motes: Array[MeshInstance3D] = []
 var _swing_t := -1.0
 var _sword: Node3D
 var _sword_blade: MeshInstance3D
+var _sword_trail: MeshInstance3D
+var _sword_trail_mesh: ImmediateMesh
+var _trail_outer: Array[Vector3] = []
+var _trail_inner: Array[Vector3] = []
+var _melee_target: CharacterBody3D = null
 var melee_damage := 26.0
 
 
@@ -299,7 +304,7 @@ func _place_bomb() -> void:
 		_bombs.remove_at(0)
 	var fwd := get_aim_dir()
 	var pos := camera.global_position + fwd * 1.1 + Vector3(0, -0.2, 0)
-	var b := RemoteBomb.place(get_tree().current_scene, pos, fwd * 3.0 + Vector3(0, 2.0, 0))
+	var b := RemoteBomb.place(get_tree().current_scene, pos, fwd * 3.0 + Vector3(0, 2.0, 0), self)
 	_bombs.append(b)
 	if not _bomb_hint_done:
 		_bomb_hint_done = true
@@ -1136,41 +1141,133 @@ func _build_sword() -> void:
 	_sword_base_rot = Vector3(-0.15, 0.0, -0.35)
 	_sword.rotation = _sword_base_rot
 	camera.add_child(_sword)
-	var steel := Toon.make_material(Color(0.78, 0.82, 0.88), true, 0.008)
-	var dark := Toon.make_material(Color(0.14, 0.13, 0.15), true, 0.006)
-	var wood := Toon.make_material(Color(0.35, 0.22, 0.10), true, 0.008)
+	var steel := Toon.make_material(Color(0.72, 0.80, 0.90), true, 0.008)
+	var edge := Toon.make_material(Color(0.93, 0.97, 1.0), true, 0.005)
+	var dark := Toon.make_material(Color(0.10, 0.12, 0.18), true, 0.006)
+	var bronze := Toon.make_material(Color(0.72, 0.48, 0.16), true, 0.007)
+	var wood := Toon.make_material(Color(0.24, 0.14, 0.07), true, 0.008)
+	var tunic := Toon.make_material(Color(0.16, 0.42, 0.25), true, 0.009)
+	var skin := Toon.make_material(Color(0.91, 0.70, 0.53), true, 0.007)
+	# 宽脊窄刃的冒险剑：中央剑脊、两侧亮刃和独立剑尖形成清晰轮廓。
 	var blade := MeshInstance3D.new()
 	var blade_mesh := BoxMesh.new()
-	blade_mesh.size = Vector3(0.035, 0.62, 0.085)
+	blade_mesh.size = Vector3(0.050, 0.60, 0.105)
 	blade.mesh = blade_mesh
 	blade.material_override = steel
 	blade.position = Vector3(0, 0.42, 0)
 	_sword.add_child(blade)
 	_sword_blade = blade
+	for sx in [-1.0, 1.0]:
+		var blade_edge := MeshInstance3D.new()
+		var edge_mesh := BoxMesh.new()
+		edge_mesh.size = Vector3(0.012, 0.60, 0.112)
+		blade_edge.mesh = edge_mesh
+		blade_edge.material_override = edge
+		blade_edge.position = Vector3(sx * 0.031, 0.42, 0)
+		_sword.add_child(blade_edge)
 	var tip := MeshInstance3D.new()
 	var tip_mesh := PrismMesh.new()
-	tip_mesh.size = Vector3(0.035, 0.12, 0.085)
+	tip_mesh.size = Vector3(0.072, 0.15, 0.112)
 	tip.mesh = tip_mesh
-	tip.material_override = steel
-	tip.position = Vector3(0, 0.79, 0)
+	tip.material_override = edge
+	tip.position = Vector3(0, 0.795, 0)
 	_sword.add_child(tip)
+	# 剑身嵌片在运动时提供颜色焦点，古代剑升级会连同剑身一起点亮。
+	for py in [0.27, 0.43, 0.59]:
+		var rune := MeshInstance3D.new()
+		var rune_mesh := BoxMesh.new()
+		rune_mesh.size = Vector3(0.058, 0.055, 0.116)
+		rune.mesh = rune_mesh
+		rune.material_override = dark
+		rune.position = Vector3(0, py, 0)
+		_sword.add_child(rune)
 	var guard := MeshInstance3D.new()
 	var guard_mesh := BoxMesh.new()
-	guard_mesh.size = Vector3(0.16, 0.035, 0.12)
+	guard_mesh.size = Vector3(0.24, 0.045, 0.14)
 	guard.mesh = guard_mesh
-	guard.material_override = dark
+	guard.material_override = bronze
 	guard.position = Vector3(0, 0.10, 0)
 	_sword.add_child(guard)
+	for sx in [-1.0, 1.0]:
+		var quillon := MeshInstance3D.new()
+		var quillon_mesh := CylinderMesh.new()
+		quillon_mesh.top_radius = 0.018
+		quillon_mesh.bottom_radius = 0.035
+		quillon_mesh.height = 0.18
+		quillon_mesh.radial_segments = 7
+		quillon.mesh = quillon_mesh
+		quillon.material_override = bronze
+		quillon.position = Vector3(sx * 0.15, 0.105, 0)
+		quillon.rotation_degrees.z = sx * 72.0
+		_sword.add_child(quillon)
 	var grip := MeshInstance3D.new()
 	var grip_mesh := CylinderMesh.new()
-	grip_mesh.top_radius = 0.022
-	grip_mesh.bottom_radius = 0.026
-	grip_mesh.height = 0.20
+	grip_mesh.top_radius = 0.027
+	grip_mesh.bottom_radius = 0.031
+	grip_mesh.height = 0.22
 	grip_mesh.radial_segments = 7
 	grip.mesh = grip_mesh
 	grip.material_override = wood
-	grip.position = Vector3(0, -0.02, 0)
+	grip.position = Vector3(0, -0.035, 0)
 	_sword.add_child(grip)
+	for py in [-0.12, -0.075, -0.03, 0.015, 0.06]:
+		var wrap := MeshInstance3D.new()
+		var wrap_mesh := TorusMesh.new()
+		wrap_mesh.inner_radius = 0.027
+		wrap_mesh.outer_radius = 0.035
+		wrap_mesh.rings = 8
+		wrap_mesh.ring_segments = 4
+		wrap.mesh = wrap_mesh
+		wrap.material_override = bronze
+		wrap.position = Vector3(0, py, 0)
+		_sword.add_child(wrap)
+	var pommel := MeshInstance3D.new()
+	var pommel_mesh := SphereMesh.new()
+	pommel_mesh.radius = 0.055
+	pommel_mesh.height = 0.10
+	pommel_mesh.radial_segments = 8
+	pommel_mesh.rings = 4
+	pommel.mesh = pommel_mesh
+	pommel.material_override = bronze
+	pommel.position = Vector3(0, -0.18, 0)
+	_sword.add_child(pommel)
+	# 第一人称持剑手与袖口，避免武器像悬浮在镜头前。
+	var hand := MeshInstance3D.new()
+	var hand_mesh := SphereMesh.new()
+	hand_mesh.radius = 0.075
+	hand_mesh.height = 0.15
+	hand_mesh.radial_segments = 9
+	hand_mesh.rings = 5
+	hand.mesh = hand_mesh
+	hand.material_override = skin
+	hand.position = Vector3(0.015, -0.10, 0.015)
+	hand.scale = Vector3(0.82, 1.18, 0.82)
+	_sword.add_child(hand)
+	var sleeve := MeshInstance3D.new()
+	var sleeve_mesh := CapsuleMesh.new()
+	sleeve_mesh.radius = 0.085
+	sleeve_mesh.height = 0.38
+	sleeve_mesh.radial_segments = 8
+	sleeve_mesh.rings = 4
+	sleeve.mesh = sleeve_mesh
+	sleeve.material_override = tunic
+	sleeve.position = Vector3(0.10, -0.30, 0.08)
+	sleeve.rotation_degrees.z = -22.0
+	_sword.add_child(sleeve)
+	# 半透明剑光由每帧采样剑根与剑尖生成，三段连击颜色逐步升温。
+	_sword_trail_mesh = ImmediateMesh.new()
+	_sword_trail = MeshInstance3D.new()
+	_sword_trail.name = "SwordTrail"
+	_sword_trail.mesh = _sword_trail_mesh
+	_sword_trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var trail_mat := StandardMaterial3D.new()
+	trail_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	trail_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	trail_mat.vertex_color_use_as_albedo = true
+	trail_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	trail_mat.no_depth_test = true
+	_sword_trail.material_override = trail_mat
+	camera.add_child(_sword_trail)
 
 
 func _build_shield() -> void:
@@ -1353,6 +1450,36 @@ func _fire_arrow() -> void:
 	weapon.set_ads(false)
 
 
+func _find_melee_target() -> CharacterBody3D:
+	var best: CharacterBody3D = null
+	var best_score := -99.0
+	var seen: Dictionary = {}
+	var forward := get_aim_dir()
+	forward.y = 0.0
+	forward = forward.normalized()
+	for group in ["wild_enemy", "wildlife", "combatant"]:
+		for candidate in get_tree().get_nodes_in_group(group):
+			if candidate == self or not (candidate is CharacterBody3D):
+				continue
+			var target := candidate as CharacterBody3D
+			if seen.has(target.get_instance_id()) or target.get("alive") == false:
+				continue
+			seen[target.get_instance_id()] = true
+			var to_target := target.global_position - global_position
+			to_target.y = 0.0
+			var distance := to_target.length()
+			if distance < 0.15 or distance > 4.2:
+				continue
+			var facing := forward.dot(to_target / distance)
+			if facing < 0.18:
+				continue
+			var score := facing * 2.2 - distance * 0.18
+			if score > best_score:
+				best_score = score
+				best = target
+	return best
+
+
 func _melee_swing() -> void:
 	_melee_cd = 0.5
 	_swing_t = 0.0
@@ -1360,6 +1487,19 @@ func _melee_swing() -> void:
 	if _combo_reset_t <= 0.0:
 		_combo_i = 0
 	_combo_reset_t = 1.0
+	_melee_target = _find_melee_target()
+	# 轻微踏步补足第一人称近战距离，但不把玩家瞬移到敌人身上。
+	if _melee_target and is_instance_valid(_melee_target):
+		var lunge := _melee_target.global_position - global_position
+		lunge.y = 0.0
+		if lunge.length() > 1.45:
+			var lunge_dir := lunge.normalized()
+			velocity.x += lunge_dir.x * 3.2
+			velocity.z += lunge_dir.z * 3.2
+	var sfx := get_tree().get_first_node_in_group("sfx_bank")
+	if sfx:
+		sfx.play("sword_whoosh", -8.0, 1.0 + _combo_i * 0.08)
+	_clear_sword_trail()
 
 
 # 连段姿态：每段 [蓄力 pose, 挥击 pose]（视模空间位置+欧拉角）。
@@ -1380,6 +1520,7 @@ func _apply_melee_hit() -> void:
 	var hit_something := false
 	var hit_pos := camera.global_position + get_aim_dir() * 1.6
 	var forward := get_aim_dir()
+	var hit_ids: Dictionary = {}
 	# 中心射线：砍树、点符文等静态可伤害物。
 	var space := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(camera.global_position, camera.global_position + forward * 2.6, 1 | 4, [get_rid()])
@@ -1389,13 +1530,19 @@ func _apply_melee_hit() -> void:
 		if col.has_method("take_damage"):
 			col.take_damage(melee_damage * mult, self, "body")
 			hit_something = true
-		hit_pos = result.position
+			hit_pos = result.position
+			if col is CharacterBody3D:
+				hit_ids[(col as CharacterBody3D).get_instance_id()] = true
+				if col.has_method("apply_melee_impulse"):
+					col.apply_melee_impulse(forward, 7.0, _combo_i == 2)
 		if col == _stasis_target:
 			_stasis_dmg += melee_damage * mult
 	# 弧形范围：怪物、动物、AI 战士。
 	for group in ["wild_enemy", "wildlife", "combatant"]:
 		for target in get_tree().get_nodes_in_group(group):
 			if target == self or not (target is CharacterBody3D):
+				continue
+			if hit_ids.has(target.get_instance_id()):
 				continue
 			if not target.alive:
 				continue
@@ -1404,6 +1551,9 @@ func _apply_melee_hit() -> void:
 				continue
 			if target.has_method("take_damage"):
 				target.take_damage(melee_damage * mult, self, "body")
+				hit_ids[target.get_instance_id()] = true
+				if target.has_method("apply_melee_impulse"):
+					target.apply_melee_impulse(forward, 7.0, _combo_i == 2)
 				hit_something = true
 				hit_pos = target.global_position + Vector3(0, 0.8, 0)
 				if target == _stasis_target:
@@ -1411,12 +1561,43 @@ func _apply_melee_hit() -> void:
 	if hit_something:
 		var sfx := get_tree().get_first_node_in_group("sfx_bank")
 		if sfx:
-			sfx.play("hit", -6.0)
-		FX.impact(hit_pos)
+			sfx.play("heavy_impact", -5.0, 0.92 if _combo_i == 2 else 1.05)
+		FX.melee_hit(hit_pos, forward, _combo_i == 2)
 		if not flurry:
 			Engine.time_scale = 0.05
 			_hitstop_end_ms = Time.get_ticks_msec() + 50
 		pitch += randf_range(0.008, 0.018)
+
+
+func _clear_sword_trail() -> void:
+	_trail_outer.clear()
+	_trail_inner.clear()
+	if _sword_trail_mesh:
+		_sword_trail_mesh.clear_surfaces()
+
+
+func _sample_sword_trail() -> void:
+	if _sword == null or _sword_trail_mesh == null:
+		return
+	_trail_outer.append(_sword.transform * Vector3(0, 0.87, 0))
+	_trail_inner.append(_sword.transform * Vector3(0, 0.11, 0))
+	while _trail_outer.size() > 8:
+		_trail_outer.pop_front()
+		_trail_inner.pop_front()
+	_sword_trail_mesh.clear_surfaces()
+	if _trail_outer.size() < 2:
+		return
+	_sword_trail_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	for i in range(_trail_outer.size()):
+		var life := float(i + 1) / float(_trail_outer.size())
+		var color := Color(0.45, 0.82, 1.0, life * (0.68 if _combo_i < 2 else 0.88))
+		if _combo_i == 2:
+			color = Color(1.0, 0.72, 0.25, life * 0.88)
+		_sword_trail_mesh.surface_set_color(color)
+		_sword_trail_mesh.surface_add_vertex(_trail_inner[i])
+		_sword_trail_mesh.surface_set_color(Color(color.r, color.g, color.b, color.a * 0.12))
+		_sword_trail_mesh.surface_add_vertex(_trail_outer[i])
+	_sword_trail_mesh.surface_end()
 
 
 func _update_sword(delta: float) -> void:
@@ -1434,6 +1615,12 @@ func _update_sword(delta: float) -> void:
 	var swipe := 0.10
 	var recover := 0.22
 	var poses := _combo_poses()
+	if _melee_target and is_instance_valid(_melee_target) and _melee_target.get("alive") != false and _swing_t < windup + swipe:
+		var assist := _melee_target.global_position - global_position
+		assist.y = 0.0
+		if assist.length_squared() > 0.01:
+			var assist_yaw := atan2(assist.x, assist.z) + PI
+			rotation.y = lerp_angle(rotation.y, assist_yaw, minf(1.0, delta * 11.0))
 	if _swing_t < windup:
 		var t := 1.0 - pow(1.0 - _swing_t / windup, 2.0)
 		_sword.position = _sword_base_pos.lerp(poses[0][0], t)
@@ -1445,14 +1632,19 @@ func _update_sword(delta: float) -> void:
 		var t := (_swing_t - windup) / swipe
 		_sword.position = poses[0][0].lerp(poses[1][0], t)
 		_sword.rotation = poses[0][1].lerp(poses[1][1], t)
+		_sample_sword_trail()
 	elif _swing_t < windup + swipe + recover:
 		var t := (_swing_t - windup - swipe) / recover
 		t = t * t * (3.0 - 2.0 * t)
 		_sword.position = poses[1][0].lerp(_sword_base_pos, t)
 		_sword.rotation = poses[1][1].lerp(_sword_base_rot, t)
+		if t > 0.45:
+			_clear_sword_trail()
 	else:
 		_swing_t = -1.0
 		_combo_i = (_combo_i + 1) % 3
+		_melee_target = null
+		_clear_sword_trail()
 		_sword.position = _sword_base_pos
 		_sword.rotation = _sword_base_rot
 

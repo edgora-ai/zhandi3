@@ -9,10 +9,12 @@ const SELF_DAMAGE := 12.0
 
 var _light: OmniLight3D
 var _fuse := 0.0
+var source: Node = null
 
 
-static func place(parent: Node, pos: Vector3, toss: Vector3) -> RemoteBomb:
+static func place(parent: Node, pos: Vector3, toss: Vector3, p_source: Node = null) -> RemoteBomb:
 	var b := RemoteBomb.new()
+	b.source = p_source
 	parent.add_child(b)
 	b.global_position = pos
 	b.linear_velocity = toss
@@ -78,7 +80,7 @@ func detonate() -> void:
 			if d > RADIUS:
 				continue
 			if target.has_method("take_damage"):
-				target.take_damage(DAMAGE * clampf(1.0 - d / RADIUS, 0.25, 1.0), self, "body")
+				target.take_damage(DAMAGE * clampf(1.0 - d / RADIUS, 0.25, 1.0), source if source else self, "body")
 	# 可炸物：裂岩等可破坏物按全额伤害结算。
 	for target in get_tree().get_nodes_in_group("crackable"):
 		var cd: float = target.global_position.distance_to(pos)

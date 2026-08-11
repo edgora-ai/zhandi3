@@ -231,22 +231,23 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.0, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
 	_play(&"hit")
 	_anim_hold = 0.25
-	if hp <= 0.0:
-		alive = false
+	if hp > 0.0:
+		return
+	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
 	if from and from.has_method("give_rupees"):
 		from.give_rupees(10)
-		Loot.spawn(get_tree().current_scene, global_position, "armor", "", 50, 2)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.8, 0, 0.5), "ammo", "", 90, 2)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.8, 0, 0.5), "monster_part", "", 3, 1)
-		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), "击破!", Color(1.0, 0.55, 0.20))
-		if _ap:
-			_play(&"die")
-			collision_layer = 0
-			collision_mask = 0
-			await get_tree().create_timer(0.8).timeout
-		queue_free()
+	Loot.spawn(get_tree().current_scene, global_position, "armor", "", 50, 2)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0.8, 0, 0.5), "ammo", "", 90, 2)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.8, 0, 0.5), "monster_part", "", 3, 1)
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), "击破!", Color(1.0, 0.55, 0.20))
+	if _ap:
+		_play(&"die")
+		collision_layer = 0
+		collision_mask = 0
+		await get_tree().create_timer(0.8).timeout
+	queue_free()
 
 
 func _physics_process(delta: float) -> void:

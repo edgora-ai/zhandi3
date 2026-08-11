@@ -21,6 +21,10 @@ var _arm_right: Node3D
 var _legs: Array[Node3D] = []
 var _flash := 0.0
 var _death_t := -1.0
+var _attack_cue: MeshInstance3D
+var _melee_windup := -1.0
+var _stagger_t := 0.0
+var _knockback := Vector3.ZERO
 
 
 func setup(p_terrain: Terrain, p_player: Player) -> void:
@@ -42,6 +46,7 @@ func _ready() -> void:
 	col.position.y = 0.78
 	add_child(col)
 	_build_model()
+	_attack_cue = FX.attack_ring(self, 0.72, Color(1.0, 0.34, 0.08, 0.76))
 
 
 func _build_model() -> void:
@@ -124,28 +129,44 @@ func get_hit_part(_shape_idx: int) -> String:
 	return "body"
 
 
+func apply_melee_impulse(direction: Vector3, strength: float, heavy: bool = false) -> void:
+	if not alive:
+		return
+	var push := direction
+	push.y = 0.0
+	if push.length_squared() < 0.01:
+		return
+	_stagger_t = 0.50 if heavy else 0.28
+	_knockback = push.normalized() * strength * (1.0 if heavy else 0.75)
+	_melee_windup = -1.0
+	_hit_cooldown = maxf(_hit_cooldown, 0.55)
+	if _attack_cue:
+		_attack_cue.visible = false
+
+
 func take_damage(amount: float, from: Variant = null, _part_name: String = "body") -> void:
 	if not alive:
 		return
 	hp -= amount
 	_flash = 0.14
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
-	if hp <= 0.0:
-		alive = false
+	if hp > 0.0:
+		return
+	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
 	if from and from.has_method("give_rupees"):
 		from.give_rupees(2)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 1, 1)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "mushroom", "", 1, 1)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.4, 0.2, 0.2), "monster_part", "", 1, 1)
-		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.4, 0), "击败!", Color(1.0, 0.55, 0.20))
-		var scene := get_tree().current_scene
-		if scene and scene.get("hud") != null and from == scene.get("player"):
-			scene.hud.add_feed("你 击败了 山地小怪")
-		set_deferred("collision_layer", 0)
-		set_deferred("collision_mask", 0)
-		_death_t = 0.0
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 1, 1)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "mushroom", "", 1, 1)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.4, 0.2, 0.2), "monster_part", "", 1, 1)
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.4, 0), "击败!", Color(1.0, 0.55, 0.20))
+	var scene := get_tree().current_scene
+	if scene and scene.get("hud") != null and from == scene.get("player"):
+		scene.hud.add_feed("你 击败了 山地小怪")
+	set_deferred("collision_layer", 0)
+	set_deferred("collision_mask", 0)
+	_death_t = 0.0
 
 
 func _physics_process(delta: float) -> void:
@@ -168,11 +189,36 @@ func _physics_process(delta: float) -> void:
 	to_player.y = 0.0
 	var distance := to_player.length()
 	var move_dir := Vector3.ZERO
-	if distance < 12.0:
+	if _stagger_t > 0.0:
+		_stagger_t = maxf(0.0, _stagger_t - delta)
+		move_dir = _knockback / 6.2
+		_knockback = _knockback.move_toward(Vector3.ZERO, delta * 14.0)
+	elif _melee_windup >= 0.0:
+		# 小怪近身也先抬棒提示，给闪避与盾反留下稳定反应窗口。
+		_melee_windup += delta
+		if _attack_cue:
+			_attack_cue.visible = true
+			var cue_phase := clampf(_melee_windup / 0.42, 0.0, 1.0)
+			_attack_cue.scale = Vector3.ONE * lerpf(1.35, 0.72, cue_phase)
+		_arm_right.rotation.x = lerpf(_arm_right.rotation.x, -2.35, minf(1.0, delta * 11.0))
+		if _melee_windup >= 0.42:
+			if distance < 2.15:
+				player.take_damage(14.0, self)
+			_melee_windup = -1.0
+			_hit_cooldown = 1.0
+			if _attack_cue:
+				_attack_cue.visible = false
+			var sfx_hit := get_tree().get_first_node_in_group("sfx_bank")
+			if sfx_hit:
+				sfx_hit.play_at("heavy_impact", global_position, -9.0, 1.18)
+	elif distance < 12.0:
 		move_dir = to_player.normalized()
 		if distance < 1.7 and _hit_cooldown <= 0.0:
-			player.take_damage(14.0, self)
-			_hit_cooldown = 1.0
+			_melee_windup = 0.0
+			move_dir = Vector3.ZERO
+			var sfx_charge := get_tree().get_first_node_in_group("sfx_bank")
+			if sfx_charge:
+				sfx_charge.play_at("enemy_charge", global_position + Vector3(0, 1.0, 0), -10.0, 1.28)
 	elif distance < 46.0:
 		move_dir = to_player.normalized() * 0.25
 		if _throw_cooldown <= 0.0:
@@ -206,7 +252,8 @@ func _physics_process(delta: float) -> void:
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(_anim_time * 9.0 + i * PI) * stride
 	_arm_left.rotation.x = -sin(_anim_time * 9.0) * stride * 0.7
-	_arm_right.rotation.x = lerpf(_arm_right.rotation.x, -1.25 if distance > 12.0 and distance < 46.0 else sin(_anim_time * 9.0) * stride, delta * 6.0)
+	if _melee_windup < 0.0:
+		_arm_right.rotation.x = lerpf(_arm_right.rotation.x, -1.25 if distance > 12.0 and distance < 46.0 else sin(_anim_time * 9.0) * stride, delta * 6.0)
 
 
 func _throw_at_player() -> void:

@@ -36,6 +36,10 @@ BELLY = mat("moblin_belly", (0.85, 0.62, 0.35))
 DARK = mat("moblin_dark", (0.10, 0.08, 0.07))
 BONE = mat("moblin_bone", (0.90, 0.82, 0.60))
 EYE = mat("moblin_eye", (1.0, 0.85, 0.20), emit=(1.0, 0.72, 0.10))
+MANE = mat("moblin_mane", (0.25, 0.055, 0.035))
+CLOTH = mat("moblin_cloth", (0.12, 0.30, 0.34))
+LEATHER = mat("moblin_leather", (0.32, 0.16, 0.07))
+METAL = mat("moblin_metal", (0.42, 0.48, 0.52))
 
 
 def sphere(name, loc, scale, material):
@@ -48,8 +52,8 @@ def sphere(name, loc, scale, material):
 	return o
 
 
-def box(name, loc, size, material):
-	bpy.ops.mesh.primitive_cube_add(size=1.0, location=loc)
+def box(name, loc, size, material, rot=(0, 0, 0)):
+	bpy.ops.mesh.primitive_cube_add(size=1.0, location=loc, rotation=rot)
 	o = bpy.context.active_object
 	o.name = name
 	o.scale = size
@@ -75,19 +79,47 @@ parts = []
 parts.append(sphere("body", (0, 0, 1.25), (0.95, 0.86, 1.05), SKIN))
 parts.append(sphere("belly", (0, 0.55, 1.15), (0.56, 0.34, 0.62), BELLY))
 parts.append(sphere("head", (0, 0.10, 2.25), (0.44, 0.40, 0.38), SKIN))
+# 加厚眉弓、长口鼻与上下颌，把头部从圆球拆成可读的兽人脸。
+parts.append(sphere("muzzle", (0, 0.44, 2.18), (0.30, 0.25, 0.19), BELLY))
+parts.append(sphere("nose", (0, 0.655, 2.25), (0.15, 0.075, 0.10), DARK))
+for sx in [-1, 1]:
+	parts.append(sphere("nostril", (sx * 0.055, 0.716, 2.27), (0.022, 0.012, 0.018), MANE))
+	parts.append(box("brow", (sx * 0.16, 0.445, 2.40), (0.17, 0.045, 0.045), MANE, rot=(0, sx * math.radians(8), sx * math.radians(-12))))
 parts.append(cone("horn", (0, 0.10, 2.72), 0.10, 0.02, 0.55, BONE))
 for sx in [-1, 1]:
 	parts.append(cone("ear", (sx * 0.44, 0.08, 2.30), 0.085, 0.015, 0.48, SKIN, rot=(0, sx * math.radians(78), 0)))
 parts.append(box("mouth", (0, 0.50, 2.12), (0.30, 0.05, 0.09), DARK))
 for i in range(3):
 	parts.append(box("tooth", (-0.08 + i * 0.08, 0.515, 2.145), (0.05, 0.03, 0.07), BONE))
+# 两颗上挑獠牙和后脑鬃冠强化远距离剪影。
+for sx in [-1, 1]:
+	parts.append(cone("tusk", (sx * 0.19, 0.57, 2.12), 0.052, 0.008, 0.25, BONE, rot=(math.radians(-10), sx * math.radians(8), 0)))
+for i in range(5):
+	z = 2.58 - i * 0.15
+	parts.append(cone("mane", (0, -0.27, z), 0.11 - i * 0.008, 0.018, 0.34, MANE, rot=(math.radians(74), 0, 0)))
 for sx in [-1, 1]:
 	parts.append(sphere("eye", (sx * 0.16, 0.44, 2.30), (0.07, 0.05, 0.07), EYE))
+	parts.append(sphere("pupil", (sx * 0.16, 0.485, 2.30), (0.026, 0.015, 0.038), DARK))
+# 腰带、分片裙甲与肩甲让大块身体拥有装备层次。
+parts.append(box("belt", (0, 0.02, 0.91), (0.86, 0.48, 0.12), LEATHER))
+parts.append(sphere("buckle", (0, 0.50, 0.91), (0.13, 0.055, 0.13), METAL))
+for sx in [-1, 0, 1]:
+	parts.append(box("loincloth", (sx * 0.25, 0.48, 0.66), (0.23, 0.055, 0.42 - abs(sx) * 0.07), CLOTH, rot=(math.radians(-7), 0, sx * math.radians(4))))
+for sx in [-1, 1]:
+	parts.append(sphere("shoulder_guard", (sx * 0.70, 0.01, 1.69), (0.34, 0.30, 0.20), METAL))
+	parts.append(cyl("bracer", (sx * 0.85, 0.01, 0.98), 0.245, 0.225, 0.32, LEATHER))
 parts.append(cyl("arm_r", (0.85, 0, 1.30), 0.22, 0.18, 1.10, SKIN))
 parts.append(cyl("club", (0.85, 0.15, 0.62), 0.16, 0.10, 1.60, DARK, rot=(math.radians(8), 0, 0)))
+# 木棒的金属箍与不对称尖刺形成武器轮廓。
+for z in [0.20, 0.48, 0.76]:
+	parts.append(cyl("club_band", (0.85, 0.15, z), 0.175, 0.175, 0.075, METAL, rot=(math.radians(8), 0, 0)))
+for i, z in enumerate([0.26, 0.52, 0.78]):
+	side = -1 if i % 2 == 0 else 1
+	parts.append(cone("club_spike", (0.85 + side * 0.19, 0.15, z), 0.075, 0.008, 0.30, BONE, rot=(0, side * math.radians(90), 0)))
 parts.append(cyl("arm_l", (-0.85, 0, 1.30), 0.22, 0.18, 1.10, SKIN))
 for sx in [-1, 1]:
 	parts.append(cyl("leg", (sx * 0.38, 0, 0.45), 0.20, 0.16, 0.90, SKIN))
+	parts.append(sphere("foot", (sx * 0.38, 0.18, 0.08), (0.25, 0.34, 0.13), DARK))
 
 for p in parts:
 	p.select_set(True)
@@ -211,6 +243,17 @@ make_clip("hit", {
 	"arml": [(1, 0, 0, 0), (3, -25, 0, 15), (10, 0, 0, 0)],
 	"armr": [(1, 0, 0, 0), (3, -25, 0, -15), (10, 0, 0, 0)],
 })
+
+# die：膝盖先软、躯干侧倒，最后停在倒地姿态，避免生命清空时瞬间消失。
+make_clip("die", {
+	"spine": [(1, 0, 0, 0), (7, -10, 0, 8), (15, -28, 0, 58), (25, -34, 0, 82)],
+	"head": [(1, 0, 0, 0), (7, -12, 0, -8), (15, -20, 0, -28), (25, -22, 0, -35)],
+	"armr": [(1, 0, 0, 0), (7, -38, 0, -22), (15, -18, 0, -58), (25, -12, 0, -72)],
+	"forearmr": [(1, 0, 0, 0), (15, 35, 0, 0), (25, 46, 0, 0)],
+	"arml": [(1, 0, 0, 0), (7, -30, 0, 28), (15, 18, 0, 64), (25, 24, 0, 78)],
+	"legl": [(1, 0, 0, 0), (7, 30, 0, 0), (15, 54, 0, 0), (25, 62, 0, 0)],
+	"legr": [(1, 0, 0, 0), (7, 18, 0, 0), (15, -20, 0, 0), (25, -30, 0, 0)],
+}, loc_keys={"spine": [(1, 0, 0, 0), (7, 0, 0, -0.16), (15, 0, 0, -0.52), (25, 0, 0, -0.72)]})
 
 reset_pose()
 scene = bpy.context.scene

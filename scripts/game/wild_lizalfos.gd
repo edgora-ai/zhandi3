@@ -23,10 +23,16 @@ var _anim := 0.0
 var _legs: Array[Node3D] = []
 var _tail: MeshInstance3D
 var _flash := 0.0
+var _attack_cue: MeshInstance3D
+var _dash_windup := -1.0
+var _dash_dir := Vector3.ZERO
+var _stagger_t := 0.0
+var _knockback := Vector3.ZERO
 
 const SIGHT := 30.0
 const DASH_CD := 3.2
 const DASH_TIME := 0.38
+const DASH_WINDUP := 0.48
 
 
 func setup(p_terrain: Terrain, p_player: Player) -> void:
@@ -48,6 +54,7 @@ func _ready() -> void:
 	add_child(col)
 	if not _try_glb_visual():
 		_build_model()
+	_attack_cue = FX.attack_ring(self, 0.92, Color(1.0, 0.42, 0.08, 0.82))
 
 
 # glb 视觉：Blender 管线生成的蒙皮蜥蜴与动画；缺失时回退到程序化模型。
@@ -76,10 +83,27 @@ func _play(clip: StringName) -> void:
 	if _ap.has_animation(clip):
 		# glTF 导入的动画默认不循环（loop_mode=0），持续状态剪辑手动开循环。
 		var anim_res := _ap.get_animation(clip)
-		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"smash", &"hit", &"die", &"buck", &"dash", &"attack"]):
+		if anim_res and anim_res.loop_mode == Animation.LOOP_NONE and not (clip in [&"windup", &"prepare", &"smash", &"hit", &"die", &"buck", &"dash", &"attack"]):
 			anim_res.loop_mode = Animation.LOOP_LINEAR
 		_cur_anim = clip
 		_ap.play(clip)
+
+
+func apply_melee_impulse(direction: Vector3, strength: float, heavy: bool = false) -> void:
+	if not alive:
+		return
+	var push := direction
+	push.y = 0.0
+	if push.length_squared() < 0.01:
+		return
+	_stagger_t = 0.52 if heavy else 0.30
+	_knockback = push.normalized() * strength * (0.88 if heavy else 0.68)
+	_dash_t = 0.0
+	_dash_windup = -1.0
+	if _attack_cue:
+		_attack_cue.visible = false
+	_play(&"hit")
+	_anim_hold = _stagger_t
 
 
 func _build_model() -> void:
@@ -180,21 +204,22 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 	_play(&"hit")
 	_anim_hold = 0.30
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), str(int(amount)), Color(1.0, 0.85, 0.25))
-	if hp <= 0.0:
-		alive = false
+	if hp > 0.0:
+		return
+	alive = false
 	if from and from.get("kills") != null:
 		from.kills += 1
 	if from and from.has_method("give_rupees"):
 		from.give_rupees(4)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 2, 1)
-		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "monster_part", "", 2, 1)
-		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), "击破!", Color(1.0, 0.55, 0.20))
-		if _ap:
-			_play(&"die")
-			collision_layer = 0
-			collision_mask = 0
-			await get_tree().create_timer(0.8).timeout
-		queue_free()
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.2, 0), "meat", "", 2, 1)
+	Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0.2, 0.3), "monster_part", "", 2, 1)
+	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 1.8, 0), "击破!", Color(1.0, 0.55, 0.20))
+	if _ap:
+		_play(&"die")
+		collision_layer = 0
+		collision_mask = 0
+		await get_tree().create_timer(0.8).timeout
+	queue_free()
 
 
 func _physics_process(delta: float) -> void:
@@ -208,15 +233,40 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	to_player.y = 0.0
 	var dist := to_player.length()
-	var dir := to_player.normalized()
+	var dir := to_player.normalized() if dist > 0.01 else Vector3.FORWARD
 	if dist > SIGHT or not player.alive:
 		velocity.x = 0.0
 		velocity.z = 0.0
+		_dash_windup = -1.0
+		if _attack_cue:
+			_attack_cue.visible = false
+	elif _stagger_t > 0.0:
+		_stagger_t = maxf(0.0, _stagger_t - delta)
+		velocity.x = _knockback.x
+		velocity.z = _knockback.z
+		_knockback = _knockback.move_toward(Vector3.ZERO, delta * 13.0)
+	elif _dash_windup >= 0.0:
+		# 先收身蓄力再沿锁定方向扑出；蓄力结束后不再追踪玩家转弯。
+		_dash_windup += delta
+		velocity.x = 0.0
+		velocity.z = 0.0
+		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z) + PI, minf(1.0, delta * 13.0))
+		if _attack_cue:
+			_attack_cue.visible = true
+			var cue_phase := clampf(_dash_windup / DASH_WINDUP, 0.0, 1.0)
+			_attack_cue.scale = Vector3.ONE * lerpf(1.45, 0.72, cue_phase) * (1.0 + sin(_anim * 24.0) * 0.06)
+		if _dash_windup >= DASH_WINDUP:
+			_dash_dir = dir
+			_dash_t = DASH_TIME
+			_dash_windup = -1.0
+			if _attack_cue:
+				_attack_cue.visible = false
+			_play(&"dash")
 	elif _dash_t > 0.0:
 		# 突进中：高速前扑。
 		_dash_t -= delta
-		velocity.x = dir.x * 11.0
-		velocity.z = dir.z * 11.0
+		velocity.x = _dash_dir.x * 11.0
+		velocity.z = _dash_dir.z * 11.0
 		if dist < 1.3:
 			player.take_damage(16.0, self)
 			_dash_t = 0.0
@@ -237,9 +287,12 @@ func _physics_process(delta: float) -> void:
 		velocity.z = want.z
 		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z) + PI, delta * 8.0)
 		if _dash_cd <= 0.0 and dist < 9.0:
-			_dash_t = DASH_TIME
+			_dash_windup = 0.0
 			_dash_cd = DASH_CD
-			_play(&"dash")
+			_play(&"prepare")
+			var sfx := get_tree().get_first_node_in_group("sfx_bank")
+			if sfx:
+				sfx.play_at("enemy_charge", global_position + Vector3(0, 0.8, 0), -8.0, 1.18)
 	velocity.y = -4.0
 	move_and_slide()
 	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
@@ -250,7 +303,7 @@ func _physics_process(delta: float) -> void:
 		_tail.rotation.y = sin(_anim * 4.0) * 0.4
 	_anim_hold = maxf(0.0, _anim_hold - delta)
 	if _ap and _anim_hold <= 0.0:
-		if _dash_t > 0.0:
+		if _dash_t > 0.0 or _dash_windup >= 0.0:
 			pass
 		elif Vector2(velocity.x, velocity.z).length() > 0.3:
 			_play(&"strafe")

@@ -318,11 +318,43 @@ func _ready() -> void:
 				anim.play(anim.get_animation_list()[0])
 			print("[pilot] anims=%s loop=%s" % [str(anim.get_animation_list() if anim else []), str(anim.get_animation(anim.get_animation_list()[0]).loop_mode if anim and not anim.get_animation_list().is_empty() else -1)])
 	if args.has("--moblintest") and _map_id == "wild":
-		var mb := get_tree().get_first_node_in_group("wild_enemy") as WildMoblin
+		var mb: WildMoblin = null
+		for enemy in get_tree().get_nodes_in_group("wild_enemy"):
+			if enemy is WildMoblin and enemy.alive:
+				mb = enemy as WildMoblin
+				break
 		if mb:
-			player.global_position = mb.global_position + Vector3(0, 0, 4.0)
+			var test_ground := Vector3(-22.0, terrain.get_height(-22.0, 104.0) + 0.05, 104.0)
+			mb.global_position = test_ground
+			mb._home = test_ground
+			player.global_position = test_ground + Vector3(0, 0, 4.0)
+			var to_mb := mb.global_position - player.global_position
+			player.rotation.y = atan2(to_mb.x, to_mb.z) + PI
+			player.pitch = -0.08
+			player.camera.rotation.x = -0.08
+			var to_player := player.global_position - mb.global_position
+			mb.rotation.y = atan2(to_player.x, to_player.z) + PI
 			mb._windup = 0.0
 			mb._play(&"windup")
+	if args.has("--liztest") and _map_id == "wild":
+		var liz: WildLizalfos = null
+		for enemy in get_tree().get_nodes_in_group("wild_enemy"):
+			if enemy is WildLizalfos and enemy.alive:
+				liz = enemy as WildLizalfos
+				break
+		if liz:
+			var liz_ground := Vector3(-22.0, terrain.get_height(-22.0, 104.0) + 0.05, 104.0)
+			liz.global_position = liz_ground
+			liz._home = liz_ground
+			player.global_position = liz_ground + Vector3(0, 0, 4.0)
+			var to_liz := liz.global_position - player.global_position
+			player.rotation.y = atan2(to_liz.x, to_liz.z) + PI
+			player.pitch = -0.14
+			player.camera.rotation.x = -0.14
+			var liz_to_player := player.global_position - liz.global_position
+			liz.rotation.y = atan2(liz_to_player.x, liz_to_player.z) + PI
+			liz._dash_windup = 0.0
+			liz._play(&"prepare")
 	if args.has("--jeeptest"):
 		var rt_jeep := get_tree().get_first_node_in_group("vehicle") as Vehicle
 		if rt_jeep:
@@ -1251,7 +1283,7 @@ func _update_wild_test() -> void:
 					break
 			if bm2:
 				var bp := bm2.global_position + Vector3(1.5, 0.3, 0)
-				var bomb := RemoteBomb.place(self, bp, Vector3.ZERO)
+				var bomb := RemoteBomb.place(self, bp, Vector3.ZERO, player)
 				var bm_hp: float = bm2.hp
 				player.alive = true
 				player.global_position = bp + Vector3(2.0, 0, 0)
@@ -1393,6 +1425,13 @@ func _update_wild_test() -> void:
 					rp_mob = e as WildMoblin
 					break
 			if rp_mob:
+				var survival_hp := rp_mob.hp
+				var survival_kills := player.kills
+				var survival_loot := get_tree().get_nodes_in_group("loot").size()
+				rp_mob.take_damage(10.0, player)
+				var nonlethal_ok := rp_mob.alive and is_equal_approx(rp_mob.hp, survival_hp - 10.0) and player.kills == survival_kills and get_tree().get_nodes_in_group("loot").size() == survival_loot
+				rp_mob.apply_melee_impulse(Vector3(1, 0, 0), 7.0, true)
+				print("[wildtest] combat nonlethal=%s stagger=%.2f" % [str(nonlethal_ok), rp_mob._stagger_t])
 				rp_mob.take_damage(999.0, player)
 			var rp1 := player.rupees
 			player.rupees = 20

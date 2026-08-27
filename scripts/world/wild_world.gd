@@ -70,15 +70,15 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		_guardian_points.append(gp)
 		var guardian := Guardian.new()
 		guardian.setup(terrain, player)
-		add_child(guardian)
 		guardian.global_position = _ground(gp, 0.05)
+		add_child(guardian)
 	# 三只莫布林：草原/谷地/营地外围的重击手。
 	for mp in [Vector3(30, 0, 60), Vector3(-60, 0, -20), Vector3(120, 0, -40)]:
 		_moblin_points.append(mp)
 		var moblin := WildMoblin.new()
 		moblin.setup(terrain, player)
-		add_child(moblin)
 		moblin.global_position = _ground(mp, 0.05)
+		add_child(moblin)
 	_spawn_npcs()
 	# 三块磁力金属块：压力板神庙、城堡门前、遗迹旁，供磁力搬运与投掷。
 	for mp in [Vector3(-136, 0, -104), Vector3(6, 0, -108), Vector3(30, 0, -84)]:
@@ -124,8 +124,8 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		_liz_points.append(lp)
 		var liz := WildLizalfos.new()
 		liz.setup(terrain, player)
-		add_child(liz)
 		liz.global_position = _ground(lp, 0.05)
+		add_child(liz)
 	_spawn_wild_loot()
 	_spawn_fish_and_circles()
 	_build_home(_ground(Vector3(-122, 0, 98)))
@@ -959,13 +959,13 @@ func _spawn_mounts() -> void:
 		horse.coat_light_color = lights[i]
 		horse.mane_color = manes[i]
 		horse.marking_color = Color(0.92, 0.86, 0.72) if i != 1 else Color(0.48, 0.44, 0.38)
-		add_child(horse)
 		horse.global_position = _ground(horse_points[i], 0.06)
+		add_child(horse)
 		horse.rotation.y = float(i) * 1.37 + 0.35
 	var bike := WildMotorcycle.new()
 	bike.terrain = terrain
-	add_child(bike)
 	bike.global_position = _ground(Vector3(-103, 0, 78), 0.08)
+	add_child(bike)
 	bike.rotation.y = -0.3
 
 
@@ -985,8 +985,8 @@ func _spawn_monsters() -> void:
 	for p in points:
 		var monster := WildMonster.new()
 		monster.setup(terrain, player)
-		add_child(monster)
 		monster.global_position = _ground(p, 0.05)
+		add_child(monster)
 		monster.rotation.y = randf_range(0, TAU)
 
 
@@ -1002,8 +1002,8 @@ func respawn_monsters() -> int:
 		if not occupied:
 			var monster := WildMonster.new()
 			monster.setup(terrain, player)
-			add_child(monster)
 			monster.global_position = _ground(p, 0.05)
+			add_child(monster)
 			monster.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	for entry in _animal_specs:
@@ -1017,9 +1017,9 @@ func respawn_monsters() -> int:
 		if not occupied2:
 			var creature := WildCreature.new()
 			creature.setup(kind, terrain, player)
-			add_child(creature)
 			var altitude := 8.0 if kind == "bird" else 0.05
 			creature.global_position = _ground(p2, altitude)
+			add_child(creature)
 			creature.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	# 莫布林/蜥蜴战士/古代守卫同样按刷新点补齐。
@@ -1027,8 +1027,8 @@ func respawn_monsters() -> int:
 		if not _enemy_near(mp, 12.0):
 			var moblin := WildMoblin.new()
 			moblin.setup(terrain, player)
-			add_child(moblin)
 			moblin.global_position = _ground(mp, 0.05)
+			add_child(moblin)
 			moblin.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	for lp in _liz_points:

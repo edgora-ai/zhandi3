@@ -204,7 +204,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not alive:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode == KEY_B:
+		# N = 背包（原 B ），B 保留给炸弹引爆，避免同一按键抢占导致 _detonate_bombs() 永不可达
+		if event.physical_keycode == KEY_N:
 			_toggle_backpack()
 			get_viewport().set_input_as_handled()
 			return
@@ -258,7 +259,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_buy(3)
 				KEY_5:
 					_buy(4)
-				KEY_E, KEY_ESCAPE, KEY_B:
+				KEY_E, KEY_ESCAPE, KEY_B, KEY_N:
 					close_shop()
 			return
 		if vehicle and event.physical_keycode != KEY_F:
@@ -1966,8 +1967,10 @@ func _use_backpack_selection() -> void:
 		elif int(backpack_items["meat"]) >= 1:
 			backpack_items["monster_part"] = count - 1
 			backpack_items["meat"] = int(backpack_items["meat"]) - 1
+			var has_elixir := _elixir_stam_end_ms > Time.get_ticks_msec()
 			_elixir_stam_end_ms = Time.get_ticks_msec() + 60000
-			max_stamina += 20.0
+			if not has_elixir:
+				max_stamina += 20.0
 			stamina = max_stamina
 			hud.add_feed("炼成精力药剂：精力全满，上限 +20（60 秒）")
 			_cook_feedback()

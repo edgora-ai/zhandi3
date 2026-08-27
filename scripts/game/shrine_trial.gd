@@ -132,6 +132,8 @@ func on_rune_hit(_rune: ShrineRune) -> void:
 
 
 func _complete() -> void:
+	if completed:
+		return
 	completed = true
 	_active = false
 	var scene := get_tree().current_scene

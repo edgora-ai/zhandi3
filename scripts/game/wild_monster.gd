@@ -180,7 +180,7 @@ func _physics_process(delta: float) -> void:
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta)
 		scale = Vector3.ONE * (1.0 + _flash * 1.2)
-	if not alive or player == null or terrain == null:
+	if not alive or player == null or not is_instance_valid(player) or terrain == null:
 		return
 	_throw_cooldown = maxf(0.0, _throw_cooldown - delta)
 	_hit_cooldown = maxf(0.0, _hit_cooldown - delta)

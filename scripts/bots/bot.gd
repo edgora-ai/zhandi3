@@ -20,7 +20,7 @@ var damage_mult := 1.0
 var regen_rate := 0.0
 var display_name := "Bot"
 var kills := 0
-var skill := 1.0               # 越大越准（误差乘数）
+var skill := 1.0               # 越大越准（1.0=基准，>1 更准）；散布用 1.8*(1.5-skill) 方向已修正
 var zone: Zone
 var terrain: Terrain
 
@@ -304,11 +304,11 @@ func get_aim_origin() -> Vector3:
 
 
 func get_aim_dir() -> Vector3:
-	if aim_target and aim_target.alive:
+	if aim_target and is_instance_valid(aim_target) and aim_target.alive:
 		var chest: Vector3 = aim_target.global_position + Vector3(0, 1.1, 0)
 		var d: Vector3 = (chest - get_aim_origin()).normalized()
 		var dist := get_aim_origin().distance_to(chest)
-		var e := deg_to_rad(1.8 * skill * (1.0 + dist * 0.015))
+		var e := deg_to_rad(1.8 * maxf(0.12, 1.5 - skill) * (1.0 + dist * 0.015))
 		d = d.rotated(Vector3.UP, randf_range(-e, e))
 		var side := d.cross(Vector3.UP)
 		if side.length() > 0.01:
@@ -324,11 +324,11 @@ func get_hit_part(shape_idx: int) -> String:
 func give_weapon(id: String) -> void:
 	if weapon.weapon_id != "":
 		return
-	weapon.set_weapon(id, Weapon.WEAPONS[id].mag, 999)
+	weapon.set_weapon(id, Weapon.WEAPONS[id].mag, Weapon.WEAPONS[id].start_reserve)
 
 
-func give_ammo(_amount: int) -> void:
-	weapon.reserve = 999
+func give_ammo(amount: int) -> void:
+	weapon.reserve = mini(999, weapon.reserve + amount)
 
 
 # ---------- 感知与决策 ----------
@@ -498,7 +498,7 @@ func _physics_process(delta: float) -> void:
 
 	# 朝向
 	var face := move_dir
-	if state == State.FIGHT and aim_target:
+	if state == State.FIGHT and aim_target and is_instance_valid(aim_target):
 		face = (aim_target.global_position - global_position)
 		face.y = 0
 	if face.length_squared() > 0.01:
@@ -532,7 +532,7 @@ func _physics_process(delta: float) -> void:
 	# 身体：两倍频起伏 + 速度前倾；站立时只剩呼吸。
 	_visual.position.y = abs(cos(_anim_t)) * 0.055 * amp + sin(_anim_t * 0.9) * 0.012 * (1.0 - amp)
 	_visual.rotation.x = lerpf(_visual.rotation.x, amp * 0.13, delta * 6.0)
-	if state == State.FIGHT and aim_target:
+	if state == State.FIGHT and aim_target and is_instance_valid(aim_target):
 		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -1.35, delta * 10.0)
 		_elbow_r.rotation.x = lerpf(_elbow_r.rotation.x, -0.06, delta * 10.0)
 		_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -0.95, delta * 10.0)
@@ -561,7 +561,7 @@ func _seek(target: Vector3) -> Vector3:
 
 
 func _fight_move() -> Vector3:
-	if not aim_target:
+	if not aim_target or not is_instance_valid(aim_target):
 		return Vector3.ZERO
 	var to_t := aim_target.global_position - global_position
 	to_t.y = 0
@@ -579,7 +579,7 @@ func _fight_move() -> Vector3:
 
 
 func _fight_fire(delta: float) -> void:
-	if not aim_target or not aim_target.alive or weapon.weapon_id == "":
+	if not aim_target or not is_instance_valid(aim_target) or not aim_target.alive or weapon.weapon_id == "":
 		return
 	if weapon.mag_left <= 0:
 		weapon.start_reload()

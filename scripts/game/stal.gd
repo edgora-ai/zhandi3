@@ -167,6 +167,12 @@ func _die(from: Variant) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# crumble 状态需在 alive=false 后仍能完成 queue_free
+	if _state == "crumble":
+		_state_t -= delta
+		if _state_t <= 0.0:
+			queue_free()
+		return
 	if not alive or player == null:
 		return
 	_anim += delta
@@ -217,11 +223,6 @@ func _physics_process(delta: float) -> void:
 		_state_t -= delta
 		if _state_t <= 0.0:
 			_state = "active"
-		return
-	if _state == "crumble":
-		_state_t -= delta
-		if _state_t <= 0.0:
-			queue_free()
 		return
 	# active：僵硬拖步逼近，近身双爪撕抓。
 	_attack_cd = maxf(0.0, _attack_cd - delta)

@@ -354,7 +354,10 @@ func apply_to(target: CharacterBody3D) -> void:
 			if target.has_signal("health_changed"):
 				target.health_changed.emit(target.hp, target.armor)
 		"medkit":
-			target.hp = minf(100.0, target.hp + amount)
+			var cap := 100.0
+			if "max_hp" in target:
+				cap = float(target.get("max_hp"))
+			target.hp = minf(cap, target.hp + amount)
 			if target.has_signal("health_changed"):
 				target.health_changed.emit(target.hp, target.armor)
 		"ammo":

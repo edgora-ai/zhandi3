@@ -288,7 +288,9 @@ func _build_top() -> void:
 
 	_world_state_label = _mk_label(_ui, "", 17, Color(0.86, 0.95, 0.76))
 	_world_state_label.position = Vector2(22, 18)
-	_world_state_label.size = Vector2(420, 54)
+	_world_state_label.size = Vector2(420, 72)
+	_world_state_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_world_state_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 
 	_capture_wrap = Control.new()
 	_capture_wrap.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -404,15 +406,27 @@ func _build_vignette() -> void:
 	_ui.add_child(_vignette)
 
 
+var _danger_on := false
+
 func flash_damage() -> void:
+	if _danger_on:
+		_vignette.modulate.a = 1.0
+		var tw2 := _vignette.create_tween()
+		tw2.tween_property(_vignette, "modulate:a", 0.25, 0.6)
+		return
 	_vignette.modulate.a = 1.0
 	var tw := _vignette.create_tween()
 	tw.tween_property(_vignette, "modulate:a", 0.0, 0.6)
 
 
 func set_danger(on: bool) -> void:
-	if on and _vignette.modulate.a < 0.25:
-		_vignette.modulate.a = 0.25
+	_danger_on = on
+	if on:
+		if _vignette.modulate.a < 0.25:
+			_vignette.modulate.a = 0.25
+	else:
+		var tw := _vignette.create_tween()
+		tw.tween_property(_vignette, "modulate:a", 0.0, 0.3)
 
 
 # ---------- 结算 ----------

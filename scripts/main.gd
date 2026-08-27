@@ -847,12 +847,14 @@ func _recompute_buffs() -> void:
 		if c.alive:
 			var skewer_value: Variant = c.get("skewer_mult")
 			var charm_value: Variant = c.get("charm_mult")
-			c.damage_mult = (float(skewer_value) if skewer_value != null else 1.0) * (float(charm_value) if charm_value != null else 1.0)
-			c.regen_rate = 0.0
-	for cp in capture_points:
-		if cp.owner_body and cp.owner_body.alive:
-			cp.owner_body.damage_mult *= 1.1
-			cp.owner_body.regen_rate += 3.0
+			var base := (float(skewer_value) if skewer_value != null else 1.0) * (float(charm_value) if charm_value != null else 1.0)
+			var has_point := false
+			for cp in capture_points:
+				if cp.owner_body == c and c.alive:
+					has_point = true
+					break
+			c.damage_mult = base * (1.1 if has_point else 1.0)
+			c.regen_rate = 3.0 if has_point else 0.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1125,8 +1127,7 @@ func _process(delta: float) -> void:
 	else:
 		hud.set_zone_text(zone.status_text())
 		hud.set_world_state("群岛战场\nM 地图选择")
-		if zone.active and zone.is_outside(player.global_position):
-			hud.set_danger(true)
+		hud.set_danger(zone.active and zone.is_outside(player.global_position))
 	# 占点提示
 	var shown := false
 	if _map_id == "wild" and wild_world:

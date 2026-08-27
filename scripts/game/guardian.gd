@@ -247,11 +247,13 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		collision_layer = 0
 		collision_mask = 0
 		await get_tree().create_timer(0.8).timeout
+		if not is_inside_tree() or is_queued_for_deletion():
+			return
 	queue_free()
 
 
 func _physics_process(delta: float) -> void:
-	if not alive or player == null or terrain == null:
+	if not alive or player == null or not is_instance_valid(player) or terrain == null:
 		return
 	_cooldown = maxf(0.0, _cooldown - delta)
 	_anim += delta

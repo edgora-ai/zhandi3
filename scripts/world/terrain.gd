@@ -380,6 +380,7 @@ func _build_water() -> void:
 
 
 func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, water_shallow: Color, water_deep: Color, rain_amount: float, ice_amount: float) -> void:
+	_season_wetness = wetness
 	if _ground_material:
 		if profile == "wild":
 			ground_tint *= Color(0.97, 1.0, 0.90, 1.0)
@@ -393,10 +394,13 @@ func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, 
 		_water_material.set_shader_parameter("ice_amount", ice_amount)
 
 
-# 天气系统专用：只改湿润与雨量，不动季节色调。
+var _season_wetness := 0.0
+
+# 天气系统专用：天气湿润与季节基底湿润取 max，避免晴天把春秋湿润覆为 0。
 func set_weather(wetness: float, rain_amount: float) -> void:
+	var eff := maxf(_season_wetness, wetness)
 	if _ground_material:
-		_ground_material.set_shader_parameter("wetness", wetness)
+		_ground_material.set_shader_parameter("wetness", eff)
 	if _water_material:
 		_water_material.set_shader_parameter("rain_amount", rain_amount)
 

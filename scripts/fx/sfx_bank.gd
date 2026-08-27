@@ -17,6 +17,10 @@ const SOUNDS := {
 	"pickup": "res://assets/sfx/pickup.wav",
 	"cook": "res://assets/sfx/cook.wav",
 	"thunder": "res://assets/sfx/thunder.wav",
+	"explosion": "res://assets/sfx/explosion.wav",
+	"freeze": "res://assets/sfx/freeze.wav",
+	"stasis": "res://assets/sfx/stasis.wav",
+	"shot_bow": "res://assets/sfx/hit.wav",
 }
 
 var _streams := {}
@@ -118,15 +122,31 @@ func set_streams_paused(paused: bool) -> void:
 		_night_player.stream_paused = paused
 
 
+func _calc_music_volumes() -> Dictionary:
+	# 统一计算三轨目标音量，避免昼夜与 Boss 互盖
+	if _boss_on:
+		return {"day": -30.0, "night": -32.0, "boss": -13.0}
+	if _night_on:
+		return {"day": -32.0, "night": -18.0, "boss": -32.0}
+	return {"day": -16.0, "night": -32.0, "boss": -32.0}
+
+func _apply_music_volumes(dur: float) -> void:
+	var vols := _calc_music_volumes()
+	var tw := create_tween()
+	tw.set_parallel(true)
+	if _music_player:
+		tw.tween_property(_music_player, "volume_db", vols["day"], dur)
+	if _night_player:
+		tw.tween_property(_night_player, "volume_db", vols["night"], dur)
+	if _boss_player:
+		tw.tween_property(_boss_player, "volume_db", vols["boss"], dur)
+
 # 昼夜音乐切换：入夜白日配乐淡出、夜曲淡入（3 秒缓慢交叉）。
 func set_night_music(night: bool) -> void:
 	if night == _night_on or _music_player == null or _night_player == null:
 		return
 	_night_on = night
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(_music_player, "volume_db", -32.0 if night else -16.0, 3.0)
-	tw.tween_property(_night_player, "volume_db", -18.0 if night else -32.0, 3.0)
+	_apply_music_volumes(3.0)
 
 
 # Boss 战音乐：进入战区渐强鼓点、压暗日常配乐；脱离战区淡回。
@@ -144,18 +164,20 @@ func set_boss_music(on: bool) -> void:
 			_boss_player.volume_db = -28.0
 			add_child(_boss_player)
 		_boss_player.play()
-		var tw := create_tween()
-		tw.set_parallel(true)
-		if _music_player:
-			tw.tween_property(_music_player, "volume_db", -30.0, 1.2)
-		tw.tween_property(_boss_player, "volume_db", -13.0, 1.2)
+		_apply_music_volumes(1.2)
 	elif _boss_player:
 		var tw2 := create_tween()
-		tw2.set_parallel(true)
-		if _music_player:
-			tw2.tween_property(_music_player, "volume_db", -16.0, 1.2)
 		tw2.tween_property(_boss_player, "volume_db", -30.0, 1.2)
 		tw2.chain().tween_callback(_boss_player.stop)
+		# 同步把日常轨拉回当前昼夜应有音量
+		if _music_player or _night_player:
+			var vols := _calc_music_volumes()
+			var tw3 := create_tween()
+			tw3.set_parallel(true)
+			if _music_player:
+				tw3.tween_property(_music_player, "volume_db", vols["day"], 1.2)
+			if _night_player:
+				tw3.tween_property(_night_player, "volume_db", vols["night"], 1.2)
 
 
 func _exit_tree() -> void:

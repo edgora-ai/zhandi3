@@ -223,7 +223,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 
 
 func _physics_process(delta: float) -> void:
-	if not alive or player == null or terrain == null:
+	if not alive or player == null or not is_instance_valid(player) or terrain == null:
 		return
 	_anim += delta
 	_dash_cd = maxf(0.0, _dash_cd - delta)

@@ -280,7 +280,7 @@ func _die(from: Variant) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not alive or terrain == null or player == null:
+	if not alive or terrain == null or player == null or not is_instance_valid(player):
 		return
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	_anim_time += delta

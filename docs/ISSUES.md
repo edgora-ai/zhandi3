@@ -1,0 +1,97 @@
+# zhandi3 全量问题清单 · 7视角评审建档
+
+> 基线 `main@f953edd` 57 `.gd` / 17746 行，Godot 4.7 Forward Plus。
+> 7视角落盘：Game Design 5.5 / Visual 5.8 / Tech 5.2 / Audio 4.2 / Systems 4.5 / QA 4.5 / Commercial 3.5，加权 ~4.5 需大改。
+> 重跑模型：Tech/Audio 用 `muse-free`（原 `gpt-5.6-sol` watchdog 超时）重跑成功；workflow `wufj3j4y7` 6/8 完成（2个 Prompt 过长失败已由直连 Agent 补齐）。
+> 同伴3阻断与 Audio/Tech 互证已合并。
+
+## 统计
+
+- 总计 49 项（含同伴3阻断去重后）：Critical 7 / High 22 / Medium 17 / Low 3
+- 关联 Task：P0 热修 #4 #5 / P1 稳定 #6 + 性能 #7 / P2 系统 #8 + 发行 #9
+- 验证基座：`godot --headless --check-only` + `--screenshot` 雨夜回归（Task #3）
+
+---
+
+## Critical（7）
+
+| # | 标题 | 视角 | 证据 | Task |
+|---|------|------|------|------|
+| C1 | `SOUNDS` 缺 `explosion/freeze/stasis/shot_bow` 静默 | Audio#1 / Game#4 | `sfx_bank.gd:5-20` 仅15条；`remote_bomb.gd:113` `player.gd:352/401` `main.gd:493` 直 `return`；`assets/sfx/*.wav` 存在 | #4 |
+| C2 | 昼夜与 Boss 音乐同改 `volume_db` 互盖 | Audio#2 | `sfx_bank.gd:122-158` 夜 `-32dB` Boss 拉回 `-30dB`；Tween 打架；`_night_player` 未 duck | #5 |
+| C3 | `export_presets.cfg` 缺失无法交付 | Tech#1 / Commercial | `project.godot:20-25` 仅 `1280x720 MSAA2x`；`export_presets.cfg` 不存在 | #9 |
+| C4 | 输入硬编码无 InputMap/手柄全失效 | Tech#2 | `player.gd:568` `KEY_WASD` 直读；全仓 `@export 0` | #9 |
+| C5 | 局外存档=0 “永久成长”归零 | Systems#1 / QA | `selected_map.txt` 仅存地图；`player.gd:26` 等实例变量 `reload_current_scene` 清零 | #8 |
+| C6 | IP 直接下架风险 | Commercial | `README.md:1-3` 战地3/旷野之息/海拉鲁等 `main.gd:622` | #9 |
+| C7 | 无复玩闭环/错误大逃杀定位 | Commercial | `main.gd:4` `BOT_COUNT 24` 短局；无网络/匹配/反作弊 | #9 |
+
+## High（22）
+
+| # | 标题 | 视角 | 证据 | Task |
+|---|------|------|------|------|
+| H1 | B 键背包抢占炸弹引爆永不可达 | Game#1 / QA#3 / Peer B | `player.gd:207 return` 抢占 `285` | #4 |
+| H2 | 据点 `1.1^n` 指数叠加 | Peer C | `main.gd:854` 每0.5s `*=1.1` | #4 |
+| H3 | Bot 精度反向+无限资源 | Game#2 | `bot.gd:311 1.8*skill` 越大越偏；`327 999` 备弹 | #4 |
+| H4 | 四大 Boss 攻击全哑 | Audio#3 | `guardian.gd:329` `hinox.gd:172` `wild_dragon.gd:252` `wizzrobe.gd:102` 仅 `FX` | #5 |
+| H5 | 全 Master 单总线无分层压限 | Audio#4 | `sfx_bank.gd:40,45` 全 `Master`；无 `bus_layout` | #5 |
+| H6 | 移动/Foley 大面积哑区 | Audio#5 | `grep footstep 0`；`player.gd:598-813` `horse.gd` 零 `sfx` | #5 |
+| H7 | AI O(N²)轮询+射线爆发必掉帧 | Tech#3 | `bot.gd:384` 31Bot≈3000 ray/s；Wild 无休眠 | #7 |
+| H8 | 全同步 `load()`+单帧烘焙黑屏 | Tech#4 | `terrain.gd:212` 193x193 同步；`wild_world.gd:32` 数百 `add_child` | #7 |
+| H9 | Player 超级 `_physics_process` | Tech#5 | `player.gd:598` 6组扫描+ImmediateMesh每帧重建 | #7 |
+| H10 | HUD 固定像素溢出 | Visual#1 | `hud.gd:547` `660x490` 等 | #5 |
+| H11 | 世界状态 420x54 裁切 | Visual#2 | `hud.gd:289` vs `main.gd:1121` 3行 | #5 |
+| H12 | 毒圈红晕只开不关 | Visual#3 | `hud.gd:413` 仅 `on=true` | #5 |
+| H13 | 小地图非导航 | Visual#4 | `hud.gd:136` 仅12色块 | #5 |
+| H14 | 世界生成 `_home` 原点 | QA#2 | `wild_world.gd:70` 先 `add_child` 后坐标 | #6 |
+| H15 | Stal `queue_free` 不可达泄漏 | QA#1 | `stal.gd:172` `not alive return` 挡 `220` | #6 |
+| H16 | Bot/敌人 `is_instance_valid` 缺失 | QA#4,5 | `bot.gd:305` 等直访 `aim_target.alive` | #6 |
+| H17 | 载具固定偏移无 shape_test | QA | `vehicle.gd:360` 等 | #6 |
+| H18 | `global_position` 直写绕过物理 | QA | `player.gd:1711` `wizzrobe.gd:115` | #6 |
+| H19 | 种子预算无上限无消耗出口 | Systems#2,3 | `player.gd:1010` `max_stamina` 无封顶；`wild_world.gd:1431` 多源；5项商店 | #8 |
+| H20 | 成长与经济中后期溢出 | Systems#3 | `fish_spot.gd:37` 60s +血月多源 vs 护甲满甲归零 | #8 |
+| H21 | 结算不进局外 | Systems#7 | `main.gd:765` `hud.gd:420` 仅展示 | #8 |
+| H22 | 无输入/本地化/无障碍 | Commercial | `project.godot` 无 InputMap；中文硬编码 | #9 |
+
+## Medium（17）
+
+| # | 标题 | 视角 | 证据 | Task |
+|---|------|------|------|------|
+| M1 | 医疗上限 `100` 与 `max_hp` 成长不一致 | Game#6 | `loot.gd:345` 写死100 vs `player.gd:1027` `max_hp+10` | #4 |
+| M2 | 载具无成本压缩探索 | Game#7 | `vehicle.gd:360` 27速 无燃料 | #8 |
+| M3 | 神庙同模板无分层 | Game#8 | `shrine_trial.gd:134` 均 `completed` 开门 | #8 |
+| M4 | 季节湿润被 Weather 覆盖 | Visual#5 | `weather.gd:114` vs `terrain.gd:382` | #5 |
+| M5 | 纯颜色编码无冗余 | Visual | `hud.gd:661` 灰/青/绿 | #5 |
+| M6 | `_puff` 实心球 | Visual | `fx.gd:100` 无 alpha/碎片 | #5 |
+| M7 | 飘字 `no_depth_test` 无合并 | Visual | `damage_number.gd:10` | #5 |
+| M8 | 雨雪 CPU 逐实例 `set_instance_transform` | Visual#9 | `weather.gd:15` 700+420 每帧 | #7 |
+| M9 | 雨雪只有雷声 | Audio#6 | `weather.gd:96` 仅雷 | #5 |
+| M10 | 3D 衰减不统一 | Audio#7 | `sfx_bank.gd:46 unit6` vs 地区声 `unit80` | #5 |
+| M11 | Haptics/镜头缺失 | Audio#8 | 零 `vibration/shake`；顿帧50ms | #5 |
+| M12 | `time_scale` 无栈泄漏 | Tech#6 | `player.gd:580/1077` 共用 `time_scale` | #7 |
+| M13 | 零 `@export` 魔法数 | Tech#7 | 全仓 `@export 0` | #7 |
+| M14 | 渲染无分级 | Tech#8 | `terrain.gd:124 res192` 常驻 | #7 |
+| M15 | 体力药 `max_stamina+=20` 无层数 | QA | `player.gd:1969` 叠加 | #6 |
+| M16 | `await` 缺 `is_inside_tree` | QA | `guardian.gd:236` 等 | #6 |
+| M17 | `O(N²)` 组扫描 | QA | `wild_npc.gd:297` 等每帧 `get_nodes_in_group` | #6 |
+
+## Low（3）
+
+| # | 标题 | 视角 | 证据 | Task |
+|---|------|------|------|------|
+| L1 | 神庙统计 `shrines=2` 与实际4座不一致 | Game#9 | `wild_world.gd:23 vs 120` | #8 |
+| L2 | 缺 Stinger/语音记忆点 | Audio#9 | `hinox.gd:117` 等仅 `pickup` | #5 |
+| L3 | 启动统计与隐私/EULA缺失 | Commercial | `docs/` 无 | #9 |
+
+---
+
+## 路线图
+
+- **Phase 1 阻断 4-6周：** #4 P0 5项 + #5 音画/HUD + `export_presets`/`InputMap` + 存档 + 异步/分帧 + IP 清理并行
+- **Phase 2 体验 6-8周：** AI/Player 性能 + 成长预算 + HUD响应式/小地图 + 载具差异化
+- **Phase 3 内容 8-12周：** 区域随机池/血月变体、神庙分层、野外风险层、讨伐分阶段
+- **Phase 4 发行 4-6周：** 商店页/视频/胶囊、手柄/本地化、LICENSE/NOTICE、隐私/EULA、分级、LOD基准；定价 免费/6-15试玩→18-30买断
+
+## 验证
+
+- 每项修复后 `godot --headless --check-only` + `--screenshot` 雨夜回归（Task #3）
+- 本文件为唯一真实来源，Top15 Backlog 以此为准

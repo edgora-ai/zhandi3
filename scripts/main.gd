@@ -694,6 +694,9 @@ func _on_npc_talk(npc: Node) -> void:
 				1:
 					var got := int(player.backpack_items["mushroom"]) - _quest_mushroom_base
 					if got >= 3:
+						player.backpack_items["mushroom"] = int(player.backpack_items["mushroom"]) - 3
+						player.backpack_changed.emit()
+						player._refresh_backpack()
 						quest_states[qid] = 3
 						player.armor = minf(100.0, player.armor + 25.0)
 						player.health_changed.emit(player.hp, player.armor)

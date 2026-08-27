@@ -457,7 +457,16 @@ func _physics_process(delta: float) -> void:
 		return
 	_think -= delta
 	if _think <= 0.0:
-		_think = 0.3
+		# 远距 AI（>80m 无可见目标）降频至 0.5Hz，近距保持 3Hz
+		var far := true
+		if aim_target and is_instance_valid(aim_target) and aim_target.alive:
+			far = false
+		else:
+			for c in get_tree().get_nodes_in_group("combatant"):
+				if c != self and c.alive and global_position.distance_to(c.global_position) < 80.0:
+					far = false
+					break
+		_think = 0.5 if far else 0.3
 		_think_tick()
 
 	var move_dir := Vector3.ZERO

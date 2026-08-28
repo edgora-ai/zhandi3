@@ -54,8 +54,8 @@
 | H12 | 毒圈红晕只开不关 | `hud.gd:413` 仅 on=true | Phase2 #5 | 已修（set_danger 对称开关） | 进/出圈红晕对称开关；探针来回各 5 次均正确 |
 | H13 | 小地图非导航 | `hud.gd:136` 仅12色块 | Phase2 #5 | 已修（安全圈可视） | 小地图绘制安全圈/据点/方向/距离（与 `zone` 同源坐标）；与状态文本一致 |
 | H14 | 世界生成 `_home` 原点 | `wild_world.gd:70` 先 add_child 后坐标 | Phase1 #6 | 部分已修 | `--wildtest` 零 `!is_inside_tree()`；抽检 WildMonster/Guardian/Fish 等生成点距原点误差 <0.01 |
-| H15 | Stal `queue_free` 不可达泄漏 | `stal.gd:172 not alive return` 挡 `220` | Phase1 #6 | 待修 | 头颅崩解/回收必达；长测节点数不泄漏；`alive==false` 分支仍可释放 |
-| H16 | Bot/敌人 `is_instance_valid` 缺失 | `bot.gd:305` 直访 `aim_target.alive` | Phase1 #6 | 待修 | 所有跨实例 `alive` 访问前 `is_instance_valid`；`--sim` 1 场零悬垂 |
+| H15 | Stal `queue_free` 不可达泄漏 | `stal.gd:172 not alive return` 挡 `220` | Phase1 #6 | 已修（crumble 早返于 not alive 前） | 头颅崩解/回收必达；长测节点数不泄漏；`alive==false` 分支仍可释放 |
+| H16 | Bot/敌人 `is_instance_valid` 缺失 | `bot.gd:305` 直访 `aim_target.alive` | Phase1 #6 | 已修（全路径守卫） | 所有跨实例 `alive` 访问前 `is_instance_valid`；`--sim` 1 场零悬垂 |
 | H17 | 载具固定偏移无 shape_test | `vehicle.gd:360` 等 | Phase1 #6 | 待修 | 上下车前 shape_test / 安全落脚检测；墙内/水面不刷出 |
 | H18 | `global_position` 直写绕过物理 | `player.gd:1711` `wizzrobe.gd:115` | Phase1 #6 | 待修 | 传送/闪现走 `CharacterBody` 安全路径或带碰撞校验；无穿墙 |
 | H19 | 种子预算无上限无消耗出口 | `player.gd:1010` `max_stamina` 无封顶；`wild_world.gd:1431` 多源 | Phase2 #8 | 待修 | 种子精力有封顶；全图种子总数与商店/掉落预算审计通过；溢出回归为 0 |

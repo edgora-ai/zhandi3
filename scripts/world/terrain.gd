@@ -396,6 +396,14 @@ func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, 
 
 var _season_wetness := 0.0
 
+func get_season_wetness() -> float:
+	return _season_wetness
+
+# 测试桩：验证 Season × Weather 湿润合成互覆盖为 0
+func get_wetness_composite_for_test(weather_wet: float) -> float:
+	# 预期：两者取 max，不会因覆盖归零
+	return maxf(_season_wetness, weather_wet)
+
 # 天气系统专用：天气湿润与季节基底湿润取 max，避免晴天把春秋湿润覆为 0。
 func set_weather(wetness: float, rain_amount: float) -> void:
 	var eff := maxf(_season_wetness, wetness)

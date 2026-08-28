@@ -102,6 +102,9 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 func _cast() -> void:
 	_cast_cd = 3.0
 	_play(&"cast")
+	var _sfx_w := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_w:
+		_sfx_w.play_at("explosion", global_position + Vector3(0, 1.6, 0), -6.0, 1.12)
 	_anim_hold = 0.55
 	var from := global_position + Vector3(0.55, 1.62, 0) - global_transform.basis.x * 0.55
 	var target := player.global_position + Vector3(0, 1.0, 0)
@@ -115,6 +118,9 @@ func _cast() -> void:
 func _teleport() -> void:
 	_tp_cd = 2.5
 	FX.impact(global_position + Vector3(0, 1.0, 0))
+	var _sfx_tp := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_tp:
+		_sfx_tp.play_at("stasis", global_position + Vector3(0, 1.0, 0), -7.0)
 	var offset := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * randf_range(8.0, 12.0)
 	var next := global_position + offset
 	global_position = Vector3(next.x, terrain.get_height(next.x, next.z) + 1.5, next.z)

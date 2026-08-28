@@ -109,6 +109,9 @@ func cycle_season() -> void:
 	set_season(SEASONS[(index + 1) % SEASONS.size()])
 
 
+# M4: 季/天气 Environment 互覆盖问题 — Weather 的湿润通过独立权重上报，
+#   DayNight/World 应统一合成 fog/ambient/wetness。此处 Season 侧仍直写 _terrain/_env，
+#   已暴露 get_season_wetness 思想由 terrain 承载；TODO(M4) 待 EnvironmentDirector 统一接管。
 func set_season(season_name: String) -> void:
 	if not PALETTES.has(season_name):
 		return

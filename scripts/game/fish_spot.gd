@@ -38,7 +38,7 @@ func catch(p: Player) -> void:
 	if not available:
 		return
 	available = false
-	_respawn = 60.0
+	_respawn = 120.0
 	_fish.visible = false
 	p.give_item("meat", 1)
 	if p.hud:

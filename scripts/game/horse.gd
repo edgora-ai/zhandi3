@@ -46,6 +46,7 @@ var _buck_t := 0.0
 var _graze_t := 0.0
 var _call_target: Player = null
 var _call_t := 0.0
+var _gallop_cd := 0.0
 
 
 func whistle_call(p: Player) -> void:
@@ -363,6 +364,8 @@ func _wedge(parent: Node3D, half_w: float, half_h: float, front_w: float, front_
 func enter(p: Player) -> void:
 	if driver:
 		return
+	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
+		return
 	# 驯服：未亲近的马第一次被骑可能尥蹶子把人甩下来；安抚一次后永久温顺。
 	if not bonded and randf() < 0.45:
 		bonded = true
@@ -596,8 +599,20 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 			_play(&"graze")
 		elif speed_ratio > 0.75:
 			_play(&"gallop")
+			_gallop_cd -= delta
+			if _gallop_cd <= 0.0:
+				_gallop_cd = 0.32
+				var _sfx_hg := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_hg:
+					_sfx_hg.play_at("heavy_impact", global_position, -14.0, randf_range(0.92, 1.08))
 		elif speed_ratio > 0.4:
 			_play(&"trot")
+			_gallop_cd -= delta * 0.5
+			if _gallop_cd <= 0.0:
+				_gallop_cd = 0.45
+				var _sfx_ht := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_ht:
+					_sfx_ht.play_at("heavy_impact", global_position, -16.0, randf_range(0.88, 1.02))
 		elif actual_speed > 0.15:
 			_play(&"walk")
 		else:

@@ -167,6 +167,8 @@ func _box(parent: Node3D, size: Vector3, mat: Material, pos: Vector3, rot: Vecto
 func enter(p: Player) -> void:
 	if driver:
 		return
+	if Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
+		return
 	driver = p
 	driver.vehicle = self
 	driver.visible = false

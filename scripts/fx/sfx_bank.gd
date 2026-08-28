@@ -36,20 +36,32 @@ var _night_player: AudioStreamPlayer
 var _night_on := false
 
 
+func _bus_for(name: String) -> String:
+	# 业务分 bus：与 audio/bus_layout.tres 四分轨一致，缺省回落 SFX
+	if name in ["music", "music_night", "boss", "victory", "defeat"]:
+		return "Music"
+	if name in ["ambience", "snowwind", "volcano", "rain_loop", "snow_loop"]:
+		return "Ambience"
+	if name in ["pickup", "capture", "cook"]:
+		return "UI"
+	return "SFX"
+
+
 func _ready() -> void:
 	for key in SOUNDS:
 		_streams[key] = load(SOUNDS[key])
 	for i in range(8):
 		var p := AudioStreamPlayer.new()
-		p.bus = "Master"
+		p.bus = "SFX"
 		add_child(p)
 		_pool_2d.append(p)
 	for i in range(16):
 		var p := AudioStreamPlayer3D.new()
-		p.bus = "Master"
-		p.max_distance = 120.0
+		p.bus = "SFX"
+		# M10 统一 3D 衰减：与区域环境声同模型同尺度，近/远场一致
+		p.max_distance = 90.0
 		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
-		p.unit_size = 6.0
+		p.unit_size = 18.0
 		add_child(p)
 		_pool_3d.append(p)
 
@@ -59,10 +71,12 @@ func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 		return
 	var p := _pool_2d[_idx_2d]
 	_idx_2d = (_idx_2d + 1) % _pool_2d.size()
+	p.bus = _bus_for(name)
 	p.stream = _streams[name]
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.96, 1.04)
 	p.play()
+	print("[sfx] play %s bus=%s vol=%.1f" % [name, p.bus, volume_db])
 
 
 func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 1.0) -> void:
@@ -70,11 +84,13 @@ func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 
 		return
 	var p := _pool_3d[_idx_3d]
 	_idx_3d = (_idx_3d + 1) % _pool_3d.size()
+	p.bus = _bus_for(name)
 	p.global_position = pos
 	p.stream = _streams[name]
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.94, 1.06)
 	p.play()
+	print("[sfx] play_at %s bus=%s pos=%s" % [name, p.bus, str(pos)])
 
 
 ## 循环背景音乐 + 环境音（风/海浪/鸟鸣）
@@ -83,6 +99,7 @@ func start_ambience() -> void:
 	music.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	music.loop_end = int(music.get_length() * music.mix_rate)
 	_music_player = AudioStreamPlayer.new()
+	_music_player.bus = "Music"
 	_music_player.stream = music
 	_music_player.volume_db = -16.0
 	add_child(_music_player)
@@ -92,6 +109,7 @@ func start_ambience() -> void:
 	amb.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	amb.loop_end = int(amb.get_length() * amb.mix_rate)
 	_ambience_player = AudioStreamPlayer.new()
+	_ambience_player.bus = "Ambience"
 	_ambience_player.stream = amb
 	_ambience_player.volume_db = -13.0
 	add_child(_ambience_player)
@@ -101,6 +119,7 @@ func start_ambience() -> void:
 	nmusic.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	nmusic.loop_end = int(nmusic.get_length() * nmusic.mix_rate)
 	_night_player = AudioStreamPlayer.new()
+	_night_player.bus = "Music"
 	_night_player.stream = nmusic
 	_night_player.volume_db = -32.0
 	add_child(_night_player)
@@ -160,6 +179,7 @@ func set_boss_music(on: bool) -> void:
 			track.loop_mode = AudioStreamWAV.LOOP_FORWARD
 			track.loop_end = int(track.get_length() * track.mix_rate)
 			_boss_player = AudioStreamPlayer.new()
+			_boss_player.bus = "Music"
 			_boss_player.stream = track
 			_boss_player.volume_db = -28.0
 			add_child(_boss_player)

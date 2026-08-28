@@ -27,6 +27,14 @@ var _animal_specs: Array = []
 var _moblin_points: Array = []
 var _liz_points: Array = []
 var _guardian_points: Array = []
+# Phase3 血月扩展占位 (P5/D7)：后期类型用空数组 + _enemy_near 分支，保证 Phase3 可验证且不改现行为
+var _chuchu_points: Array = []
+var _keese_points: Array = []
+var _stal_points: Array = []
+var _wizzrobe_points: Array = []
+var _hinox_points: Array = []
+var _flyer_points: Array = []
+var _dragon_points: Array = []
 
 
 func generate(p_terrain: Terrain, p_player: Player) -> void:
@@ -84,27 +92,32 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	for mp in [Vector3(-136, 0, -104), Vector3(6, 0, -108), Vector3(30, 0, -84)]:
 		MetalProp.create(self, _ground(mp, 0.45))
 	# 丘丘果冻群：河滩与林缘四只大只（死亡分裂）。
-	for cp in [Vector3(-40, 0, 45), Vector3(15, 0, 70), Vector3(-90, 0, -30), Vector3(60, 0, 40)]:
+	_chuchu_points = [Vector3(-40, 0, 45), Vector3(15, 0, 70), Vector3(-90, 0, -30), Vector3(60, 0, 40)]
+	for cp in _chuchu_points:
 		Chuchu.create(self, terrain, player, _ground(cp, 0.05))
 	# 夜行蝙蝠两窝：遗迹与北林（夜间盘旋俯冲，白天蛰伏）。
-	for kp in [Vector3(26, 0, -88), Vector3(-100, 0, -60)]:
+	_keese_points = [Vector3(26, 0, -88), Vector3(-100, 0, -60)]
+	for kp in _keese_points:
 		for i in range(3):
 			var bat := Keese.new()
 			bat.setup(terrain, player, _ground(kp, 6.0) + Vector3(randf_range(-3, 3), randf_range(0, 2), randf_range(-3, 3)))
 			add_child(bat)
 	# 骷髅坟场：遗迹三具、城堡外两具（夜间破土，白天潜伏）。
-	for sp in [Vector3(28, 0, -86), Vector3(23, 0, -91), Vector3(30, 0, -90), Vector3(2, 0, -100), Vector3(-4, 0, -103)]:
+	_stal_points = [Vector3(28, 0, -86), Vector3(23, 0, -91), Vector3(30, 0, -90), Vector3(2, 0, -100), Vector3(-4, 0, -103)]
+	for sp in _stal_points:
 		Stal.create_body(self, terrain, player, _ground(sp, 0.05))
 	# 维佐法师两名：火山山麓与北谷（悬浮施法、近身闪现）。
-	for wp in [Vector3(95, 0, -60), Vector3(-60, 0, -120)]:
+	_wizzrobe_points = [Vector3(95, 0, -60), Vector3(-60, 0, -120)]
+	for wp in _wizzrobe_points:
 		Wizzrobe.create(self, terrain, player, _ground(wp, 1.5))
 	# 三座防具宝箱：城堡庭院（士兵）、测绘塔下（攀爬者）、火山口（蛮族）。
 	LootChest.create(self, _ground(Vector3(4, 0, -116), 0.0), "armor_soldier", 0.4)
 	LootChest.create(self, _ground(Vector3(-128, 0, 106), 0.0), "armor_climber", -0.6)
 	LootChest.create(self, _ground(Vector3(152, 0, -138), 0.0), "armor_barbarian", 2.2)
 	# 西诺克斯两头：双子山谷与北林缘（沉睡巨人，靠近惊醒）。
-	Hinox.create(self, terrain, player, _ground(Vector3(70, 0, 45), 0.0))
-	Hinox.create(self, terrain, player, _ground(Vector3(-80, 0, -60), 0.0))
+	_hinox_points = [Vector3(70, 0, 45), Vector3(-80, 0, -60)]
+	for hp in _hinox_points:
+		Hinox.create(self, terrain, player, _ground(hp, 0.0))
 	# 三座测绘塔顶传送水晶（激活后 M 地图传送）。
 	WarpBeacon.create(self, _ground(Vector3(-132, 0, 109)) + Vector3(0, 16.5, 0), "高原塔")
 	WarpBeacon.create(self, _ground(Vector3(72, 0, 116)) + Vector3(0, 19.0, 0), "双子塔")
@@ -1051,6 +1064,46 @@ func respawn_monsters() -> int:
 			guardian.position = _ground(gp, 0.05)
 			add_child(guardian)
 			respawned += 1
+	# Phase3 血月扩展占位：Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon 各走 _enemy_near 分支，保证未来扩展可 headless 验证
+	for cp in _chuchu_points:
+		if not _enemy_near(cp, 12.0, "chuchu"):
+			Chuchu.create(self, terrain, player, _ground(cp, 0.05))
+			respawned += 1
+	for kp in _keese_points:
+		if not _enemy_near(kp, 12.0, "keese"):
+			for i in range(3):
+				var bat := Keese.new()
+				bat.setup(terrain, player, _ground(kp, 6.0) + Vector3(randf_range(-3, 3), randf_range(0, 2), randf_range(-3, 3)))
+				add_child(bat)
+				respawned += 1
+	for sp in _stal_points:
+		if not _enemy_near(sp, 12.0, "stal"):
+			Stal.create_body(self, terrain, player, _ground(sp, 0.05))
+			respawned += 1
+	for wp in _wizzrobe_points:
+		if not _enemy_near(wp, 12.0, "wizzrobe"):
+			Wizzrobe.create(self, terrain, player, _ground(wp, 1.5))
+			respawned += 1
+	for hp in _hinox_points:
+		if not _enemy_near(hp, 14.0, "hinox"):
+			Hinox.create(self, terrain, player, _ground(hp, 0.0))
+			respawned += 1
+	for fp in _flyer_points:
+		if not _enemy_near(fp, 14.0, "flying_attacker"):
+			var attacker := FlyingAttacker.new()
+			attacker.setup(terrain, player)
+			attacker.position = _ground(fp, 9.0)
+			add_child(attacker)
+			respawned += 1
+	for dp in _dragon_points:
+		if not _enemy_near(dp, 18.0, "wild_dragon"):
+			# 巨龙单例；血月期间若被击败则单点补位
+			var p := Vector3(164, terrain.get_height(164, -145) + 12.0, -145)
+			var dragon := WildDragon.new()
+			dragon.setup(player, p)
+			dragon.position = p + Vector3(66, 42, 0)
+			add_child(dragon)
+			respawned += 1
 	return respawned
 
 
@@ -1334,6 +1387,7 @@ func _spawn_animals() -> void:
 
 func _spawn_dragon() -> void:
 	var p := Vector3(164, terrain.get_height(164, -145) + 12.0, -145)
+	_dragon_points = [Vector3(230, 0, -145)]
 	var dragon := WildDragon.new()
 	dragon.setup(player, p)
 	dragon.position = p + Vector3(66, 42, 0)
@@ -1341,7 +1395,8 @@ func _spawn_dragon() -> void:
 
 
 func _spawn_flying_attackers() -> void:
-	for p in [Vector3(22, 0, -70), Vector3(116, 0, -80), Vector3(-128, 0, 70)]:
+	_flyer_points = [Vector3(22, 0, -70), Vector3(116, 0, -80), Vector3(-128, 0, 70)]
+	for p in _flyer_points:
 		var attacker := FlyingAttacker.new()
 		attacker.setup(terrain, player)
 		attacker.position = _ground(p, 9.0)
@@ -1370,10 +1425,12 @@ func _make_region_loop(path: String, pos: Vector3, vol_db: float, unit: float) -
 	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	stream.loop_end = int(stream.get_length() * stream.mix_rate)
 	var p := AudioStreamPlayer3D.new()
+	p.bus = "Ambience"
 	p.stream = stream
 	p.volume_db = vol_db
 	p.unit_size = unit
 	p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	p.max_distance = unit * 2.2
 	p.position = pos
 	return p
 

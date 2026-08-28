@@ -579,7 +579,7 @@ func show_backpack(lines: Array[String], selected: int) -> void:
 	_mk_rect(_backpack_panel, Vector2(8, 8), Vector2(644, 474), Color(0.09, 0.17, 0.16, 0.88))
 	var title := _mk_label(_backpack_panel, "旅 行 背 包", 31, Color(0.97, 0.83, 0.42))
 	title.position = Vector2(30, 24)
-	var subtitle := _mk_label(_backpack_panel, "↑↓ / W S 选择    E / Enter 取出或使用    X 存入当前武器    N 关闭（B 引爆）", 15, Color(0.68, 0.88, 0.83))
+	var subtitle := _mk_label(_backpack_panel, "↑↓/W S/move_*: 选择  E/interact/Enter:取出或使用  X/bomb_place:存入当前武器  N/backpack:关闭(手柄Select)  B/detonate:引爆(手柄B)", 15, Color(0.68, 0.88, 0.83))
 	subtitle.position = Vector2(30, 70)
 	var scroll := ScrollContainer.new()
 	scroll.position = Vector2(25, 102)
@@ -709,8 +709,15 @@ func show_journal(entries: Array) -> void:
 	for e in entries:
 		var st := int(e.get("state", 0))
 		var bullet := Color(0.45, 0.48, 0.52) if st == 0 else (Color(0.35, 0.75, 0.85) if st == 1 else Color(0.45, 0.85, 0.45))
+		# M5: 除颜色外加图标与文字冗余，避免纯颜色编码（色觉辅助）
+		var _status_icon := "○" if st == 0 else ("◎" if st == 1 else "✔")
+		var _status_text := "未接" if st == 0 else ("进行" if st == 1 else "完成")
 		_mk_rect(_journal_panel, Vector2(34, row + 5), Vector2(15, 15), bullet)
-		var name_l := _mk_label(_journal_panel, str(e.get("name", "")), 21, Color(0.95, 0.92, 0.80) if st < 3 else Color(0.60, 0.80, 0.58))
+		var _icon_l := _mk_label(_journal_panel, _status_icon, 14, Color.WHITE)
+		_icon_l.position = Vector2(36, row + 5)
+		_icon_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# 文字冗余：在描述前追加状态词，便于读屏与色弱用户
+		var name_l := _mk_label(_journal_panel, "[%s] %s" % [_status_text, str(e.get("name", ""))], 21, Color(0.95, 0.92, 0.80) if st < 3 else Color(0.60, 0.80, 0.58))
 		name_l.position = Vector2(62, row)
 		var prog_l := _mk_label(_journal_panel, str(e.get("progress", "")), 17, Color(0.85, 0.80, 0.60))
 		prog_l.position = Vector2(468, row + 3)

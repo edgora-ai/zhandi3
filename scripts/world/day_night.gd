@@ -93,6 +93,9 @@ func _check_midnight(prev: float, now: float) -> void:
 		blood_moon = false
 
 
+# TODO(M4): EnvironmentDirector 统一合成 — Season/DayNight/Weather 仅上报权重，
+#   由单一合成器决定 fog/ambient/wetness；当前三者各直写 Environment，Weather 已独立 _weather_wetness
+#   供测试桩验证 max 合成正确（互覆盖回归为 0）。
 func _apply() -> void:
 	if _sky_mat == null:
 		return

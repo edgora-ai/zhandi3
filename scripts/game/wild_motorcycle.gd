@@ -271,6 +271,8 @@ func _cylinder(radius: float, height: float, mat: Material, pos: Vector3, rot: V
 func enter(p: Player) -> void:
 	if driver:
 		return
+	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
+		return
 	driver = p
 	driver.vehicle = self
 	driver.visible = false

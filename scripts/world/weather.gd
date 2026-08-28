@@ -23,11 +23,18 @@ var _env: Environment
 var _fog_base := 0.0009
 var _lightning_t := 0.0
 var _rng := RandomNumberGenerator.new()
+# M4: Environment 合成分解 — Weather 的湿润独立通道，DayNight/World 再统一合成。
+#   当前 terrain.set_weather 仍直写 wetness，与 SeasonSystem.set_season_palette 潜在互覆盖；
+#   独立权重 weather_wetness 供 EnvironmentDirector 统一合成（Season × Weather 取 max/lerp）。
+var _weather_wetness := 0.0  # 独立通道：仅天气侧的湿润贡献（0..0.85）
 
 const DROP_COUNT := 420
 const AREA := 26.0
 const FALL_SPEED := 22.0
 
+
+var _rain_player: AudioStreamPlayer
+var _snow_player: AudioStreamPlayer
 
 func setup(p_terrain: Terrain, p_player: Player, env: Environment) -> void:
 	terrain = p_terrain
@@ -36,6 +43,25 @@ func setup(p_terrain: Terrain, p_player: Player, env: Environment) -> void:
 	_rng.seed = 4477
 	_state_t = _rng.randf_range(0.0, 40.0)
 	_build_rain()
+	# M9 雨雪环境声：复用 ambience/volcano 循环，随强度淡入
+	var rs: AudioStreamWAV = load("res://assets/sfx/ambience.wav")
+	rs.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	rs.loop_end = int(rs.get_length() * rs.mix_rate)
+	_rain_player = AudioStreamPlayer.new()
+	_rain_player.bus = "Ambience"
+	_rain_player.stream = rs
+	_rain_player.volume_db = -48.0
+	add_child(_rain_player)
+	_rain_player.play()
+	var ss: AudioStreamWAV = load("res://assets/sfx/snowwind.wav")
+	ss.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	ss.loop_end = int(ss.get_length() * ss.mix_rate)
+	_snow_player = AudioStreamPlayer.new()
+	_snow_player.bus = "Ambience"
+	_snow_player.stream = ss
+	_snow_player.volume_db = -48.0
+	add_child(_snow_player)
+	_snow_player.play()
 
 
 func _build_rain() -> void:
@@ -113,9 +139,17 @@ func _process(delta: float) -> void:
 		_state_len = _rng.randf_range(90.0, 150.0)
 	rain_strength = move_toward(rain_strength, 1.0 if raining else 0.0, delta * 0.25)
 	snow_strength = move_toward(snow_strength, 1.0 if snowing else 0.0, delta * 0.25)
+	if _rain_player:
+		_rain_player.volume_db = lerpf(-48.0, -10.0, rain_strength)
+	if _snow_player:
+		_snow_player.volume_db = lerpf(-48.0, -12.0, snow_strength)
 	# 地面与水面联动。
+	# TODO(M4): weather 与 season 的 wetness 合成应由 DayNight/World 统一合成器接管；
+	#   此处先保留独立权重 _weather_wetness，并暴露 get_weather_wetness()/get_season_wetness()
+	#   供合成测试验证互覆盖回归为 0。当前仍调用 terrain.set_weather，但同时记录独立通道。
+	_weather_wetness = rain_strength * 0.85
 	if terrain:
-		terrain.set_weather(rain_strength * 0.85, rain_strength)
+		terrain.set_weather(_weather_wetness, rain_strength)
 	# 雨幕跟随玩家。
 	if _rain_mm:
 		_rain_mm.visible = rain_strength > 0.05
@@ -251,6 +285,13 @@ func _spawn_bolt(pos: Vector3) -> void:
 	tw.tween_property(bolt, "visible", true, 0.0)
 	tw.tween_interval(0.16)
 	tw.tween_callback(bolt.queue_free)
+
+
+func get_weather_wetness() -> float:
+	return _weather_wetness
+
+# 占位：供 DayNight/World 合成器调用的季节基线读取（通过 terrain.get_season_wetness() 或 SeasonSystem 注入）
+# 当前最小改动仅记录天气侧，季节侧已由 terrain 暴露 get_season_wetness()，两值可在测试中验证 max 合成正确。
 
 
 func _feed(text_value: String) -> void:

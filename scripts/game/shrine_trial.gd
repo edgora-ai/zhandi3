@@ -3,12 +3,17 @@ extends Node3D
 ## 神庙试炼：靠近开启，限时射中全部符文，奖励精灵宝珠（生命上限 +10）。
 
 const RUNE_COUNT := 4
-const TIME_LIMIT := 15.0
 const START_DIST := 22.0
+# M3：分难度/时长/奖励 — 三种及以上试炼模式各有独立限时与奖励，便于头显与无头回归可验证。
+const TIME_BY_MODE := {"rune": 15.0, "torch": 18.0, "plate": 20.0, "ball": 20.0}
+const REWARD_BY_MODE := {"rune": {"orb": 1, "seed": 0}, "torch": {"orb": 1, "seed": 1}, "plate": {"orb": 0, "seed": 2}, "ball": {"orb": 2, "seed": 0}}
 
 var player: Player
 var completed := false
 var mode := "rune"
+var _trial_time := 15.0
+var _reward_orb := 1
+var _reward_seed := 0
 var _plate_t := 0.0
 var _plate: MeshInstance3D
 var _runes: Array[ShrineRune] = []
@@ -24,6 +29,11 @@ func setup(p_player: Player, trial_mode: Variant = "rune") -> void:
 		mode = "torch" if trial_mode else "rune"
 	else:
 		mode = str(trial_mode)
+	# 按模式确立限时与奖励（M3回归：15/18/20s 梯度）
+	_trial_time = float(TIME_BY_MODE.get(mode, 15.0))
+	var rew: Dictionary = REWARD_BY_MODE.get(mode, {"orb": 1, "seed": 0})
+	_reward_orb = int(rew.get("orb", 0))
+	_reward_seed = int(rew.get("seed", 0))
 	if mode == "plate":
 		_build_plate()
 		return
@@ -136,9 +146,15 @@ func _complete() -> void:
 		return
 	completed = true
 	_active = false
+	# 按模式发放差异化奖励（M3：orb/seed 数随难度递进），供 headless 统计 Loot 数量回归验证
 	var scene := get_tree().current_scene
+	if scene:
+		for i in range(_reward_orb):
+			Loot.spawn(scene, global_position + Vector3(0, 1.2 + i * 0.4, -3.5), "orb", "", 1, 3)
+		for i in range(_reward_seed):
+			Loot.spawn(scene, global_position + Vector3(0.6 + i * 0.4, 1.2, -3.5), "seed", "", 1, 3)
 	if scene and scene.get("hud") != null:
-		scene.hud.add_feed("神庙试炼完成！石门开启")
+		scene.hud.add_feed("神庙试炼完成！石门开启（奖励 orb=%d seed=%d）" % [_reward_orb, _reward_seed])
 	# 完成时刻全符文强光脉冲。
 	var light := OmniLight3D.new()
 	light.light_color = Color(0.5, 1.0, 0.85)
@@ -196,11 +212,11 @@ func _process(delta: float) -> void:
 	var dist := global_position.distance_to(player.global_position)
 	if not _active and dist < START_DIST:
 		_active = true
-		_window = TIME_LIMIT
+		_window = _trial_time
 		_hit_count = 0
 		var scene := get_tree().current_scene
 		if scene and scene.get("hud") != null:
-			scene.hud.add_feed("神庙试炼开启：%d 秒内射中 %d 个符文" % [int(TIME_LIMIT), RUNE_COUNT])
+			scene.hud.add_feed("神庙试炼开启：%d 秒内射中 %d 个符文" % [int(_trial_time), RUNE_COUNT])
 	elif _active:
 		_window -= delta
 		if _window <= 0.0:

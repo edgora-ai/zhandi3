@@ -30,6 +30,7 @@ const WEAPONS := {
 	},
 }
 
+@export var base_fov := 75.0
 const GUNMETAL := Color(0.15, 0.16, 0.18)
 const BASE_FOV := 75.0
 

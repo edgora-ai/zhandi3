@@ -174,6 +174,9 @@ func _physics_process(delta: float) -> void:
 		if _strike_t < 0.0:
 			if _strike_kind == "stomp":
 				FX.impact(global_position + Vector3(0, 0.2, -2.2))
+				var _sfx_h := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_h:
+					_sfx_h.play_at("heavy_impact", global_position + Vector3(0, 0.2, -2.2), -4.0, 0.85)
 				if dist < 4.2 and player.alive:
 					player.take_damage(25.0, self)
 					if player.alive:
@@ -187,6 +190,9 @@ func _physics_process(delta: float) -> void:
 				rock.configure("rock", dir * 20.0, 20.0, self)
 				get_tree().current_scene.add_child(rock)
 				rock.global_position = from + dir * 1.5
+				var _sfx_t := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_t:
+					_sfx_t.play_at("heavy_impact", from, -4.0, 1.15)
 	if _state == "sleep":
 		velocity.x = 0.0
 		velocity.z = 0.0

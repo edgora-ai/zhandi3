@@ -9,19 +9,20 @@ signal landed
 signal grenade_thrown(left: int)
 signal backpack_changed
 
-const WALK_SPEED := 5.5
-const SPRINT_SPEED := 8.6
+@export var WALK_SPEED := 5.5
+@export var SPRINT_SPEED := 8.6
 const ACCEL := 30.0
 const AIR_ACCEL := 14.0
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 const MOUSE_SENS := 0.0022
-const MAX_HP := 100.0
+@export var MAX_HP := 100.0
 const INTERACT_DIST := 3.4
-const SWIM_SPEED := 4.8
-const GLIDE_SPEED := 8.2
-const GLIDE_FALL_SPEED := 3.1
-const CLIMB_SPEED := 2.6
+@export var SWIM_SPEED := 4.8
+@export var GLIDE_SPEED := 8.2
+@export var GLIDE_FALL_SPEED := 3.1
+@export var CLIMB_SPEED := 2.6
+@export var MELEE_DAMAGE := 26.0
 
 var max_hp := MAX_HP
 var hp := MAX_HP
@@ -131,7 +132,13 @@ var _sword_trail_mesh: ImmediateMesh
 var _trail_outer: Array[Vector3] = []
 var _trail_inner: Array[Vector3] = []
 var _melee_target: CharacterBody3D = null
-var melee_damage := 26.0
+var melee_damage := MELEE_DAMAGE
+var _footstep_cd := 0.0
+var _climb_sfx_cd := 0.0
+var _swim_sfx_cd := 0.0
+var _landed_last_frame := true
+var _shake_t := 0.0
+var _shake_amp := 0.0
 
 
 func _ready() -> void:
@@ -206,34 +213,32 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		# N = 背包（原 B ），B 保留给炸弹引爆，避免同一按键抢占导致 _detonate_bombs() 永不可达
-		if event.physical_keycode == KEY_N:
+		if event.is_action_pressed("backpack"):
 			_toggle_backpack()
 			get_viewport().set_input_as_handled()
 			return
-		if event.physical_keycode == KEY_J:
+		if event.is_action_pressed("journal"):
 			_toggle_journal()
 			get_viewport().set_input_as_handled()
 			return
 		if backpack_open:
-			match event.physical_keycode:
-				KEY_UP, KEY_W:
-					backpack_index = posmod(backpack_index - 1, maxi(1, _backpack_entry_count()))
-					_refresh_backpack()
-				KEY_DOWN, KEY_S:
-					backpack_index = posmod(backpack_index + 1, maxi(1, _backpack_entry_count()))
-					_refresh_backpack()
-				KEY_ENTER, KEY_E:
-					_use_backpack_selection()
-				KEY_X:
-					_store_current_weapon()
-				KEY_ESCAPE:
-					_toggle_backpack()
+			if event.is_action_pressed("move_forward"):
+				backpack_index = posmod(backpack_index - 1, maxi(1, _backpack_entry_count()))
+				_refresh_backpack()
+			elif event.is_action_pressed("move_back"):
+				backpack_index = posmod(backpack_index + 1, maxi(1, _backpack_entry_count()))
+				_refresh_backpack()
+			elif event.is_action_pressed("interact"):
+				_use_backpack_selection()
+			elif event.is_action_pressed("bomb_place"):
+				_store_current_weapon()
+			elif event.is_action_pressed("backpack") or event.is_action_pressed("ui_cancel"):
+				_toggle_backpack()
 			get_viewport().set_input_as_handled()
 			return
 		if journal_open:
-			match event.physical_keycode:
-				KEY_ESCAPE:
-					_toggle_journal()
+			if event.is_action_pressed("journal") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("backpack"):
+				_toggle_journal()
 			get_viewport().set_input_as_handled()
 			return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -249,53 +254,51 @@ func _unhandled_input(event: InputEvent) -> void:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if shop_open:
-			match event.physical_keycode:
-				KEY_1:
-					_buy(0)
-				KEY_2:
-					_buy(1)
-				KEY_3:
-					_buy(2)
-				KEY_4:
-					_buy(3)
-				KEY_5:
-					_buy(4)
-				KEY_E, KEY_ESCAPE, KEY_B, KEY_N:
-					close_shop()
+			if event.is_action_pressed("weapon_slot_1"):
+				_buy(0)
+			elif event.is_action_pressed("weapon_slot_2"):
+				_buy(1)
+			elif event.is_action_pressed("weapon_slot_3"):
+				_buy(2)
+			elif event.is_action_pressed("weapon_slot_4"):
+				_buy(3)
+			elif event.is_action_pressed("weapon_slot_5"):
+				_buy(4)
+			elif event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("detonate") or event.is_action_pressed("backpack"):
+				close_shop()
 			return
-		if vehicle and event.physical_keycode != KEY_F:
+		if vehicle and not event.is_action_pressed("vehicle"):
 			return  # 驾驶中只响应下车
-		match event.physical_keycode:
-			KEY_ESCAPE:
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
-			KEY_R:
-				weapon.start_reload()
-			KEY_E:
-				_try_pickup()
-			KEY_C:
-				_toggle_prone()
-			KEY_G:
-				_throw_smoke()
-			KEY_F:
-				_toggle_vehicle()
-			KEY_H:
-				_whistle_horse()
-			KEY_Q:
-				_dodge()
-			KEY_X:
-				_place_bomb()
-			KEY_B:
-				_detonate_bombs()
-			KEY_T:
-				_raise_ice()
-			KEY_V:
-				_toggle_stasis()
-			KEY_Z:
-				_toggle_magnet()
-			KEY_1:
-				switch_slot(0)
-			KEY_2:
-				switch_slot(1)
+		if event.is_action_pressed("ui_cancel"):
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
+		elif event.is_action_pressed("reload"):
+			weapon.start_reload()
+		elif event.is_action_pressed("interact"):
+			_try_pickup()
+		elif event.is_action_pressed("crouch"):
+			_toggle_prone()
+		elif event.is_action_pressed("smoke"):
+			_throw_smoke()
+		elif event.is_action_pressed("vehicle"):
+			_toggle_vehicle()
+		elif event.is_action_pressed("whistle"):
+			_whistle_horse()
+		elif event.is_action_pressed("dodge"):
+			_dodge()
+		elif event.is_action_pressed("bomb_place"):
+			_place_bomb()
+		elif event.is_action_pressed("detonate"):
+			_detonate_bombs()
+		elif event.is_action_pressed("ice"):
+			_raise_ice()
+		elif event.is_action_pressed("stasis"):
+			_toggle_stasis()
+		elif event.is_action_pressed("magnet"):
+			_toggle_magnet()
+		elif event.is_action_pressed("weapon_slot_1"):
+			switch_slot(0)
+		elif event.is_action_pressed("weapon_slot_2"):
+			switch_slot(1)
 
 
 # 遥控炸弹：X 放置（至多 2 枚，放第三枚时引爆最旧的一枚），B 全部引爆。
@@ -565,8 +568,8 @@ func _dodge() -> void:
 		return
 	dodge_cd = 0.8
 	# 闪身：沿输入方向（无输入则向后）短促位移，0.3s 无敌帧。
-	var f := float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
-	var r := float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
+	var f := Input.get_axis("move_back", "move_forward")
+	var r := Input.get_axis("move_left", "move_right")
 	var dir := global_transform.basis * Vector3(r, 0, -f)
 	if dir.length_squared() < 0.01:
 		dir = global_transform.basis.z
@@ -596,6 +599,7 @@ func _end_flurry() -> void:
 
 
 func _check_timed_consumables() -> void:
+	_shop_cd = maxf(0.0, _shop_cd - get_physics_process_delta_time())
 	# 墙钟计时，不受 Engine.time_scale 影响；需在所有 early return 前调用
 	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
 		_hitstop_end_ms = 0
@@ -613,8 +617,25 @@ func _check_timed_consumables() -> void:
 		_end_flurry()
 
 
+func _trigger_shake(amp: float, dur: float) -> void:
+	_shake_amp = maxf(_shake_amp, amp)
+	_shake_t = maxf(_shake_t, dur)
+
+func _update_shake(delta: float) -> void:
+	if _shake_t > 0.0 and camera:
+		_shake_t -= delta
+		var k := _shake_t / 0.28
+		camera.h_offset = randf_range(-1.0, 1.0) * _shake_amp * k
+		camera.v_offset = randf_range(-1.0, 1.0) * _shake_amp * k
+		if _shake_t <= 0.0:
+			camera.h_offset = 0.0
+			camera.v_offset = 0.0
+			_shake_amp = 0.0
+
+
 func _physics_process(delta: float) -> void:
 	_check_timed_consumables()
+	_update_shake(delta)
 	if not alive:
 		return
 	# 测试钩子：无头环境下输入分支不执行，举盾状态在这里维护。
@@ -639,10 +660,36 @@ func _physics_process(delta: float) -> void:
 			_magnet_prop.magnet_hold(camera.global_position + get_aim_dir() * 5.0)
 			_update_magnet_beam()
 	camera.position.y = lerpf(camera.position.y, 0.55 if prone else 1.58, delta * 8.0)
-	var f := float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
+	# H6 Foley: footsteps/climb/swim tick with speed-gated cd
+	_footstep_cd = maxf(0.0, _footstep_cd - delta)
+	_climb_sfx_cd = maxf(0.0, _climb_sfx_cd - delta)
+	_swim_sfx_cd = maxf(0.0, _swim_sfx_cd - delta)
+	if is_on_floor() and not is_swimming and not is_climbing and not is_gliding:
+		var _spd := Vector2(velocity.x, velocity.z).length()
+		if _spd > 1.5 and _footstep_cd <= 0.0:
+			_footstep_cd = 0.38 if _spd > 6.0 else 0.52
+			var _sfx_f := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_f:
+				_sfx_f.play_at("heavy_impact", global_position, -18.0, randf_range(0.95, 1.08))
+				print("[sfx] play_at heavy_impact footstep=%.1f" % _spd)
+	elif is_climbing and _climb_sfx_cd <= 0.0:
+		var _cs := Vector2(velocity.x, velocity.y).length() + absf(velocity.z) * 0.5
+		if _cs > 0.5:
+			_climb_sfx_cd = 0.55
+			var _sfx_c := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_c:
+				_sfx_c.play_at("heavy_impact", global_position + Vector3(0, 1.2, 0), -16.0, 0.82)
+	elif is_swimming and _swim_sfx_cd <= 0.0:
+		var _sw := Vector2(velocity.x, velocity.z).length()
+		if _sw > 1.0:
+			_swim_sfx_cd = 0.65
+			var _sfx_s := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_s:
+				_sfx_s.play_at("freeze", global_position, -14.0, 1.18)
+	var f := Input.get_axis("move_back", "move_forward")
 	if debug_move != 0.0:
 		f = debug_move
-	var r := float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
+	var r := Input.get_axis("move_left", "move_right")
 	var wish := (global_transform.basis * Vector3(r, 0.0, -f))
 	wish.y = 0.0
 	wish = wish.normalized()
@@ -658,7 +705,7 @@ func _physics_process(delta: float) -> void:
 		_set_player_capsule("prone" if prone else "stand")
 
 	var speed := WALK_SPEED
-	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads and not prone and stamina > 0.0:
+	if Input.is_action_pressed("sprint") and f > 0.0 and not weapon.is_ads and not prone and stamina > 0.0:
 		speed = SPRINT_SPEED
 		_drain_stamina(9.0 * delta)
 	if weapon.is_ads:
@@ -685,10 +732,15 @@ func _physics_process(delta: float) -> void:
 		velocity.y = 0.0
 	elif is_on_floor():
 		_airborne_time = 0.0
+		if not _landed_last_frame and not is_dropping:
+			var _sfx_l := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_l:
+				_sfx_l.play_at("heavy_impact", global_position, -10.0, 1.12)
+		_landed_last_frame = true
 		if is_dropping:
 			is_dropping = false
 			landed.emit()
-		if Input.is_key_pressed(KEY_SPACE):
+		if Input.is_action_pressed("jump"):
 			velocity.y = JUMP_VEL
 	else:
 		_airborne_time += delta
@@ -697,7 +749,7 @@ func _physics_process(delta: float) -> void:
 		if terrain:
 			clearance = global_position.y - terrain.get_height(global_position.x, global_position.z)
 		var can_deploy := is_dropping or (_airborne_time > 0.18 and clearance > 2.35)
-		var wants_glide := can_deploy and (Input.is_key_pressed(KEY_SPACE) or debug_glide) and velocity.y < -0.55
+		var wants_glide := can_deploy and (Input.is_action_pressed("glide") or Input.is_action_pressed("jump") or debug_glide) and velocity.y < -0.55
 		_set_gliding(wants_glide)
 		if is_gliding:
 			_drain_stamina(5.0 * delta)
@@ -967,7 +1019,11 @@ func close_shop() -> void:
 		hud.hide_shop()
 
 
+var _shop_cd := 0.0
 func _buy(idx: int) -> void:
+	if _shop_cd > 0.0:
+		return
+	_shop_cd = 0.35
 	var prices := [15, 12, 25]
 	# 出售端：卖兽肉 +8、卖蘑菇 +5。
 	if idx == 3:
@@ -1023,7 +1079,7 @@ func collect_seed() -> void:
 	armor = minf(100.0, armor + 5.0)
 	health_changed.emit(hp, armor)
 	if seed_count % 3 == 0:
-		max_stamina += 10.0
+		max_stamina = minf(180.0, max_stamina + 10.0)
 		stamina = max_stamina
 	if seed_count >= 10 and charm_mult < 1.05:
 		charm_mult = 1.05
@@ -1112,6 +1168,9 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		dmg -= absorbed
 	hp -= dmg
 	damaged.emit(dmg)
+	# M11 受击镜头抖动（强度随伤害）
+	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45)
+	_shake_t = 0.28 if dmg >= 15.0 else 0.18
 	health_changed.emit(hp, armor)
 	if hp <= 0.0:
 		die(from)
@@ -1698,7 +1757,7 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 		if f < -0.05 and is_on_floor():
 			is_climbing = false
 			return false
-		if Input.is_key_pressed(KEY_SPACE):
+		if Input.is_action_pressed("jump") or Input.is_action_pressed("glide"):
 			velocity = n * 4.2 + Vector3.UP * 3.0
 			is_climbing = false
 			return false
@@ -1768,12 +1827,12 @@ func _update_swimming(delta: float, wish: Vector3) -> void:
 	is_swimming = true
 	prone = false
 	var surface := terrain.get_water_level(global_position.x, global_position.z)
-	var swim_speed := SWIM_SPEED * (1.18 if Input.is_key_pressed(KEY_SHIFT) else 1.0)
+	var swim_speed := SWIM_SPEED * (1.18 if Input.is_action_pressed("sprint") else 1.0)
 	var target_h := wish * swim_speed
 	var hv := Vector3(velocity.x, 0, velocity.z).move_toward(target_h, 12.0 * delta)
 	velocity.x = hv.x
 	velocity.z = hv.z
-	var vertical_input := float(Input.is_key_pressed(KEY_SPACE)) - float(Input.is_key_pressed(KEY_C))
+	var vertical_input := Input.get_axis("crouch", "jump")
 	if absf(vertical_input) > 0.01:
 		velocity.y = move_toward(velocity.y, vertical_input * 3.2, 9.0 * delta)
 	else:

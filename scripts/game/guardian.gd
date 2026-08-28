@@ -281,6 +281,9 @@ func _physics_process(delta: float) -> void:
 			_eye_mat.albedo_color = Color(1.0, 0.15, 0.12)
 		_set_eye(Color(1.0, 0.14, 0.10))
 		_play(&"aim")
+		var _sfx_c := get_tree().get_first_node_in_group("sfx_bank")
+		if _sfx_c:
+			_sfx_c.play_at("enemy_charge", global_position + Vector3(0, 0.95, 0), -6.0, 0.90)
 	# 巡逻：充能时定住。
 	if _charge < 0.0:
 		_think -= delta
@@ -337,5 +340,8 @@ func _fire_beam() -> void:
 	var query := PhysicsRayQueryParameters3D.create(from, to, 1 | 2)
 	var result := space.intersect_ray(query)
 	FX.tracer(from, to)
+	var _sfx_f := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_f:
+		_sfx_f.play_at("explosion", from, -4.0, 0.85)
 	if not result.is_empty() and result.collider == player:
 		player.take_damage(BEAM_DAMAGE, self)

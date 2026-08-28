@@ -252,6 +252,9 @@ func _physics_process(delta: float) -> void:
 func _breathe_fire() -> void:
 	var mouth := global_position + -global_transform.basis.z * 7.1 + Vector3(0, 1.5, 0)
 	_play(&"fire")
+	var _sfx_d := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_d:
+		_sfx_d.play_at("explosion", mouth, -5.0, 0.92)
 	_anim_hold = 0.8
 	var target := player.global_position + Vector3(0, 0.8, 0)
 	var count := 8 if _enraged else 5

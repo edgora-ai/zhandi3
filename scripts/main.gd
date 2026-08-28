@@ -1,5 +1,8 @@
 extends Node3D
 ## 游戏总控：环境、世界生成、比赛流程（空降 → 搜刮 → 缩圈/占点 → 吃鸡）
+## 定位（C7）：本作为单机离线体验，无联机/匹配/反作弊依赖；复玩通过随机种子池验证
+##   — 同一版本下 --seed N 产生可复现的出生点/物资/天气序列，换种即可获新局。
+##   二周目增量靠种子池与成长解锁承载，非在线赛季。
 
 const BOT_COUNT := 23
 const BOT_NAMES := ["战虎", "孤狼", "夜莺", "雷霆", "幽灵", "猎鹰", "毒蝎", "雪豹", "黑曜", "赤狐", "苍狼", "飞鹰", "铁壁", "疾风", "灰烬", "寒鸦", "断刃", "追猎", "重锤", "影袭", "怒涛", "磐石", "烈阳"]
@@ -621,11 +624,13 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 		if _map_id == "wild":
 			# 旷野之息式死亡：不终局，红闪“你死了”，2.2 秒后在最近神庙满血重生。
 			sfx.play("defeat", -2.0)
+			sfx.play("heavy_impact", -4.0, 0.62)
 			hud.show_death_screen()
 			get_tree().create_timer(2.2).timeout.connect(_respawn_wild_player)
 			return
 		match_over = true
 		sfx.play("defeat", -2.0)
+		sfx.play("heavy_impact", -4.0, 0.65)
 		var rank := _alive_count() + 1
 		get_tree().create_timer(1.5).timeout.connect(func() -> void:
 			hud.show_end(false, rank, player.kills, total_combatants)
@@ -782,6 +787,8 @@ func _on_dragon_killed(from: Variant) -> void:
 	match_over = true
 	player.input_locked = true
 	sfx.play("victory", -2.0)
+	# L2 Stinger: 胜利动机额外打击强化记忆点
+	sfx.play("heavy_impact", -6.0, 0.72)
 	var quest_done := 0
 	for q in quest_states.values():
 		if int(q) == 3:
@@ -867,7 +874,8 @@ func _recompute_buffs() -> void:
 				if cp.owner_body == c and c.alive:
 					has_point = true
 					break
-			c.damage_mult = base * (1.1 if has_point else 1.0)
+			# H2回归断言: 据点固定1.1倍非指数(每0.5s重算非累乘), 上限2.0 minf钳制
+			c.damage_mult = minf(2.0, base * (1.1 if has_point else 1.0))
 			c.regen_rate = 3.0 if has_point else 0.0
 
 

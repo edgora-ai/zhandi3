@@ -31,7 +31,7 @@
 | C1 | `SOUNDS` 缺 `explosion/freeze/stasis/shot_bow` 静默 | `sfx_bank.gd:5-20` `remote_bomb.gd:113` `player.gd:352/401` `main.gd:493` 直 `return` | Phase1 P0#4 | 部分已修（`shot_bow` 0161f32+4041505） | `grep -r "SOUNDS\[" scripts/` 全命中可播；`--wildtest` 中遥控炸弹/时停/冰柱/弓各触发一次均有 `sfx play` 日志且无 `unknown sound`；`assets/sfx/*.wav` 存在性校验通过 |
 | C2 | 昼夜与 Boss 音乐同改 `volume_db` 互盖 | `sfx_bank.gd:122-158` 夜 `-32dB`/Boss `-30dB` Tween 打架 | Phase1 P0#5 | 已修（`fadf566` 三轨 Mixer） | 四组合真值表闭合：昼/夜 × Boss开/关 音量符合预期且无跳变；`_calc_music_volumes` 单元/探针通过；切夜/进 Boss 来回 10 次无 Tween 冲突日志 |
 | C3 | `export_presets.cfg` 缺失无法交付 | `project.godot:20-25` 仅 1280×720；文件不存在 | Phase4 #9 | 已修（PC/Mac/Linux 3预设，PCK 可导） | 仓库存在合法 `export_presets.cfg`（PC/Mac/Web 至少 2 目标）；`godot --headless --export-release <preset> /tmp/out` 可产出且无缺贴图/缺字体告警 |
-| C4 | 输入硬编码无 InputMap/手柄全失效 | `player.gd:568` `KEY_WASD` 直读；全仓 `@export 0` | Phase1/4 #9 | 待修 | `project.godot` InputMap 覆盖移动/跳/冲/瞄/格/弓/盾滑/背包/地图/口哨/制冰/磁力；玩法代码零 `Key.KEY_*` 直读（`grep -r "KEY_" scripts/player` 为空）；键位重映射后行为一致；手柄左摇/右摇/扳机可完成一局 |
+| C4 | 输入硬编码无 InputMap/手柄全失效 | `player.gd:568` `KEY_WASD` 直读；全仓 `@export 0` | Phase1/4 #9 | 已修（InputMap 10->32，grep KEY_ 0，手柄双绑） | `project.godot` InputMap 覆盖移动/跳/冲/瞄/格/弓/盾滑/背包/地图/口哨/制冰/磁力；玩法代码零 `Key.KEY_*` 直读（`grep -r "KEY_" scripts/player` 为空）；键位重映射后行为一致；手柄左摇/右摇/扳机可完成一局 |
 | C5 | 局外存档=0 “永久成长”归零 | `selected_map.txt` 仅存地图；`player.gd:26` 实例变量 `reload_current_scene` 清零 | Phase1/2 #8 | 待 XL 存档服务 | `user://save_v1.json` 版本化原子写入（tmp→rename）；含塔/神庙/种子/宝箱/任务/成长/马匹；重载后逐项回读一致；损坏文件回退默认值不崩溃 |
 | C6 | IP 直接下架风险 | `README.md:1-3` 战地3/旷野之息/海拉鲁等 | Phase4 #9 | 待修 | 全仓无外部 IP 商标/地名直用；文案改为原创表述；商店页/描述合规自检清单通过 |
 | C7 | 无复玩闭环/错误大逃杀定位 | `main.gd:4` `BOT_COUNT 24` 短局；无网络/匹配/反作弊 | Phase4 #9 | 待修 | 明确单机定位或补齐闭环设计文档；若单机则二周目/难度/随机池可验证复玩增量；若联机则给出网络方案与反作弊边界 |

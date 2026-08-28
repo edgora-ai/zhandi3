@@ -516,12 +516,7 @@ func _update_magnet_beam() -> void:
 
 func _toggle_prone() -> void:
 	prone = not prone
-	if prone:
-		_col.shape.height = 0.9
-		_col.position.y = 0.45
-	else:
-		_col.shape.height = 1.7
-		_col.position.y = 0.85
+	_set_player_capsule("prone" if prone else "stand")
 
 
 func _throw_smoke() -> void:
@@ -660,10 +655,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if is_swimming:
 		is_swimming = false
-		# 恢复趴下碰撞体（游泳时可能通过 C 误触 prone）
-		if _col and _col.shape is CapsuleShape3D:
-			_col.shape.height = 0.9 if prone else 1.7
-			_col.position.y = 0.45 if prone else 0.85
+		_set_player_capsule("prone" if prone else "stand")
 
 	var speed := WALK_SPEED
 	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads and not prone and stamina > 0.0:
@@ -738,7 +730,7 @@ func _physics_process(delta: float) -> void:
 
 	# 盾滑：举盾站在坡面上会顺坡加速滑下（旷野之息式的下山方式）。
 	# 陡坡（>45°）is_on_floor 为 false，用地形高度差判断“贴着地面”。
-	if blocking and terrain and (is_on_floor() or global_position.y - terrain.get_height(global_position.x, global_position.z) < 0.35):
+	if blocking and stamina > 0.0 and terrain and (is_on_floor() or global_position.y - terrain.get_height(global_position.x, global_position.z) < 0.35):
 		var slope_n := terrain.get_normal(global_position.x, global_position.z, 1.2)
 		if slope_n.y < 0.92:
 			var downhill := Vector3(slope_n.x, 0, slope_n.z).normalized()
@@ -863,7 +855,7 @@ func _scan_loot() -> void:
 			best_n = d_n
 			nearby_npc = n
 	nearby_fish = null
-	if is_swimming:
+	if is_swimming or (terrain != null and terrain.is_in_water(global_position.x, global_position.z) and global_position.y < terrain.get_water_level(global_position.x, global_position.z) + 0.9):
 		var best_f := 2.6
 		for candidate_f in get_tree().get_nodes_in_group("fish"):
 			var fs: Node = candidate_f
@@ -1769,6 +1761,7 @@ func _try_step_up() -> void:
 
 
 func _update_swimming(delta: float, wish: Vector3) -> void:
+	_set_player_capsule("swim")
 	if is_gliding:
 		_set_gliding(false)
 	if is_dropping:
@@ -1808,6 +1801,20 @@ func _drain_stamina(amount: float) -> void:
 	stamina = maxf(0.0, stamina - amount)
 	_stamina_used = true
 	_stamina_wait = 0.45
+
+
+func _set_player_capsule(mode: String) -> void:
+	if _col == null or _col.shape == null:
+		return
+	if mode == "swim":
+		_col.shape.height = 1.1
+		_col.position.y = 0.55
+	elif mode == "prone":
+		_col.shape.height = 0.9
+		_col.position.y = 0.45
+	else:
+		_col.shape.height = 1.7
+		_col.position.y = 0.85
 
 
 func _update_glider_visual(delta: float) -> void:
@@ -1921,7 +1928,7 @@ func _toggle_backpack() -> void:
 
 
 func _backpack_entry_count() -> int:
-	return backpack_weapons.size() + get_backpack_lines().size()
+	return get_backpack_lines().size()
 
 
 func _refresh_backpack() -> void:
@@ -1971,8 +1978,11 @@ func _use_backpack_selection() -> void:
 		_retrieve_weapon(backpack_index)
 		return
 	var item_index := backpack_index - backpack_weapons.size()
-	var key: String = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom", "armor_soldier", "armor_climber", "armor_barbarian", "monster_part"][item_index]
-	var count := int(backpack_items[key])
+	var keys: Array[String] = ["mushroom", "meat", "dragon_scale", "wood", "roast_meat", "roast_mushroom", "armor_soldier", "armor_climber", "armor_barbarian", "monster_part"]
+	if item_index < 0 or item_index >= keys.size():
+		return
+	var key: String = keys[item_index]
+	var count := int(backpack_items.get(key, 0))
 	if count <= 0:
 		return
 	# 防具：使用即装备（不消耗），三套效果互斥。

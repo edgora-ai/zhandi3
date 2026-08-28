@@ -29,6 +29,7 @@ var weapon: Weapon
 var move_target := Vector3.ZERO
 var aim_target: CharacterBody3D = null
 var target_loot: Loot = null
+var _loot_time := 0.0
 var capture_goal: CapturePoint = null
 
 var _think := 0.0
@@ -364,6 +365,14 @@ func _think_tick() -> void:
 		if loot:
 			state = State.LOOT
 			target_loot = loot
+			_loot_time = 0.0
+			return
+	if weapon.reserve == 0 and weapon.mag_left == 0:
+		var ammo_loot := _find_nearest_loot("ammo")
+		if ammo_loot:
+			state = State.LOOT
+			target_loot = ammo_loot
+			_loot_time = 0.0
 			return
 	if state != State.CAPTURE and randf() < 0.15:
 		var cp := _find_capture_point()
@@ -372,8 +381,11 @@ func _think_tick() -> void:
 			capture_goal = cp
 			move_target = cp.global_position
 			return
-	if state == State.LOOT and (target_loot == null or not is_instance_valid(target_loot) or target_loot.consumed):
-		state = State.ROTATE
+	if state == State.LOOT:
+		_loot_time += 0.3
+		if target_loot == null or not is_instance_valid(target_loot) or target_loot.consumed or _loot_time > 8.0:
+			state = State.ROTATE
+			_loot_time = 0.0
 	if state in [State.ROTATE, State.CAPTURE, State.DROP]:
 		if global_position.distance_to(move_target) < 3.0 or state == State.DROP:
 			# 到达后小范围游荡

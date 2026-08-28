@@ -165,7 +165,7 @@ func _box(parent: Node3D, size: Vector3, mat: Material, pos: Vector3, rot: Vecto
 
 
 func _is_exit_safe(world_pos: Vector3) -> bool:
-	# FIX: H17 占位：木筏下船落点水面/岸边校验
+	# // FIX: H17 占位：木筏下船落点水面/岸边校验
 	var terrain: Terrain = get_tree().current_scene.get("terrain") as Terrain if get_tree().current_scene else null
 	if terrain == null: return true
 	if terrain.get_normal(world_pos.x, world_pos.z, 1.2).y < 0.48: return false
@@ -181,9 +181,9 @@ func enter(p: Player) -> void:
 	if driver:
 		return
 	if Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
-		return # FIX: M2 门限：木筏为水面载具以 3.5速度门限替代 is_on_floor，防高速/落水瞬间上筏 + 燃料占位：当前零成本，后续可接 stamina/fuel
-	# FIX: H17 shape_test占位
-	# FIX: M2 燃料占位：木筏 is_on_floor语义由速度门限承担，零燃料为当前设计，后续对接 fuel 管线
+		return # // FIX: M2 门限：木筏为水面载具以 3.5速度门限替代 is_on_floor，防高速/落水瞬间上筏 + 燃料占位：当前零成本，后续可接 stamina/fuel
+	# // FIX: H17 shape_test占位
+	# // FIX: M2 燃料占位：木筏 is_on_floor语义由速度门限承担，零燃料为当前设计，后续对接 fuel 管线
 	if not _is_exit_safe(p.global_position): pass
 	driver = p
 	driver.vehicle = self
@@ -200,7 +200,7 @@ func exit() -> void:
 	var p := driver
 	driver = null
 	velocity = Vector3.ZERO
-	p.global_position = _find_safe_exit(global_position + global_transform.basis.x * 1.8 + Vector3(0, 0.5, 0)) # FIX: H17 固定偏移→安全落点
+	p.global_position = _find_safe_exit(global_position + global_transform.basis.x * 1.8 + Vector3(0, 0.5, 0)) # // FIX: H17 固定偏移→安全落点
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)

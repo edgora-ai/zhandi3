@@ -781,7 +781,7 @@ func _on_moblin_killed(from: Variant) -> void:
 		hud.add_feed("任务进度：莫布林 %d/2" % mini(_quest_moblin_kills, 2))
 
 
-# FIX: H21 结算进局外占位（当前为讨伐结算展示 + 日志，后续在此对接存档写入 save_v1 / 成长解锁管线）
+# // FIX: H21 结算进局外占位（当前为讨伐结算展示 + 日志，后续在此对接存档写入 save_v1 / 成长解锁管线）
 func _on_dragon_killed(from: Variant) -> void:
 	if from != player or match_over:
 		return
@@ -877,8 +877,8 @@ func _recompute_buffs() -> void:
 				if cp.owner_body == c and c.alive:
 					has_point = true
 					break
-			# FIX: H2 回归断言—据点固定1.1倍非指数(每0.5s重算非累乘) 上限2.0 minf钳制 非*=累乘 回归验证:持续占有≠指数叠加
-			c.damage_mult = minf(2.0, base * (1.1 if has_point else 1.0)) # FIX: H2 已为加法固定倍率+上限，非累乘
+			# // FIX: H2 回归断言—据点固定1.1倍非指数(每0.5s重算非累乘) 上限2.0 minf钳制 非*=累乘 回归验证:持续占有≠指数叠加
+			c.damage_mult = minf(2.0, base * (1.1 if has_point else 1.0)) # // FIX: H2 已为加法固定倍率+上限，非累乘
 			c.regen_rate = 3.0 if has_point else 0.0
 
 
@@ -895,10 +895,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_map("wild")
 			elif event.physical_keycode >= KEY_3 and event.physical_keycode <= KEY_5:
 				var wi := int(event.physical_keycode - KEY_3)
-				# FIX: H18 传送落点 shape_test 占位 — 当前落点为塔顶安全点（_ground+16.5m平整高地），直写 global_position 属可控传送；后续可接 PhysicsShapeQuery + is_on_floor 校验防穿墙
+				# // FIX: H18 传送落点 shape_test 占位 — 当前落点为塔顶安全点（_ground+16.5m平整高地），直写 global_position 属可控传送；后续可接 PhysicsShapeQuery + is_on_floor 校验防穿墙
 				if wi < warp_points.size():
 					_toggle_map_menu()
-					player.global_position = (warp_points[wi]["pos"] as Vector3) + Vector3(0, 0.5, 0) # FIX: H18 传送穿墙 shape_test 占位
+					player.global_position = (warp_points[wi]["pos"] as Vector3) + Vector3(0, 0.5, 0) # // FIX: H18 传送穿墙 shape_test 占位
 					hud.add_feed("传送：%s" % str(warp_points[wi]["name"]))
 				else:
 					hud.add_feed("这个传送位还没有激活的测绘点")

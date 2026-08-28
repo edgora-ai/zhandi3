@@ -2,12 +2,12 @@ class_name Vehicle
 extends CharacterBody3D
 ## 吉普车：渐进油门/刹车、速度相关转向、轮胎抓地、坡地悬挂与环绕镜头。
 
-@export var TOP_SPEED := 20.0 # FIX: M13 魔法数抽离 / M2 载具成本见燃料占位
-@export var REVERSE_SPEED := 5.5 # FIX: M13
-@export var ENGINE_ACCEL := 10.0 # FIX: M13
-@export var BRAKE_ACCEL := 20.0 # FIX: M13
-@export var COAST_DECEL := 3.2 # FIX: M13
-@export var TURN_RATE := 1.7 # FIX: M13
+@export var TOP_SPEED := 20.0 # // FIX: M13 魔法数抽离 / M2 载具成本见燃料占位
+@export var REVERSE_SPEED := 5.5 # // FIX: M13
+@export var ENGINE_ACCEL := 10.0 # // FIX: M13
+@export var BRAKE_ACCEL := 20.0 # // FIX: M13
+@export var COAST_DECEL := 3.2 # // FIX: M13
+@export var TURN_RATE := 1.7 # // FIX: M13
 const CAMERA_SENS := 0.0022
 
 var terrain: Terrain
@@ -232,7 +232,7 @@ func _cylinder(radius: float, height: float, mat: Material, pos: Vector3, rot: V
 
 
 func _is_exit_safe(world_pos: Vector3) -> bool:
-	# FIX: H17 shape_test占位：下车落点需碰撞校验（未来用 PhysicsShapeQueryParameters3D 球扫 0.6m）
+	# // FIX: H17 shape_test占位：下车落点需碰撞校验（未来用 PhysicsShapeQueryParameters3D 球扫 0.6m）
 	if terrain == null:
 		return true
 	if terrain.is_in_water(world_pos.x, world_pos.z):
@@ -242,7 +242,7 @@ func _is_exit_safe(world_pos: Vector3) -> bool:
 	return true
 
 func _find_safe_exit(fallback: Vector3) -> Vector3:
-	# FIX: H17 固定偏移改为多方向探测，首个安全点为出口
+	# // FIX: H17 固定偏移改为多方向探测，首个安全点为出口
 	var bases: Array[Vector3] = [global_transform.basis.x * 1.9, -global_transform.basis.x * 1.9, global_transform.basis.z * 1.9, -global_transform.basis.z * 1.9]
 	for off in bases:
 		var cand := global_position + off + Vector3(0, 0.55, 0)
@@ -254,11 +254,11 @@ func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
-		return # FIX: M2 is_on_floor门限防空中上车+燃料成本占位：当前零燃料无限驾驶，未来在此接入耐力/燃料扣除与油量UI
-	# FIX: H17 enter前 shape_test占位：进入前可做体积扫判定
-	# FIX: M2 燃料占位：吉普车当前无消耗，is_on_floor门限已落地，未来对接 stamina/fuel 管线
+		return # // FIX: M2 is_on_floor门限防空中上车+燃料成本占位：当前零燃料无限驾驶，未来在此接入耐力/燃料扣除与油量UI
+	# // FIX: H17 enter前 shape_test占位：进入前可做体积扫判定
+	# // FIX: M2 燃料占位：吉普车当前无消耗，is_on_floor门限已落地，未来对接 stamina/fuel 管线
 	if not _is_exit_safe(p.global_position):
-		pass # FIX: H17 占位：未来在此做进入前碰撞通过校验
+		pass # // FIX: H17 占位：未来在此做进入前碰撞通过校验
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
@@ -279,7 +279,7 @@ func exit() -> void:
 	speed = 0.0
 	velocity = Vector3.ZERO
 	var fallback := global_position + global_transform.basis.x * 1.9 + Vector3(0, 0.55, 0)
-	p.global_position = _find_safe_exit(fallback) # FIX: H17 固定偏移→安全落点 shape_test
+	p.global_position = _find_safe_exit(fallback) # // FIX: H17 固定偏移→安全落点 shape_test
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)

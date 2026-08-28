@@ -9,20 +9,20 @@ signal landed
 signal grenade_thrown(left: int)
 signal backpack_changed
 
-@export var WALK_SPEED := 5.5 # FIX: M13 @export 魔法数抽离
-@export var SPRINT_SPEED := 8.6 # FIX: M13
+@export var WALK_SPEED := 5.5 # // FIX: M13 @export 魔法数抽离
+@export var SPRINT_SPEED := 8.6 # // FIX: M13
 const ACCEL := 30.0
 const AIR_ACCEL := 14.0
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 const MOUSE_SENS := 0.0022
-@export var MAX_HP := 100.0 # FIX: M13
+@export var MAX_HP := 100.0 # // FIX: M13
 const INTERACT_DIST := 3.4
-@export var SWIM_SPEED := 4.8 # FIX: M13
-@export var GLIDE_SPEED := 8.2 # FIX: M13
-@export var GLIDE_FALL_SPEED := 3.1 # FIX: M13
-@export var CLIMB_SPEED := 2.6 # FIX: M13
-@export var MELEE_DAMAGE := 26.0 # FIX: M13
+@export var SWIM_SPEED := 4.8 # // FIX: M13
+@export var GLIDE_SPEED := 8.2 # // FIX: M13
+@export var GLIDE_FALL_SPEED := 3.1 # // FIX: M13
+@export var CLIMB_SPEED := 2.6 # // FIX: M13
+@export var MELEE_DAMAGE := 26.0 # // FIX: M13
 
 var max_hp := MAX_HP
 var hp := MAX_HP
@@ -137,7 +137,7 @@ var _footstep_cd := 0.0
 var _climb_sfx_cd := 0.0
 var _swim_sfx_cd := 0.0
 var _landed_last_frame := true
-var _scan_cd := 0.0 # FIX: H9/M17 组扫描限频 0.12s，避免每帧6组get_nodes_in_group
+var _scan_cd := 0.0 # // FIX: H9/M17 组扫描限频 0.12s，避免每帧6组get_nodes_in_group
 var _shake_t := 0.0
 var _shake_amp := 0.0
 
@@ -619,11 +619,11 @@ func _check_timed_consumables() -> void:
 		_end_flurry()
 
 
-func _trigger_shake(amp: float, dur: float) -> void: # FIX: M11 命中/爆炸分级抖动入口（amp/dur 分级，可开关）
+func _trigger_shake(amp: float, dur: float) -> void: # // FIX: M11 命中/爆炸分级抖动入口（amp/dur 分级，可开关）
 	_shake_amp = maxf(_shake_amp, amp)
 	_shake_t = maxf(_shake_t, dur)
 
-func _update_shake(delta: float) -> void: # FIX: M11 镜头抖动更新（h/v_offset 随强度衰减）
+func _update_shake(delta: float) -> void: # // FIX: M11 镜头抖动更新（h/v_offset 随强度衰减）
 	if _shake_t > 0.0 and camera:
 		_shake_t -= delta
 		var k := _shake_t / 0.28
@@ -697,9 +697,9 @@ func _physics_process(delta: float) -> void:
 	wish = wish.normalized()
 
 	var water_now := terrain != null and terrain.is_in_water(global_position.x, global_position.z) and global_position.y < terrain.get_water_level(global_position.x, global_position.z) + 0.9
-	# FIX: H9/M17 每0.12s扫一次loot/vehicle等+ImmediateMesh限频，首帧swim仍保证抓鱼可达
+	# // FIX: H9/M17 每0.12s扫一次loot/vehicle等+ImmediateMesh限频，首帧swim仍保证抓鱼可达
 	_scan_cd = maxf(0.0, _scan_cd - delta)
-	var need_scan := _scan_cd <= 0.0 or water_now # FIX: H9 水面强制首帧扫鱼
+	var need_scan := _scan_cd <= 0.0 or water_now # // FIX: H9 水面强制首帧扫鱼
 	if need_scan:
 		_scan_loot()
 		_scan_cd = 0.12
@@ -1030,11 +1030,11 @@ func close_shop() -> void:
 		hud.hide_shop()
 
 
-var _shop_cd := 0.0 # FIX: H20 成长溢出—商店限购 0.35s CD已落地，防连点刷资源；未来可扩展每日限购/库存，本项为限频+溢出回归点
+var _shop_cd := 0.0 # // FIX: H20 成长溢出—商店限购 0.35s CD已落地，防连点刷资源；未来可扩展每日限购/库存，本项为限频+溢出回归点
 func _buy(idx: int) -> void:
 	if _shop_cd > 0.0:
-		return # FIX: H20 商店限购说明：0.35s 内重复购买直接拒单，避免脚本连点溢出
-	_shop_cd = 0.35 # FIX: H20 0.35s CD重置，已验证限频生效
+		return # // FIX: H20 商店限购说明：0.35s 内重复购买直接拒单，避免脚本连点溢出
+	_shop_cd = 0.35 # // FIX: H20 0.35s CD重置，已验证限频生效
 	var prices := [15, 12, 25]
 	# 出售端：卖兽肉 +8、卖蘑菇 +5。
 	if idx == 3:
@@ -1179,8 +1179,8 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		dmg -= absorbed
 	hp -= dmg
 	damaged.emit(dmg)
-	# FIX: M11 命中/受击镜头抖动分级（可开关，见 _shake_enabled 注释）— 已做 camera shake，命中/爆炸分级如下
-	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45) # FIX: M11 受击分级：<15dmg 0.18s / >=15dmg 0.28s，Haptics 可在 _trigger_shake 内 Input.vibrate_handheld(80+amp*120) 接入（可开关）
+	# // FIX: M11 命中/受击镜头抖动分级（可开关，见 _shake_enabled 注释）— 已做 camera shake，命中/爆炸分级如下
+	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45) # // FIX: M11 受击分级：<15dmg 0.18s / >=15dmg 0.28s，Haptics 可在 _trigger_shake 内 Input.vibrate_handheld(80+amp*120) 接入（可开关）
 	_shake_t = 0.28 if dmg >= 15.0 else 0.18
 	health_changed.emit(hp, armor)
 	if hp <= 0.0:

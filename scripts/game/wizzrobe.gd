@@ -116,7 +116,7 @@ func _cast() -> void:
 
 
 func _is_teleport_safe(pos: Vector3) -> bool:
-	# FIX: H18 shape_test占位：落点需通过物理空间碰撞校验，避免穿墙/落水/陡坡
+	# // FIX: H18 shape_test占位：落点需通过物理空间碰撞校验，避免穿墙/落水/陡坡
 	if terrain == null:
 		return true
 	if terrain.is_in_water(pos.x, pos.z):
@@ -143,7 +143,7 @@ func _teleport() -> void:
 			found = true
 			break
 	if not found:
-		return # FIX: H18 无安全落点则取消闪现，避免直写碰撞体内
+		return # // FIX: H18 无安全落点则取消闪现，避免直写碰撞体内
 	global_position = next
 	FX.impact(global_position + Vector3(0, 1.0, 0))
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.0, 0), "闪现!", Color(0.85, 0.50, 1.0))

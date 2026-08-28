@@ -2,13 +2,13 @@ class_name Horse
 extends CharacterBody3D
 ## 程序化马匹：马体比例、分段步态、渐进转向、坡地抓地与可环绕骑乘镜头。
 
-@export var WALK_SPEED := 9.0 # FIX: M13
-@export var GALLOP_SPEED := 19.0 # FIX: M13 / M2 燃料占位见 M2注释
-@export var REVERSE_SPEED := 3.2 # FIX: M13
-@export var ACCEL := 10.0 # FIX: M13
-@export var BRAKE := 16.0 # FIX: M13
-@export var COAST_DECEL := 4.0 # FIX: M13
-@export var TURN_SPEED := 1.85 # FIX: M13
+@export var WALK_SPEED := 9.0 # // FIX: M13
+@export var GALLOP_SPEED := 19.0 # // FIX: M13 / M2 燃料占位见 M2注释
+@export var REVERSE_SPEED := 3.2 # // FIX: M13
+@export var ACCEL := 10.0 # // FIX: M13
+@export var BRAKE := 16.0 # // FIX: M13
+@export var COAST_DECEL := 4.0 # // FIX: M13
+@export var TURN_SPEED := 1.85 # // FIX: M13
 const CAMERA_SENS := 0.0022
 
 var terrain: Terrain
@@ -362,7 +362,7 @@ func _wedge(parent: Node3D, half_w: float, half_h: float, front_w: float, front_
 
 
 func _is_exit_safe(world_pos: Vector3) -> bool:
-	# FIX: H17 shape_test占位：落点球体积扫描预留
+	# // FIX: H17 shape_test占位：落点球体积扫描预留
 	if terrain == null:
 		return true
 	if terrain.is_in_water(world_pos.x, world_pos.z):
@@ -372,7 +372,7 @@ func _is_exit_safe(world_pos: Vector3) -> bool:
 	return true
 
 func _find_safe_exit(fallback: Vector3) -> Vector3:
-	# FIX: H17 多方向安全落点
+	# // FIX: H17 多方向安全落点
 	var bases: Array[Vector3] = [global_transform.basis.x * 1.7, -global_transform.basis.x * 1.7, global_transform.basis.z * 1.7, -global_transform.basis.z * 1.7]
 	for off in bases:
 		var cand := global_position + off + Vector3(0, 0.35, 0)
@@ -384,9 +384,9 @@ func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
-		return # FIX: M2 is_on_floor门限防空中上马+燃料占位：马匹当前零成本，未来可接入体力/饥渴或耐力消耗
-	# FIX: H17 shape_test占位：进入前碰撞校验
-	# FIX: M2 燃料占位：马匹 is_on_floor门限已落地，零燃料为当前设计，未来可对接 stamina/fuel 管线
+		return # // FIX: M2 is_on_floor门限防空中上马+燃料占位：马匹当前零成本，未来可接入体力/饥渴或耐力消耗
+	# // FIX: H17 shape_test占位：进入前碰撞校验
+	# // FIX: M2 燃料占位：马匹 is_on_floor门限已落地，零燃料为当前设计，未来可对接 stamina/fuel 管线
 	if not _is_exit_safe(p.global_position):
 		pass
 	# 驯服：未亲近的马第一次被骑可能尥蹶子把人甩下来；安抚一次后永久温顺。
@@ -420,7 +420,7 @@ func exit() -> void:
 	speed = 0.0
 	velocity = Vector3.ZERO
 	var fallback := global_position + global_transform.basis.x * 1.7 + Vector3(0, 0.35, 0)
-	p.global_position = _find_safe_exit(fallback) # FIX: H17 固定偏移→安全落点
+	p.global_position = _find_safe_exit(fallback) # // FIX: H17 固定偏移→安全落点
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)

@@ -6,12 +6,12 @@ signal died(victim, killer)
 
 enum State { DROP, LOOT, ROTATE, FIGHT, CAPTURE }
 
-@export var MAX_HP := 100.0 # FIX: M13 魔法数抽离
-@export var WALK := 4.2 # FIX: M13
-@export var RUN := 6.4 # FIX: M13
+@export var MAX_HP := 100.0 # // FIX: M13 魔法数抽离
+@export var WALK := 4.2 # // FIX: M13
+@export var RUN := 6.4 # // FIX: M13
 const GRAVITY := 22.0
-@export var SIGHT_RANGE := 65.0 # FIX: M13/M14 LOD距离分级
-@export var FIGHT_DIST := 20.0 # FIX: M13
+@export var SIGHT_RANGE := 65.0 # // FIX: M13/M14 LOD距离分级
+@export var FIGHT_DIST := 20.0 # // FIX: M13
 
 var hp := MAX_HP
 var armor := 0.0
@@ -36,8 +36,8 @@ var capture_goal: CapturePoint = null
 
 var _think := 0.0
 var _lose_sight := 0.0
-var _vision_cd := 0.0 # FIX: H7 射线节流 0.2s 占位，避免 31Bot≈3000 ray/s
-var _cached_enemy: CharacterBody3D = null # FIX: H7 视锥+距离LOD缓存
+var _vision_cd := 0.0 # // FIX: H7 射线节流 0.2s 占位，避免 31Bot≈3000 ray/s
+var _cached_enemy: CharacterBody3D = null # // FIX: H7 视锥+距离LOD缓存
 var _burst_left := 0
 var _burst_pause := 0.0
 var _strafe_dir := 1.0
@@ -313,7 +313,7 @@ func get_aim_dir() -> Vector3:
 		var chest: Vector3 = aim_target.global_position + Vector3(0, 1.1, 0)
 		var d: Vector3 = (chest - get_aim_origin()).normalized()
 		var dist := get_aim_origin().distance_to(chest)
-		var e := deg_to_rad(1.8 * maxf(0.12, 1.5 - skill) * (1.0 + dist * 0.015)) # FIX: H3 1.8*maxf(0.12,1.5-skill) 散布已钳制，下限0.12防零散，距离系数0.015线性放大
+		var e := deg_to_rad(1.8 * maxf(0.12, 1.5 - skill) * (1.0 + dist * 0.015)) # // FIX: H3 1.8*maxf(0.12,1.5-skill) 散布已钳制，下限0.12防零散，距离系数0.015线性放大
 		d = d.rotated(Vector3.UP, randf_range(-e, e))
 		var side := d.cross(Vector3.UP)
 		if side.length() > 0.01:
@@ -334,7 +334,7 @@ func give_weapon(id: String) -> void:
 
 func give_ammo(amount: int) -> void:
 	weapon.reserve = mini(999, weapon.reserve + amount)
-	# FIX: H3 换弹受限说明：Bot 同 Player 共用 Weapon.start_reload/mag 钳制，999为硬上限，空匣必经换弹期
+	# // FIX: H3 换弹受限说明：Bot 同 Player 共用 Weapon.start_reload/mag 钳制，999为硬上限，空匣必经换弹期
 
 
 # ---------- 感知与决策 ----------
@@ -400,7 +400,7 @@ func _think_tick() -> void:
 
 
 func _find_visible_enemy() -> CharacterBody3D:
-	# FIX: H7 0.2s 射线节流+视锥/距离LOD：远距>40m且背身过滤已在 loop 内，非可见周期直接复用缓存
+	# // FIX: H7 0.2s 射线节流+视锥/距离LOD：远距>40m且背身过滤已在 loop 内，非可见周期直接复用缓存
 	if _vision_cd > 0.0 and _cached_enemy and is_instance_valid(_cached_enemy) and _cached_enemy.alive:
 		if global_position.distance_to(_cached_enemy.global_position) <= SIGHT_RANGE:
 			return _cached_enemy
@@ -410,7 +410,7 @@ func _find_visible_enemy() -> CharacterBody3D:
 	var best_d := SIGHT_RANGE
 	var eye := get_aim_origin()
 	var fwd := -global_transform.basis.z
-	# FIX: H7 距离LOD: 40m外每隔1个跳过射线，保留近距精度
+	# // FIX: H7 距离LOD: 40m外每隔1个跳过射线，保留近距精度
 	var idx := 0
 	for c in get_tree().get_nodes_in_group("combatant"):
 		idx += 1
@@ -423,7 +423,7 @@ func _find_visible_enemy() -> CharacterBody3D:
 		if d > 8.0 and fwd.dot(to_c) < 0.0:
 			continue
 		if d > 40.0 and (idx % 2 == 0):
-			continue # FIX: H7 远距LOD跳过一半射线
+			continue # // FIX: H7 远距LOD跳过一半射线
 		var target_eye: Vector3 = c.global_position + Vector3(0, 1.4, 0)
 		var query := PhysicsRayQueryParameters3D.create(eye, target_eye, 1 | 2 | 4, [get_rid()])
 		var result := get_world_3d().direct_space_state.intersect_ray(query)
@@ -496,7 +496,7 @@ func _physics_process(delta: float) -> void:
 	if not alive:
 		_update_corpse(delta)
 		return
-	_vision_cd = maxf(0.0, _vision_cd - delta) # FIX: H7 射线节流计时
+	_vision_cd = maxf(0.0, _vision_cd - delta) # // FIX: H7 射线节流计时
 	_think -= delta
 	if _think <= 0.0:
 		# 远距 AI（>80m 无可见目标）降频至 0.5Hz，近距保持 3Hz

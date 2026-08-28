@@ -709,15 +709,15 @@ func show_journal(entries: Array) -> void:
 	for e in entries:
 		var st := int(e.get("state", 0))
 		var bullet := Color(0.45, 0.48, 0.52) if st == 0 else (Color(0.35, 0.75, 0.85) if st == 1 else Color(0.45, 0.85, 0.45))
-		# FIX: M5 图标+文字冗余已存在（非纯颜色编码） — 补 FIX 标记
-		var _status_icon := "○" if st == 0 else ("◎" if st == 1 else "✔") # FIX: M5
-		var _status_text := "未接" if st == 0 else ("进行" if st == 1 else "完成") # FIX: M5
+		# // FIX: M5 图标+文字冗余已存在（非纯颜色编码） — 补 FIX 标记
+		var _status_icon := "○" if st == 0 else ("◎" if st == 1 else "✔") # // FIX: M5
+		var _status_text := "未接" if st == 0 else ("进行" if st == 1 else "完成") # // FIX: M5
 		_mk_rect(_journal_panel, Vector2(34, row + 5), Vector2(15, 15), bullet)
-		var _icon_l := _mk_label(_journal_panel, _status_icon, 14, Color.WHITE) # FIX: M5
+		var _icon_l := _mk_label(_journal_panel, _status_icon, 14, Color.WHITE) # // FIX: M5
 		_icon_l.position = Vector2(36, row + 5)
 		_icon_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		# FIX: M5 文字冗余 [未接/进行/完成] 已存在
-		var name_l := _mk_label(_journal_panel, "[%s] %s" % [_status_text, str(e.get("name", ""))], 21, Color(0.95, 0.92, 0.80) if st < 3 else Color(0.60, 0.80, 0.58)) # FIX: M5
+		# // FIX: M5 文字冗余 [未接/进行/完成] 已存在
+		var name_l := _mk_label(_journal_panel, "[%s] %s" % [_status_text, str(e.get("name", ""))], 21, Color(0.95, 0.92, 0.80) if st < 3 else Color(0.60, 0.80, 0.58)) # // FIX: M5
 		name_l.position = Vector2(62, row)
 		var prog_l := _mk_label(_journal_panel, str(e.get("progress", "")), 17, Color(0.85, 0.80, 0.60))
 		prog_l.position = Vector2(468, row + 3)

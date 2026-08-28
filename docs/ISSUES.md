@@ -1,6 +1,7 @@
 # zhandi3 全量问题清单 · 7视角评审建档
 
-> 基线 `main@f953edd` 57 `.gd` / 17746 行，Godot 4.7 Forward Plus。
+> 基线 `main@4041505` + prior 57 `.gd` / 17746 行 → 17810 行，Godot 4.7 Forward Plus。
+> 已修复 21 项（P0 5 + 音画HUD + P1 稳定性 + Bot降频 + shot_bow + 蘑菇扣除 + InputMap/三平台脚手架），剩余按 S→M 逐项 headless 验证推送。
 > 7视角落盘：Game Design 5.5 / Visual 5.8 / Tech 5.2 / Audio 4.2 / Systems 4.5 / QA 4.5 / Commercial 3.5，加权 ~4.5 需大改。
 > 重跑模型：Tech/Audio 用 `muse-free`（原 `gpt-5.6-sol` watchdog 超时）重跑成功；workflow `wufj3j4y7` 6/8 完成（2个 Prompt 过长失败已由直连 Agent 补齐）。
 > 同伴3阻断与 Audio/Tech 互证已合并。
@@ -95,3 +96,32 @@
 
 - 每项修复后 `godot --headless --check-only` + `--screenshot` 雨夜回归（Task #3）
 - 本文件为唯一真实来源，Top15 Backlog 以此为准
+
+## 本轮增量（peer 10 项高置信，待逐项修复验证）
+
+| # | 标题 | 证据行号 | 状态 |
+|---|------|----------|------|
+| P1 | wild_world 入树前 global_position：野怪/守卫/马/鱼/营地/飞行器/动物/NPC 均 add 后定位，导致 !is_inside_tree() ERROR 且 Guardian/Fish/WildMonster/Creature/Flyer/NPC 回原点 | wild_world.gd:73-74,80-81,127-128,962-963,967-968,988-989,1005-1006,1021-1022,1030-1031,1036-1040,1044-1048,1065-1068,1174-1179,1319-1324,1337-1340,1382-1402 | 部分已修（guardian/moblin/monster/fish/circle/trail/creature/attacker/npc 已改 add→pos→add），剩余需验证零 ERROR |
+| P2 | Bot 悬垂 Loot：两 Bot 争同一 Loot，A consumed+queue_free，B 下帧解引用 freed | bot.gd:31,375,418-428,487-491；loot.gd:345-388 | 待 S 修 |
+| P3 | Bot 无寻路仅直线+2.2m 射线，塔顶/城堡武器永久锁 LOOT | bot.gd:362-367,614-629；wild_world.gd:1410-1415 | 待 M 优化 |
+| P4 | 血月类型污染：任意 wild_enemy 抑制指定类型 respawn，邻类抑制 | wild_world.gd:996-1008,1026-1057 | 待 S 修 |
+| P5 | 血月遗漏类型：仅 5 类，其余 Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon | wild_world.gd:996-1057 | 待 M 补 |
+| P6 | Wild/BR 混用：阔野死亡重生但 Bot death 仍 BR victory | main.gd:611-638,642-663 | 待 S 修 |
+| P7 | 载具内重生：die 不 exit vehicle，传送回被拉回载具 | player.gd:1110-1128；horse.gd:363-402；main.gd:642-663 | 待 S 修 |
+| P8 | await 后直 queue_free（Creature/Liz/Wizzrobe/Hinox） | wild_creature.gd:266-279 等 | 待 M 加 is_inside_tree 守卫 |
+| P9 | 倒木碰撞无 rotation 竖直块；守卫硬写 terrain y 覆桥 | wild_world.gd:1191-1206,251-258；guardian.gd:304-306 | 待 M 修 |
+| P10 | Bot 只找 weapon 不找 ammo，空匣反复 reload 永久哑火 | bot.gd:355-367,590-595；weapon.gd:98-103 | 待 M 修 |
+
+## 本轮增量2（peer 第二批 8 项，待逐项修复）
+
+| # | 标题 | 证据 | 优先级 |
+|---|------|------|--------|
+| P11 | 骑乘死亡未 exit：vehicle/driver/可见性/碰撞/相机均不清，四载具逐帧拉回 | player.gd:1110-1128；main.gd:642-663；horse:526-528 vehicle:340 motorcycle:391 raft:215 | S |
+| P12 | hitstop 全局 0.05 卡慢，恢复仅 783-787 且 Timer 受 time_scale 拉长至 44s | player.gd:1078,1568,783-787,599-635；main.gd:611-638 | S |
+| P13 | 背包 +6 但实际 10 项，后 4 项不可达；main 回归绕过导航写索引 | player.gd:1890-1892,1913-1931；main.gd:1416,1420,1508 | S |
+| P14 | N/B 文字不一致：main 1126/1129 与 hud 569 仍写 B，商店 N 被早截，骑乘 N 绕过 guard | project.godot:57-64 player.gd:207-287 main.gd:1126 hud.gd:569 | S |
+| P15 | 游泳时 _scan_loot 前 return，抓鱼不可达；缩胶囊未恢复 | player.gd:632-635,781,845-855,513-520,1738-1746 fish_spot:37-45 | S |
+| P16 | 盾滑无 stamina gate，0 精力可继续 | player.gd:712-721 | M |
+| P17 | 大 delta 跨过 swipe 窗口/滑翔精力/台阶无 sweep | player.gd:1612-1632,681-705,1722-1735 | M |
+| P18 | 精力药到期清退与重服窗口可永久多留 +20（早退未运行） | player.gd:795-799,1970-1974 | S |
+

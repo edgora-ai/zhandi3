@@ -2,7 +2,8 @@
 
 > 基线 `main@4041505` + prior 57 `.gd` / 17746 行 → 17810 行，Godot 4.7 Forward Plus。
 > 已修复 21 项（P0 5 + 音画HUD + P1 稳定性 + Bot降频 + shot_bow + 蘑菇扣除 + InputMap/三平台脚手架），剩余按 S→M 逐项 headless 验证推送。
-> 7视角落盘：Game Design 5.5 / Visual 5.8 / Tech 5.2 / Audio 4.2 / Systems 4.5 / QA 4.5 / Commercial 3.5，加权 ~4.5 需大改。
+> 7视角落盘：Game Design 5.1 / Visual 5.9 / Tech 5.3 / Audio 4.7 / Systems 4.6 / QA 4.5 / Commercial 3.4，加权 ~4.7-4.8 需大改。
+> Game@gpt-5.6-sol 11项（2 critical：Wild终局3重冲突+零存档；8 high：背包/InputMap/Guardian/圈192s/小地图等）与 QA 已落，剩余 peer 10 项与商业合规进入 S→M 修复。
 > 重跑模型：Tech/Audio 用 `muse-free`（原 `gpt-5.6-sol` watchdog 超时）重跑成功；workflow `wufj3j4y7` 6/8 完成（2个 Prompt 过长失败已由直连 Agent 补齐）。
 > 同伴3阻断与 Audio/Tech 互证已合并。
 
@@ -124,4 +125,44 @@
 | P16 | 盾滑无 stamina gate，0 精力可继续 | player.gd:712-721 | M |
 | P17 | 大 delta 跨过 swipe 窗口/滑翔精力/台阶无 sweep | player.gd:1612-1632,681-705,1722-1735 | M |
 | P18 | 精力药到期清退与重服窗口可永久多留 +20（早退未运行） | player.gd:795-799,1970-1974 | S |
+
+## 本轮增量3（peer 10 项确定性缺陷，评分 4.5/10，再次确认）
+
+> 已闭环：Stal crumble / Guardian await / Bot aim_target / Campfire 顺序
+> 部分闭环：_home（入树前 global_position 仍 ERROR，需改 position/setup(home)）
+> 未闭环 10 项如下，优先级 S→M：
+
+| # | 标题 | 行号 | 优先级 |
+|---|------|------|--------|
+| D1 | Bot target_loot 悬垂（两 Bot 争同一 Loot，A queue_free 后 B 解引用） | bot.gd:375,487-491；loot.gd:345-388 | S |
+| D2 | _home 部分闭环：仍有 Liz/Guardian/Fish/营地/Creature/Flyer/NPC 为 add 后定位 | wild_world.gd:1036-1040,1044-1048,1065-1068,1174-1179,1319-1324,1337-1340,1382-1402 | S |
+| D3 | Bot 无寻路，塔顶/城堡 Loot 永久锁 LOOT，仅 2.2m 射线 | bot.gd:355-379,564-629；wild_world.gd:1410-1415 | M |
+| D4 | Wild 复用 BR 淘汰：8 Bot 死后阔野被结算锁死 | main.gd:611-638,466-471,642-663 | S |
+| D5 | 骑乘死亡未 exit，下帧被拉回座位 invisible/no collision | player.gd:1110-1128；main.gd:642-663；horse.gd:363-402,526-528 | S |
+| D6 | 血月 _enemy_near 不判类型，异类抑制指定类型 | wild_world.gd:993-1057 | M |
+| D7 | 血月遗漏类型（Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon） | wild_world.gd:996-1057 | M |
+| D8 | Bot 只找 weapon 不找 ammo，空匣哑火 | bot.gd:355-367,590-595；weapon.gd:98-103 | M |
+| D9 | Projectile source 悬垂 6s | wild_projectile.gd:9,101-115 | M |
+| D10 | 物理错位：倒木碰撞竖直、守卫强写 terrain y 覆桥 | wild_world.gd:1191-1206；guardian.gd:304-306 | M |
+
+近期 Tech 复审 5.3 与本轮 4.5 交叉验证，`ISSUES` 保持唯一真实来源。
+
+## 本轮增量4（Game Design@gpt-5.6-sol 5.1/10，11项，2 critical）
+
+> 基线 fadf566，已含 22 项修复；本审计覆盖野取证+运行探针。
+
+| # | 标题 | Sev | 证据 | 状态 |
+|---|------|-----|------|------|
+| G1 | Wild 终局3重冲突：无限重生+最后存活胜利+巨龙终局互斥，8 Bot死后锁死 | main.gd:620-663,768-784 探针 match_over=true | S 待修 |
+| G2 | 零存档2小时无承接（与 Systems 一致） | player.gd:26-133 main.gd:65 | XL 待存档服务 |
+| G3 | 背包 +6 vs 10 已在 f9bd405 修，但需回归 | player.gd:1890 | 已修待锁回归 |
+| G4 | InputMap 0消费者 | project.godot:27 vs player.gd:203 | L 待迁移 |
+| G5 | Battlefield 192s + 决赛圈停伤 | zone.gd:7-13,78-80 探针5s后HP=100 | M 待圈重调 |
+| G6 | 无世界地图仅 164点阵 | hud.gd:132,759 main.gd:863 | L 待地图 |
+| G7 | Guardian 每帧清零永不发射 | guardian.gd:264-283 探针5s HP=100 | S 本轮已补 |
+| G8 | 成长数值近战/HUD不一致 | player.gd:1011,1520 hud.gd:248 | M 待 CombatStats |
+| G9 | 三枪 TTK 0.89/0.80/0.83 趋同 | weapon.gd:14 | M 待差异化 |
+| G10 | IP 风险 XL | README.md:1-3 | XL 需原创化 |
+
+score 5.1，三轨音乐/据点/Bot/医疗等 6 项已闭环不重复计分。
 

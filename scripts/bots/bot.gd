@@ -372,7 +372,7 @@ func _think_tick() -> void:
 			capture_goal = cp
 			move_target = cp.global_position
 			return
-	if state == State.LOOT and (target_loot == null or target_loot.consumed):
+	if state == State.LOOT and (target_loot == null or not is_instance_valid(target_loot) or target_loot.consumed):
 		state = State.ROTATE
 	if state in [State.ROTATE, State.CAPTURE, State.DROP]:
 		if global_position.distance_to(move_target) < 3.0 or state == State.DROP:
@@ -484,7 +484,7 @@ func _physics_process(delta: float) -> void:
 			speed = WALK
 			_fight_fire(delta)
 		State.LOOT:
-			if target_loot and not target_loot.consumed:
+			if target_loot and is_instance_valid(target_loot) and not target_loot.consumed:
 				move_dir = _seek(target_loot.global_position)
 				speed = RUN
 				if global_position.distance_to(target_loot.global_position) < 1.8:

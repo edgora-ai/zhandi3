@@ -1064,14 +1064,14 @@ func _spawn_fish_and_circles() -> void:
 		var x := sin(z * 0.021) * 24.0 - 8.0 + sin(z * 0.049) * 7.0
 		var fish := FishSpot.new()
 		fish.player = player
-		add_child(fish)
 		fish.global_position = Vector3(x, Terrain.WATER_LEVEL - 0.5, z)
+		add_child(fish)
 	var circle_spots := [Vector3(-60, 0, 55), Vector3(95, 0, 15), Vector3(-20, 0, -88), Vector3(-135, 0, 35)]
 	for i in range(circle_spots.size()):
 		var circle := RockCircle.new()
-		add_child(circle)
 		circle.configure(player, float(i) * 1.7 + 0.4)
 		circle.global_position = _ground(circle_spots[i], 0.02)
+		add_child(circle)
 	# 两条花径呀哈哈。
 	var trail1 := FlowerTrail.new()
 	add_child(trail1)
@@ -1318,10 +1318,10 @@ func _spawn_animals() -> void:
 		var p: Vector3 = entry[1]
 		var creature := WildCreature.new()
 		creature.setup(kind, terrain, player)
-		add_child(creature)
 		var altitude := 8.0 if kind == "bird" else 0.05
 		creature.global_position = _ground(p, altitude)
 		creature.rotation.y = randf_range(0, TAU)
+		add_child(creature)
 
 
 func _spawn_dragon() -> void:
@@ -1336,8 +1336,8 @@ func _spawn_flying_attackers() -> void:
 	for p in [Vector3(22, 0, -70), Vector3(116, 0, -80), Vector3(-128, 0, 70)]:
 		var attacker := FlyingAttacker.new()
 		attacker.setup(terrain, player)
-		add_child(attacker)
 		attacker.global_position = _ground(p, 9.0)
+		add_child(attacker)
 
 
 # 地区性 3D 循环环境声：火山低鸣、雪原风吼，靠近地区时自然浮现。
@@ -1390,14 +1390,15 @@ func _spawn_npcs() -> void:
 			npc.quest_id = "moblin2"
 		elif i == 1:
 			npc.quest_id = "scale1"
-		add_child(npc)
 		npc.global_position = _ground(spec[0], 0.02)
+		add_child(npc)
 		npc.rotation.y = randf_range(0.0, TAU)
 	# 行商：沿道路在驿站与海利亚大桥之间往返（旷野之息式的流动商人）。
 	var merchant := WildNPC.new()
 	merchant.setup(terrain, player, "行商多戈", ["这条商路我走了十年，桥修好后好走多了。", "驿站收兽肉，蘑菇在河滩芦苇边最多。", "马上了路会自己认路，你尽管看风景。"], Color(0.60, 0.42, 0.20), 0)
 	add_child(merchant)
 	merchant.global_position = _ground(Vector3(-40, 0, 20), 0.02)
+	add_child(merchant)
 	merchant.quest_id = "escort"
 	merchant.patrol = [Vector3(-70, 0, 21.5), Vector3(-40, 0, 20), Vector3(-15.5, 0, 18.5), Vector3(6, 0, 18), Vector3(-15.5, 0, 18.5), Vector3(-40, 0, 20)]
 

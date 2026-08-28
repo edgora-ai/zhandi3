@@ -599,7 +599,8 @@ func _end_flurry() -> void:
 
 
 func _check_timed_consumables() -> void:
-	_shop_cd = maxf(0.0, _shop_cd - get_process_delta_time())
+	if _shop_cd > 0.0:
+		_shop_cd = maxf(0.0, _shop_cd - get_physics_process_delta_time())
 	# 墙钟计时，不受 Engine.time_scale 影响；需在所有 early return 前调用
 	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
 		_hitstop_end_ms = 0
@@ -743,6 +744,7 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_pressed("jump"):
 			velocity.y = JUMP_VEL
 	else:
+		_landed_last_frame = false
 		_airborne_time += delta
 		# 初次空降和之后从任意悬崖跃下都能展开；普通小跳因离地高度不足不会误触。
 		var clearance := 99.0

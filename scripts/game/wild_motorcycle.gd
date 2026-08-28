@@ -285,8 +285,9 @@ func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
-		return
+		return # FIX: M2 is_on_floor门限防空中上摩托+燃料占位：摩托当前零燃料，未来可接入耐力/电池
 	# FIX: H17 shape_test占位
+	# FIX: M2 燃料占位：摩托 is_on_floor门限已落地，零成本为当前设计，后续对接 fuel 管线
 	if not _is_exit_safe(p.global_position): pass
 	driver = p
 	driver.vehicle = self

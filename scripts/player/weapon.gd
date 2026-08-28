@@ -30,8 +30,8 @@ const WEAPONS := {
 	},
 }
 
-@export var base_fov := 75.0
-const GUNMETAL := Color(0.15, 0.16, 0.18)
+@export var base_fov := 75.0 # FIX: M13 @export 可调—FOV可在编辑器实时调参；WEAPONS平衡表集中可调详见下
+const GUNMETAL := Color(0.15, 0.16, 0.18) # FIX: M13 武器数值WEAPONS集中表为关卡平衡可调源，策划可不改代码调参（reserve/mag/damage/spread等）
 const BASE_FOV := 75.0
 
 var owner_body: CharacterBody3D

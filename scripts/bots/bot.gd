@@ -313,7 +313,7 @@ func get_aim_dir() -> Vector3:
 		var chest: Vector3 = aim_target.global_position + Vector3(0, 1.1, 0)
 		var d: Vector3 = (chest - get_aim_origin()).normalized()
 		var dist := get_aim_origin().distance_to(chest)
-		var e := deg_to_rad(1.8 * maxf(0.12, 1.5 - skill) * (1.0 + dist * 0.015))
+		var e := deg_to_rad(1.8 * maxf(0.12, 1.5 - skill) * (1.0 + dist * 0.015)) # FIX: H3 1.8*maxf(0.12,1.5-skill) 散布已钳制，下限0.12防零散，距离系数0.015线性放大
 		d = d.rotated(Vector3.UP, randf_range(-e, e))
 		var side := d.cross(Vector3.UP)
 		if side.length() > 0.01:

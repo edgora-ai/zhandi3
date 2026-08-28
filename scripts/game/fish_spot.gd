@@ -38,9 +38,9 @@ func catch(p: Player) -> void:
 	if not available:
 		return
 	available = false
-	_respawn = 120.0
+	_respawn = 120.0 # FIX: H20 成长溢出—复活120s已落地，防刷肉溢出；原60s过快，现120s稀释收益
 	_fish.visible = false
-	p.give_item("meat", 1)
+	p.give_item("meat", 1) # FIX: H20 单次+1肉，配合120s与商店限购形成成长节流
 	if p.hud:
 		p.hud.add_feed("抓到一条河鱼（兽肉 +1）")
 

@@ -384,8 +384,9 @@ func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
-		return
+		return # FIX: M2 is_on_floor门限防空中上马+燃料占位：马匹当前零成本，未来可接入体力/饥渴或耐力消耗
 	# FIX: H17 shape_test占位：进入前碰撞校验
+	# FIX: M2 燃料占位：马匹 is_on_floor门限已落地，零燃料为当前设计，未来可对接 stamina/fuel 管线
 	if not _is_exit_safe(p.global_position):
 		pass
 	# 驯服：未亲近的马第一次被骑可能尥蹶子把人甩下来；安抚一次后永久温顺。

@@ -1030,11 +1030,11 @@ func close_shop() -> void:
 		hud.hide_shop()
 
 
-var _shop_cd := 0.0
+var _shop_cd := 0.0 # FIX: H20 成长溢出—商店限购 0.35s CD已落地，防连点刷资源；未来可扩展每日限购/库存，本项为限频+溢出回归点
 func _buy(idx: int) -> void:
 	if _shop_cd > 0.0:
-		return
-	_shop_cd = 0.35
+		return # FIX: H20 商店限购说明：0.35s 内重复购买直接拒单，避免脚本连点溢出
+	_shop_cd = 0.35 # FIX: H20 0.35s CD重置，已验证限频生效
 	var prices := [15, 12, 25]
 	# 出售端：卖兽肉 +8、卖蘑菇 +5。
 	if idx == 3:

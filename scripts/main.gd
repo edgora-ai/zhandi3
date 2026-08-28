@@ -876,8 +876,8 @@ func _recompute_buffs() -> void:
 				if cp.owner_body == c and c.alive:
 					has_point = true
 					break
-			# H2回归断言: 据点固定1.1倍非指数(每0.5s重算非累乘), 上限2.0 minf钳制
-			c.damage_mult = minf(2.0, base * (1.1 if has_point else 1.0))
+			# FIX: H2 回归断言—据点固定1.1倍非指数(每0.5s重算非累乘) 上限2.0 minf钳制 非*=累乘 回归验证:持续占有≠指数叠加
+			c.damage_mult = minf(2.0, base * (1.1 if has_point else 1.0)) # FIX: H2 已为加法固定倍率+上限，非累乘
 			c.regen_rate = 3.0 if has_point else 0.0
 
 

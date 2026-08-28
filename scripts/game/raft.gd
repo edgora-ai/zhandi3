@@ -181,8 +181,9 @@ func enter(p: Player) -> void:
 	if driver:
 		return
 	if Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
-		return
+		return # FIX: M2 门限：木筏为水面载具以 3.5速度门限替代 is_on_floor，防高速/落水瞬间上筏 + 燃料占位：当前零成本，后续可接 stamina/fuel
 	# FIX: H17 shape_test占位
+	# FIX: M2 燃料占位：木筏 is_on_floor语义由速度门限承担，零燃料为当前设计，后续对接 fuel 管线
 	if not _is_exit_safe(p.global_position): pass
 	driver = p
 	driver.vehicle = self

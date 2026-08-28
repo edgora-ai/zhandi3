@@ -1446,7 +1446,7 @@ func _fire_arrow() -> void:
 	arrow.global_position = camera.global_position + dir * 0.7 - Vector3(0, 0.12, 0)
 	var sfx := get_tree().get_first_node_in_group("sfx_bank")
 	if sfx:
-		sfx.play("hit", -10.0)
+		sfx.play("shot_bow", -10.0)
 	_bow_draw = 0.0
 	weapon.set_ads(false)
 

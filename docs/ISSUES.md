@@ -105,12 +105,12 @@
 | P1 | wild_world 入树前 global_position：野怪/守卫/马/鱼/营地/飞行器/动物/NPC 均 add 后定位，导致 !is_inside_tree() ERROR 且 Guardian/Fish/WildMonster/Creature/Flyer/NPC 回原点 | wild_world.gd:73-74,80-81,127-128,962-963,967-968,988-989,1005-1006,1021-1022,1030-1031,1036-1040,1044-1048,1065-1068,1174-1179,1319-1324,1337-1340,1382-1402 | 部分已修（guardian/moblin/monster/fish/circle/trail/creature/attacker/npc 已改 add→pos→add），剩余需验证零 ERROR |
 | P2 | Bot 悬垂 Loot：两 Bot 争同一 Loot，A consumed+queue_free，B 下帧解引用 freed | bot.gd:31,375,418-428,487-491；loot.gd:345-388 | 已修复 已修复 51f2958 同 D1 |
 | P3 | Bot 无寻路仅直线+2.2m 射线，塔顶/城堡武器永久锁 LOOT | bot.gd:362-367,614-629；wild_world.gd:1410-1415 | 待 M 优化 |
-| P4 | 血月类型污染：任意 wild_enemy 抑制指定类型 respawn，邻类抑制 | wild_world.gd:996-1008,1026-1057 | 待 S 修 |
+| P4 | 血月类型污染：任意 wild_enemy 抑制指定类型 respawn | wild_world.gd:996-1008,1026-1057 | 已修复 同类判活（wild_moblin/wild_lizalfos/guardian） |
 | P5 | 血月遗漏类型：仅 5 类，其余 Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon | wild_world.gd:996-1057 | 待 M 补 |
 | P6 | Wild/BR 混用：阔野死亡重生但 Bot death 仍 BR victory | main.gd:611-638,642-663 | 已修复 已修复 551f373 Wild/BR 终局 _map_id 守卫，可验证：仅 battlefield 判胜 |
 | P7 | 载具内重生：die 不 exit vehicle，传送回被拉回载具 | player.gd:1110-1128；horse.gd:363-402；main.gd:642-663 | 已修复 已修复 551f373 玩家 die/respawn 均 exit 载具并恢复可见/碰撞 |
 | P8 | await 后直 queue_free（Creature/Liz/Wizzrobe/Hinox） | wild_creature.gd:266-279 等 | 待 M 加 is_inside_tree 守卫 |
-| P9 | 倒木碰撞无 rotation 竖直块；守卫硬写 terrain y 覆桥 | wild_world.gd:1191-1206,251-258；guardian.gd:304-306 | 待 M 修 |
+| P9 | 倒木碰撞无 rotation 竖直块；守卫硬写 terrain y 覆桥 | wild_world.gd:1191-1206,251-258；guardian.gd:304-306 | 已修复 029c057 碰撞传 90° + 仅非 is_on_floor 回落 |
 | P10 | Bot 只找 weapon 不找 ammo，空匣反复 reload 永久哑火 | bot.gd:355-367,590-595；weapon.gd:98-103 | 待 M 修 |
 
 ## 本轮增量2（peer 第二批 8 项，待逐项修复）
@@ -139,11 +139,11 @@
 | D3 | Bot 无寻路，塔顶/城堡 Loot 永久锁 LOOT，仅 2.2m 射线 | bot.gd:355-379,564-629；wild_world.gd:1410-1415 | M |
 | D4 | Wild 复用 BR 淘汰：8 Bot 死后阔野被结算锁死 | main.gd:611-638,466-471,642-663 | S |
 | D5 | 骑乘死亡未 exit，下帧被拉回座位 invisible/no collision | player.gd:1110-1128；main.gd:642-663；horse.gd:363-402,526-528 | S |
-| D6 | 血月 _enemy_near 不判类型，异类抑制指定类型 | wild_world.gd:993-1057 | M |
+| D6 | 血月 _enemy_near 不判类型，异类抑制指定类型 | wild_world.gd:993-1057 | 已修复 029c057 同 P4 |
 | D7 | 血月遗漏类型（Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon） | wild_world.gd:996-1057 | M |
 | D8 | Bot 只找 weapon 不找 ammo，空匣哑火 | bot.gd:355-367,590-595；weapon.gd:98-103 | M |
 | D9 | Projectile source 悬垂 6s | wild_projectile.gd:9,101-115 | M |
-| D10 | 物理错位：倒木碰撞竖直、守卫强写 terrain y 覆桥 | wild_world.gd:1191-1206；guardian.gd:304-306 | M |
+| D10 | 物理错位：倒木碰撞竖直、守卫强写 terrain y 覆桥 | wild_world.gd:1191-1206；guardian.gd:304-306 | 已修复 029c057 同 P9 |
 
 近期 Tech 复审 5.3 与本轮 4.5 交叉验证，`ISSUES` 保持唯一真实来源。
 

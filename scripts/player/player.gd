@@ -1110,6 +1110,8 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 func die(from: Variant = null) -> void:
 	if not alive:
 		return
+	Engine.time_scale = 1.0
+	_hitstop_end_ms = 0
 	_end_flurry()
 	# 小精灵：死亡时自动消耗一只复活（30% 生命），金色爆闪。
 	if fairies > 0:

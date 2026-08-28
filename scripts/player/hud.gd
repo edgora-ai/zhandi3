@@ -566,7 +566,7 @@ func show_backpack(lines: Array[String], selected: int) -> void:
 	_mk_rect(_backpack_panel, Vector2(8, 8), Vector2(644, 474), Color(0.09, 0.17, 0.16, 0.88))
 	var title := _mk_label(_backpack_panel, "旅 行 背 包", 31, Color(0.97, 0.83, 0.42))
 	title.position = Vector2(30, 24)
-	var subtitle := _mk_label(_backpack_panel, "↑↓ / W S 选择    E / Enter 取出或使用    X 存入当前武器    B 关闭", 15, Color(0.68, 0.88, 0.83))
+	var subtitle := _mk_label(_backpack_panel, "↑↓ / W S 选择    E / Enter 取出或使用    X 存入当前武器    N 关闭（B 引爆）", 15, Color(0.68, 0.88, 0.83))
 	subtitle.position = Vector2(30, 70)
 	for i in range(lines.size()):
 		var active := i == selected

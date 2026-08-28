@@ -650,6 +650,8 @@ func _respawn_wild_player() -> void:
 			if d2 < best_d:
 				best_d = d2
 				spot = (shrine as Node3D).global_transform * Vector3(0, 0.4, -9.0)
+	Engine.time_scale = 1.0
+	player._hitstop_end_ms = 0
 	player.alive = true
 	player.hp = player.max_hp
 	player.stamina = player.max_stamina
@@ -1123,10 +1125,10 @@ func _process(delta: float) -> void:
 		elif not player.is_on_floor() and player.velocity.y < -0.55:
 			state = " · 按住 Space 展开滑翔伞"
 		hud.set_zone_text(wild_world.get_region_name(player.global_position))
-		hud.set_world_state("海拉鲁阔野 · %s%s\nM 地图  ·  B 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
+		hud.set_world_state("海拉鲁阔野 · %s%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
 		var quest_text := quest_status_text()
 		if quest_text != "":
-			hud.set_world_state("海拉鲁阔野 · %s%s\n%s\nM 地图  ·  B 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state, quest_text])
+			hud.set_world_state("海拉鲁阔野 · %s%s\n%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state, quest_text])
 	else:
 		hud.set_zone_text(zone.status_text())
 		hud.set_world_state("群岛战场\nM 地图选择")

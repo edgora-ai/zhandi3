@@ -1,7 +1,7 @@
 # zhandi3 全量问题清单 · 7视角评审建档
 
 > 基线 `main@4041505` + prior 57 `.gd` / 17746 行 → 17810 行，Godot 4.7 Forward Plus。
-> 已修复 21 项（P0 5 + 音画HUD + P1 稳定性 + Bot降频 + shot_bow + 蘑菇扣除 + InputMap/三平台脚手架），剩余按 S→M 逐项 headless 验证推送。
+> 已修复 29 项（P0 5 + 音画HUD + P1 稳定性 + Bot降频 + shot_bow + 蘑菇扣除 + InputMap/三平台脚手架 + 背包10项(f9bd405) + time_scale(b8cde6c) + Guardian/ca90ced + Wild/BR+骑乘(551f373) + 游泳/圈(91354fd) + 悬垂/入树(51f2958)），剩余按 S→M 逐项 headless 验证推送。
 > 7视角落盘：Game Design 5.1 / Visual 5.9 / Tech 5.3 / Audio 4.7 / Systems 4.6 / QA 4.5 / Commercial 3.4，加权 ~4.7-4.8 需大改。
 > Game@gpt-5.6-sol 11项（2 critical：Wild终局3重冲突+零存档；8 high：背包/InputMap/Guardian/圈192s/小地图等）与 QA 已落，剩余 peer 10 项与商业合规进入 S→M 修复。
 > 重跑模型：Tech/Audio 用 `muse-free`（原 `gpt-5.6-sol` watchdog 超时）重跑成功；workflow `wufj3j4y7` 6/8 完成（2个 Prompt 过长失败已由直连 Agent 补齐）。
@@ -103,12 +103,12 @@
 | # | 标题 | 证据行号 | 状态 |
 |---|------|----------|------|
 | P1 | wild_world 入树前 global_position：野怪/守卫/马/鱼/营地/飞行器/动物/NPC 均 add 后定位，导致 !is_inside_tree() ERROR 且 Guardian/Fish/WildMonster/Creature/Flyer/NPC 回原点 | wild_world.gd:73-74,80-81,127-128,962-963,967-968,988-989,1005-1006,1021-1022,1030-1031,1036-1040,1044-1048,1065-1068,1174-1179,1319-1324,1337-1340,1382-1402 | 部分已修（guardian/moblin/monster/fish/circle/trail/creature/attacker/npc 已改 add→pos→add），剩余需验证零 ERROR |
-| P2 | Bot 悬垂 Loot：两 Bot 争同一 Loot，A consumed+queue_free，B 下帧解引用 freed | bot.gd:31,375,418-428,487-491；loot.gd:345-388 | 待 S 修 |
+| P2 | Bot 悬垂 Loot：两 Bot 争同一 Loot，A consumed+queue_free，B 下帧解引用 freed | bot.gd:31,375,418-428,487-491；loot.gd:345-388 | 已修复 已修复 51f2958 同 D1 |
 | P3 | Bot 无寻路仅直线+2.2m 射线，塔顶/城堡武器永久锁 LOOT | bot.gd:362-367,614-629；wild_world.gd:1410-1415 | 待 M 优化 |
 | P4 | 血月类型污染：任意 wild_enemy 抑制指定类型 respawn，邻类抑制 | wild_world.gd:996-1008,1026-1057 | 待 S 修 |
 | P5 | 血月遗漏类型：仅 5 类，其余 Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon | wild_world.gd:996-1057 | 待 M 补 |
-| P6 | Wild/BR 混用：阔野死亡重生但 Bot death 仍 BR victory | main.gd:611-638,642-663 | 待 S 修 |
-| P7 | 载具内重生：die 不 exit vehicle，传送回被拉回载具 | player.gd:1110-1128；horse.gd:363-402；main.gd:642-663 | 待 S 修 |
+| P6 | Wild/BR 混用：阔野死亡重生但 Bot death 仍 BR victory | main.gd:611-638,642-663 | 已修复 已修复 551f373 Wild/BR 终局 _map_id 守卫，可验证：仅 battlefield 判胜 |
+| P7 | 载具内重生：die 不 exit vehicle，传送回被拉回载具 | player.gd:1110-1128；horse.gd:363-402；main.gd:642-663 | 已修复 已修复 551f373 玩家 die/respawn 均 exit 载具并恢复可见/碰撞 |
 | P8 | await 后直 queue_free（Creature/Liz/Wizzrobe/Hinox） | wild_creature.gd:266-279 等 | 待 M 加 is_inside_tree 守卫 |
 | P9 | 倒木碰撞无 rotation 竖直块；守卫硬写 terrain y 覆桥 | wild_world.gd:1191-1206,251-258；guardian.gd:304-306 | 待 M 修 |
 | P10 | Bot 只找 weapon 不找 ammo，空匣反复 reload 永久哑火 | bot.gd:355-367,590-595；weapon.gd:98-103 | 待 M 修 |
@@ -153,16 +153,34 @@
 
 | # | 标题 | Sev | 证据 | 状态 |
 |---|------|-----|------|------|
-| G1 | Wild 终局3重冲突：无限重生+最后存活胜利+巨龙终局互斥，8 Bot死后锁死 | main.gd:620-663,768-784 探针 match_over=true | S 待修 |
+| G1 | Wild 终局3重冲突：无限重生+最后存活胜利+巨龙终局互斥，8 Bot死后锁死 | main.gd:620-663,768-784 探针 match_over=true | 已修复 551f373 Wild/BR 终局 _map_id 守卫 |
 | G2 | 零存档2小时无承接（与 Systems 一致） | player.gd:26-133 main.gd:65 | XL 待存档服务 |
 | G3 | 背包 +6 vs 10 已在 f9bd405 修，但需回归 | player.gd:1890 | 已修待锁回归 |
 | G4 | InputMap 0消费者 | project.godot:27 vs player.gd:203 | L 待迁移 |
 | G5 | Battlefield 192s + 决赛圈停伤 | zone.gd:7-13,78-80 探针5s后HP=100 | M 待圈重调 |
 | G6 | 无世界地图仅 164点阵 | hud.gd:132,759 main.gd:863 | L 待地图 |
-| G7 | Guardian 每帧清零永不发射 | guardian.gd:264-283 探针5s HP=100 | S 本轮已补 |
+| G7 | Guardian 每帧清零永不发射 | guardian.gd:264-283 探针5s HP=100 | 已修复 ca90ced 仅达阈值后重置 |
 | G8 | 成长数值近战/HUD不一致 | player.gd:1011,1520 hud.gd:248 | M 待 CombatStats |
 | G9 | 三枪 TTK 0.89/0.80/0.83 趋同 | weapon.gd:14 | M 待差异化 |
 | G10 | IP 风险 XL | README.md:1-3 | XL 需原创化 |
 
 score 5.1，三轨音乐/据点/Bot/医疗等 6 项已闭环不重复计分。
+
+## 已验证修复（本轮 headless 均 EXIT:0）
+
+> 验证命令：`tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 30`，近期每次修复后均回归。
+
+| 项 | 修复提交 | 验证 |
+|---|----------|------|
+| SOUNDS 4键+shot_bow 实播 | 0161f32 + 4041505 | 资源存在且调用闭环，不再静默 |
+| 昼夜/Boss 三轨 Mixer | fadf566 + 本轮 | _calc_music_volumes 四组合真值表闭合 |
+| Guardian 充能 | ca90ced | 仅达 2.2s 后重置，探针 5s 发射 |
+| 炸弹双伤 52 | ca90ced | 排除 player/source，去重字典，玩家仅自伤 |
+| Wild/BR 终局隔离 | 551f373 | _map_id!="wild" 守卫，可验证野杀8Bot不锁 |
+| 骑乘死亡 | 551f373 + b8cde6c | die/respawn 均 exit+恢复可见/碰撞 |
+| 游泳/圈停伤 | 91354fd | zone final DPS 保持，_scan_loot 前置抓鱼可达 |
+| target_loot 悬垂 | 51f2958 | 双点 is_instance_valid 守卫 |
+| 入树顺序 | 51f2958 | 鱼/圈/动物/飞行器等 5 处先设位置再入树 |
+| 背包 10项 | f9bd405 | +6→实际行数，10 项可达 |
+| time_scale 泄漏 | b8cde6c | die/respawn 无条件重置 |
 

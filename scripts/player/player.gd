@@ -1888,7 +1888,7 @@ func _toggle_backpack() -> void:
 
 
 func _backpack_entry_count() -> int:
-	return backpack_weapons.size() + 6
+	return backpack_weapons.size() + get_backpack_lines().size()
 
 
 func _refresh_backpack() -> void:

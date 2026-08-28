@@ -631,7 +631,7 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 			hud.show_end(false, rank, player.kills, total_combatants)
 		)
 		return
-	if not match_over and _alive_count() == 1 and player.alive:
+	if _map_id != "wild" and not match_over and _alive_count() == 1 and player.alive:
 		match_over = true
 		player.input_locked = true
 		sfx.play("victory", -2.0)
@@ -642,6 +642,15 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 func _respawn_wild_player() -> void:
 	if _map_id != "wild" or player.alive:
 		return
+	# 骑乘中死亡需先 exit，避免下一帧被 horse/vehicle 拉回座位
+	if player.vehicle and player.vehicle.has_method("force_exit"):
+		player.vehicle.force_exit()
+	elif player.vehicle and player.vehicle.has_method("exit"):
+		player.vehicle.exit(player)
+	player.vehicle = null
+	player.visible = true
+	player.collision_layer = 1
+	player.collision_mask = 1 | 2 | 4
 	var spot := Vector3(-122, 0, 98)
 	var best_d := INF
 	if wild_world:

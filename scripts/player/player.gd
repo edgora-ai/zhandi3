@@ -1123,6 +1123,13 @@ func die(from: Variant = null) -> void:
 		if hud:
 			hud.add_feed("小精灵把你从死亡边缘拉了回来（剩 %d 只）" % fairies)
 		return
+	# 若在载具上死亡，先下车避免重生被拉回
+	if vehicle and vehicle.has_method("exit"):
+		vehicle.exit()
+		vehicle = null
+		visible = true
+		collision_layer = 1
+		collision_mask = 1 | 2 | 4
 	alive = false
 	hp = 0.0
 	if from and from.get("kills") != null:

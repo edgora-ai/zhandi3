@@ -71,9 +71,19 @@ func _process(delta: float) -> void:
 func detonate() -> void:
 	var scene := get_tree().current_scene
 	var pos := global_position
-	# 敌伤：范围衰减。
+	# 敌伤：范围衰减。玩家走专用自伤分支，去重避免 40+12 双伤。
+	var damaged: Dictionary = {}
+	var scene_player: Node = null
+	if scene and scene.get("player") != null:
+		scene_player = scene.get("player")
 	for group in ["wild_enemy", "wildlife", "combatant"]:
 		for target in get_tree().get_nodes_in_group(group):
+			if target == scene_player:
+				continue
+			if target == source:
+				continue
+			if damaged.has(target.get_instance_id()):
+				continue
 			if not (target is CharacterBody3D) or not target.alive:
 				continue
 			var d: float = target.global_position.distance_to(pos)
@@ -81,6 +91,7 @@ func detonate() -> void:
 				continue
 			if target.has_method("take_damage"):
 				target.take_damage(DAMAGE * clampf(1.0 - d / RADIUS, 0.25, 1.0), source if source else self, "body")
+				damaged[target.get_instance_id()] = true
 	# 可炸物：裂岩等可破坏物按全额伤害结算。
 	for target in get_tree().get_nodes_in_group("crackable"):
 		var cd: float = target.global_position.distance_to(pos)

@@ -260,19 +260,19 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	to_player.y = 0.0
 	var dist := to_player.length()
-	# 瞄准与充能：激光追踪，充能满即发射。
+	# 瞄准与充能：激光追踪，充能满即发射；仅达阈值后重置。
 	if _charge >= 0.0:
 		_charge += delta
 		_aim_laser()
 		if _charge >= CHARGE_TIME:
 			_fire_beam()
-		_charge = -1.0
-		_cooldown = 4.0
-		_laser.visible = false
-		if _eye_mat:
-			_eye_mat.emission = Color(0.05, 0.95, 0.85)
-			_eye_mat.albedo_color = Color(0.10, 0.90, 0.85)
-		_set_eye(Color(0.10, 0.90, 0.85))
+			_charge = -1.0
+			_cooldown = 4.0
+			_laser.visible = false
+			if _eye_mat:
+				_eye_mat.emission = Color(0.05, 0.95, 0.85)
+				_eye_mat.albedo_color = Color(0.10, 0.90, 0.85)
+			_set_eye(Color(0.10, 0.90, 0.85))
 	elif dist < SIGHT and _cooldown <= 0.0 and player.alive:
 		_charge = 0.0
 		_laser.visible = true

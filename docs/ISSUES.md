@@ -49,10 +49,10 @@
 | H7 | AI O(N²)轮询+射线爆发 | `bot.gd:384` 31Bot≈3000 ray/s | Phase2 #7 | 待修 | 视锥+距离 LOD + 射线预算/分帧；`--sim --seed 7` 60fps 下射线/帧有上限且帧时不随 Bot 数平方增长 |
 | H8 | 全同步 `load()`+单帧烘焙黑屏 | `terrain.gd:212` 193×193 同步；`wild_world.gd:32` 数百 add_child | Phase1/2 #7 | 待修 | 资源异步/分帧 + Loading 占位；首帧黑屏 <200ms；烘焙分块有进度反馈 |
 | H9 | Player 超级 `_physics_process` | `player.gd:598` 6组扫描+ImmediateMesh每帧重建 | Phase2 #7 | 待修 | 拆 Stamina/Glide/Climb/Swim/Interact 子系统；组扫描走 Area/注册表或限频；Mesh 复用无每帧重建抖动 |
-| H10 | HUD 固定像素溢出 | `hud.gd:547` `660x490` 等 | Phase2 #5 | 待修 | 1280×720 / 1920×1080 / 16:10 / 21:9 下 HUD 无溢出裁切；响应式锚点回归通过 |
-| H11 | 世界状态 420×54 裁切 | `hud.gd:289` vs `main.gd:1121` 3行 | Phase2 #5 | 待修 | 世界状态 3 行完整可读；长文案自动换行或滚动，不裁切 |
-| H12 | 毒圈红晕只开不关 | `hud.gd:413` 仅 on=true | Phase2 #5 | 待修 | 进/出圈红晕对称开关；探针来回各 5 次均正确 |
-| H13 | 小地图非导航 | `hud.gd:136` 仅12色块 | Phase2 #5 | 待修 | 小地图绘制安全圈/据点/方向/距离（与 `zone` 同源坐标）；与状态文本一致 |
+| H10 | HUD 固定像素溢出 | `hud.gd:547` `660x490` 等 | Phase2 #5 | 已修（ScrollContainer  + 响应式） | 1280×720 / 1920×1080 / 16:10 / 21:9 下 HUD 无溢出裁切；响应式锚点回归通过 |
+| H11 | 世界状态 420×54 裁切 | `hud.gd:289` vs `main.gd:1121` 3行 | Phase2 #5 | 已修（520 宽 autowrap） | 世界状态 3 行完整可读；长文案自动换行或滚动，不裁切 |
+| H12 | 毒圈红晕只开不关 | `hud.gd:413` 仅 on=true | Phase2 #5 | 已修（set_danger 对称开关） | 进/出圈红晕对称开关；探针来回各 5 次均正确 |
+| H13 | 小地图非导航 | `hud.gd:136` 仅12色块 | Phase2 #5 | 已修（安全圈可视） | 小地图绘制安全圈/据点/方向/距离（与 `zone` 同源坐标）；与状态文本一致 |
 | H14 | 世界生成 `_home` 原点 | `wild_world.gd:70` 先 add_child 后坐标 | Phase1 #6 | 部分已修 | `--wildtest` 零 `!is_inside_tree()`；抽检 WildMonster/Guardian/Fish 等生成点距原点误差 <0.01 |
 | H15 | Stal `queue_free` 不可达泄漏 | `stal.gd:172 not alive return` 挡 `220` | Phase1 #6 | 待修 | 头颅崩解/回收必达；长测节点数不泄漏；`alive==false` 分支仍可释放 |
 | H16 | Bot/敌人 `is_instance_valid` 缺失 | `bot.gd:305` 直访 `aim_target.alive` | Phase1 #6 | 待修 | 所有跨实例 `alive` 访问前 `is_instance_valid`；`--sim` 1 场零悬垂 |
@@ -67,7 +67,7 @@
 
 | # | 标题 | 证据 | Phase | 状态 | 验收标准 |
 |---|------|------|-------|------|----------|
-| M1 | 医疗上限 100 与 max_hp 不一致 | `loot.gd:345` 写死100 vs `player.gd:1027` max_hp+10 | Phase1 P0#4 | 待修 | 医疗/回血以上限 `max_hp` 为钳制；获宝珠后满血回归为新上限 |
+| M1 | 医疗上限 100 与 max_hp 不一致 | `loot.gd:345` 写死100 vs `player.gd:1027` max_hp+10 | Phase1 P0#4 | 已修（medkit 以 max_hp 为钳制） | 医疗/回血以上限 `max_hp` 为钳制；获宝珠后满血回归为新上限 |
 | M2 | 载具无成本压缩探索 | `vehicle.gd:360` 27速 无燃料 | Phase2 #8 | 待修 | 载具引入成本/耐久/燃料或解锁门槛；全图可用性审计通过 |
 | M3 | 神庙同模板无分层 | `shrine_trial.gd:134` 均 completed 开门 | Phase3 #8 | 待修 | 三神庙分难度/时长/奖励梯度；各庙 2–3 步递进且与区域机制绑定 |
 | M4 | 季节湿润被 Weather 覆盖 | `weather.gd:114` vs `terrain.gd:382` | Phase2 #5 | 待修 | Environment 单一合成器（Season×DayNight×Weather）；互覆盖回归为 0 |

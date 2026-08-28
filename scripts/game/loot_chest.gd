@@ -10,9 +10,9 @@ var _lid: Node3D
 static func create(parent: Node, pos: Vector3, p_item: String, yaw: float = 0.0) -> LootChest:
 	var c := LootChest.new()
 	c.item = p_item
-	parent.add_child(c)
-	c.global_position = pos
+	c.position = pos
 	c.rotation.y = yaw
+	parent.add_child(c)
 	return c
 
 

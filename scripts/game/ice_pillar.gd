@@ -7,8 +7,8 @@ var _body: Node3D
 
 static func create(parent: Node, base_pos: Vector3, height: float) -> IcePillar:
 	var p := IcePillar.new()
+	p.position = base_pos
 	parent.add_child(p)
-	p.global_position = base_pos
 	p._build(height)
 	return p
 

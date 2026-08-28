@@ -12,8 +12,8 @@ var _t := 0.0
 static func create(parent: Node, pos: Vector3, p_name: String) -> WarpBeacon:
 	var b := WarpBeacon.new()
 	b.warp_name = p_name
+	b.position = pos
 	parent.add_child(b)
-	b.global_position = pos
 	return b
 
 

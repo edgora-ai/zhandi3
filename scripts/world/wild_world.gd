@@ -70,14 +70,14 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 		_guardian_points.append(gp)
 		var guardian := Guardian.new()
 		guardian.setup(terrain, player)
-		guardian.global_position = _ground(gp, 0.05)
+		guardian.position = _ground(gp, 0.05)
 		add_child(guardian)
 	# 三只莫布林：草原/谷地/营地外围的重击手。
 	for mp in [Vector3(30, 0, 60), Vector3(-60, 0, -20), Vector3(120, 0, -40)]:
 		_moblin_points.append(mp)
 		var moblin := WildMoblin.new()
 		moblin.setup(terrain, player)
-		moblin.global_position = _ground(mp, 0.05)
+		moblin.position = _ground(mp, 0.05)
 		add_child(moblin)
 	_spawn_npcs()
 	# 三块磁力金属块：压力板神庙、城堡门前、遗迹旁，供磁力搬运与投掷。
@@ -114,17 +114,17 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	CrackedWall.create(self, _ground(Vector3(-95, 0, 92)), PI * 0.5, Vector3(4.5, 3.2, 1.0), "orb")
 	CrackedWall.create(self, _ground(Vector3(22, 0, -82)), 0.9, Vector3(2.4, 1.8, 1.6), "monster_part")
 	CrackedWall.create(self, _ground(Vector3(-38, 0, 58)), 2.2, Vector3(2.2, 1.6, 1.5), "meat")
-	var raft := Raft.new()
-	add_child(raft)
 	var raft_z := 18.0
 	var raft_x := sin(raft_z * 0.021) * 24.0 - 8.0 + sin(raft_z * 0.049) * 7.0 - 12.0
-	raft.global_position = Vector3(raft_x, Terrain.WATER_LEVEL + 0.05, raft_z + 2.0)
+	var raft := Raft.new()
+	raft.position = Vector3(raft_x, Terrain.WATER_LEVEL + 0.05, raft_z + 2.0)
+	add_child(raft)
 	# 两只蜥蜴战士：草原与河滩的高速袭扰者。
 	for lp in [Vector3(-30, 0, 75), Vector3(55, 0, -20)]:
 		_liz_points.append(lp)
 		var liz := WildLizalfos.new()
 		liz.setup(terrain, player)
-		liz.global_position = _ground(lp, 0.05)
+		liz.position = _ground(lp, 0.05)
 		add_child(liz)
 	_spawn_wild_loot()
 	_spawn_fish_and_circles()
@@ -960,12 +960,12 @@ func _spawn_mounts() -> void:
 		horse.coat_light_color = lights[i]
 		horse.mane_color = manes[i]
 		horse.marking_color = Color(0.92, 0.86, 0.72) if i != 1 else Color(0.48, 0.44, 0.38)
-		horse.global_position = _ground(horse_points[i], 0.06)
+		horse.position = _ground(horse_points[i], 0.06)
 		add_child(horse)
 		horse.rotation.y = float(i) * 1.37 + 0.35
 	var bike := WildMotorcycle.new()
 	bike.terrain = terrain
-	bike.global_position = _ground(Vector3(-103, 0, 78), 0.08)
+	bike.position = _ground(Vector3(-103, 0, 78), 0.08)
 	add_child(bike)
 	bike.rotation.y = -0.3
 
@@ -986,7 +986,7 @@ func _spawn_monsters() -> void:
 	for p in points:
 		var monster := WildMonster.new()
 		monster.setup(terrain, player)
-		monster.global_position = _ground(p, 0.05)
+		monster.position = _ground(p, 0.05)
 		add_child(monster)
 		monster.rotation.y = randf_range(0, TAU)
 
@@ -1003,7 +1003,7 @@ func respawn_monsters() -> int:
 		if not occupied:
 			var monster := WildMonster.new()
 			monster.setup(terrain, player)
-			monster.global_position = _ground(p, 0.05)
+			monster.position = _ground(p, 0.05)
 			add_child(monster)
 			monster.rotation.y = randf_range(0, TAU)
 			respawned += 1
@@ -1019,7 +1019,7 @@ func respawn_monsters() -> int:
 			var creature := WildCreature.new()
 			creature.setup(kind, terrain, player)
 			var altitude := 8.0 if kind == "bird" else 0.05
-			creature.global_position = _ground(p2, altitude)
+			creature.position = _ground(p2, altitude)
 			add_child(creature)
 			creature.rotation.y = randf_range(0, TAU)
 			respawned += 1
@@ -1028,7 +1028,7 @@ func respawn_monsters() -> int:
 		if not _enemy_near(mp, 12.0, "wild_moblin"):
 			var moblin := WildMoblin.new()
 			moblin.setup(terrain, player)
-			moblin.global_position = _ground(mp, 0.05)
+			moblin.position = _ground(mp, 0.05)
 			add_child(moblin)
 			moblin.rotation.y = randf_range(0, TAU)
 			respawned += 1
@@ -1036,16 +1036,16 @@ func respawn_monsters() -> int:
 		if not _enemy_near(lp, 12.0, "wild_lizalfos"):
 			var liz := WildLizalfos.new()
 			liz.setup(terrain, player)
+			liz.position = _ground(lp, 0.05)
 			add_child(liz)
-			liz.global_position = _ground(lp, 0.05)
 			liz.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	for gp in _guardian_points:
 		if not _enemy_near(gp, 14.0, "guardian"):
 			var guardian := Guardian.new()
 			guardian.setup(terrain, player)
+			guardian.position = _ground(gp, 0.05)
 			add_child(guardian)
-			guardian.global_position = _ground(gp, 0.05)
 			respawned += 1
 	return respawned
 
@@ -1068,13 +1068,13 @@ func _spawn_fish_and_circles() -> void:
 		var x := sin(z * 0.021) * 24.0 - 8.0 + sin(z * 0.049) * 7.0
 		var fish := FishSpot.new()
 		fish.player = player
-		fish.global_position = Vector3(x, Terrain.WATER_LEVEL - 0.5, z)
+		fish.position = Vector3(x, Terrain.WATER_LEVEL - 0.5, z)
 		add_child(fish)
 	var circle_spots := [Vector3(-60, 0, 55), Vector3(95, 0, 15), Vector3(-20, 0, -88), Vector3(-135, 0, 35)]
 	for i in range(circle_spots.size()):
 		var circle := RockCircle.new()
 		circle.configure(player, float(i) * 1.7 + 0.4)
-		circle.global_position = _ground(circle_spots[i], 0.02)
+		circle.position = _ground(circle_spots[i], 0.02)
 		add_child(circle)
 	# 两条花径呀哈哈。
 	var trail1 := FlowerTrail.new()
@@ -1088,8 +1088,8 @@ func _spawn_fish_and_circles() -> void:
 		var rx := sin(rz * 0.021) * 24.0 - 8.0 + sin(rz * 0.049) * 7.0
 		var ring := DiveRing.new()
 		ring.configure(player)
+		ring.position = Vector3(rx, Terrain.WATER_LEVEL + 0.02, rz)
 		add_child(ring)
-		ring.global_position = Vector3(rx, Terrain.WATER_LEVEL + 0.02, rz)
 
 
 # 林克之家：高原上的小屋与床铺，睡到天亮回满状态。
@@ -1120,8 +1120,8 @@ func _build_home(world_pos: Vector3) -> void:
 	_part(Vector3(0.5, 0.22, 0.9), Toon.make_material(Color(0.95, 0.92, 0.82), true, 0.008), Vector3(-2.65, 0.92, 1.9), home)
 	var bed := BedSpot.new()
 	bed.add_to_group("bed")
+	bed.position = home.transform * Vector3(-1.9, 0.9, 1.9)
 	add_child(bed)
-	bed.global_position = home.transform * Vector3(-1.9, 0.9, 1.9)
 	_part(Vector3(1.4, 0.8, 0.9), _wood_dark, Vector3(1.8, 0.6, 2.2), home)
 	var lantern := _sphere(0.20, _ancient, Vector3(0, 2.2, 1.2), home)
 	lantern.scale = Vector3(0.7, 1.2, 0.7)
@@ -1135,14 +1135,14 @@ func _spawn_korok_props() -> void:
 	var rocks := [Vector3(-120, 0, 45), Vector3(75, 0, 95), Vector3(-30, 0, -50), Vector3(150, 0, -60)]
 	for p in pinwheels:
 		var prop := KorokProp.new()
-		add_child(prop)
 		prop.configure("pinwheel")
-		prop.global_position = _ground(p, 0.02)
+		prop.position = _ground(p, 0.02)
+		add_child(prop)
 	for p in rocks:
 		var prop := KorokProp.new()
-		add_child(prop)
 		prop.configure("rock")
-		prop.global_position = _ground(p, 0.02)
+		prop.position = _ground(p, 0.02)
+		add_child(prop)
 
 
 # 怪物营地：帐篷、火堆、木箱、尖桩围栏与守军，内有值钱补给。
@@ -1178,8 +1178,8 @@ func _build_monster_camp(p: Vector3, yaw: float) -> void:
 	for off in [Vector3(-1.5, 0, 0.5), Vector3(2.0, 0, -0.5)]:
 		var monster := WildMonster.new()
 		monster.setup(terrain, player)
+		monster.position = camp.transform * off
 		add_child(monster)
-		monster.global_position = camp.transform * off
 		monster.rotation.y = randf_range(0, TAU)
 	Loot.spawn(get_tree().current_scene, camp.transform * Vector3(0.5, 0.3, 3.4), "armor", "", 50, 2)
 	Loot.spawn(get_tree().current_scene, camp.transform * Vector3(-0.5, 0.3, 3.4), "ammo", "", 90, 2)
@@ -1323,24 +1323,24 @@ func _spawn_animals() -> void:
 		var creature := WildCreature.new()
 		creature.setup(kind, terrain, player)
 		var altitude := 8.0 if kind == "bird" else 0.05
-		creature.global_position = _ground(p, altitude)
-		creature.rotation.y = randf_range(0, TAU)
+		creature.position = _ground(p, altitude)
 		add_child(creature)
+		creature.rotation.y = randf_range(0, TAU)
 
 
 func _spawn_dragon() -> void:
 	var p := Vector3(164, terrain.get_height(164, -145) + 12.0, -145)
 	var dragon := WildDragon.new()
 	dragon.setup(player, p)
+	dragon.position = p + Vector3(66, 42, 0)
 	add_child(dragon)
-	dragon.global_position = p + Vector3(66, 42, 0)
 
 
 func _spawn_flying_attackers() -> void:
 	for p in [Vector3(22, 0, -70), Vector3(116, 0, -80), Vector3(-128, 0, 70)]:
 		var attacker := FlyingAttacker.new()
 		attacker.setup(terrain, player)
-		attacker.global_position = _ground(p, 9.0)
+		attacker.position = _ground(p, 9.0)
 		add_child(attacker)
 
 
@@ -1394,17 +1394,16 @@ func _spawn_npcs() -> void:
 			npc.quest_id = "moblin2"
 		elif i == 1:
 			npc.quest_id = "scale1"
-		npc.global_position = _ground(spec[0], 0.02)
+		npc.position = _ground(spec[0], 0.02)
 		add_child(npc)
 		npc.rotation.y = randf_range(0.0, TAU)
 	# 行商：沿道路在驿站与海利亚大桥之间往返（旷野之息式的流动商人）。
 	var merchant := WildNPC.new()
 	merchant.setup(terrain, player, "行商多戈", ["这条商路我走了十年，桥修好后好走多了。", "驿站收兽肉，蘑菇在河滩芦苇边最多。", "马上了路会自己认路，你尽管看风景。"], Color(0.60, 0.42, 0.20), 0)
-	add_child(merchant)
-	merchant.global_position = _ground(Vector3(-40, 0, 20), 0.02)
-	add_child(merchant)
+	merchant.position = _ground(Vector3(-40, 0, 20), 0.02)
 	merchant.quest_id = "escort"
 	merchant.patrol = [Vector3(-70, 0, 21.5), Vector3(-40, 0, 20), Vector3(-15.5, 0, 18.5), Vector3(6, 0, 18), Vector3(-15.5, 0, 18.5), Vector3(-40, 0, 20)]
+	add_child(merchant)
 
 
 func _spawn_wild_loot() -> void:

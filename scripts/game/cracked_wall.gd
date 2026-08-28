@@ -13,9 +13,9 @@ static func create(parent: Node, pos: Vector3, yaw: float, size: Vector3, p_rewa
 	var w := CrackedWall.new()
 	w._size = size
 	w.reward = p_reward
-	parent.add_child(w)
-	w.global_position = pos
+	w.position = pos
 	w.rotation.y = yaw
+	parent.add_child(w)
 	w._build()
 	return w
 

@@ -7,8 +7,8 @@ var held := false
 
 static func create(parent: Node, pos: Vector3) -> MetalProp:
 	var p := MetalProp.new()
+	p.position = pos
 	parent.add_child(p)
-	p.global_position = pos
 	return p
 
 

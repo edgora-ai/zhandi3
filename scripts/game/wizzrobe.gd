@@ -23,9 +23,9 @@ static func create(parent: Node, p_terrain: Terrain, p_player: Player, pos: Vect
 	var w := Wizzrobe.new()
 	w.terrain = p_terrain
 	w.player = p_player
-	parent.add_child(w)
-	w.global_position = pos
+	w.position = pos
 	w._home = pos
+	parent.add_child(w)
 	return w
 
 

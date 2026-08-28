@@ -27,9 +27,9 @@ static func create_body(parent: Node, p_terrain: Terrain, p_player: Player, pos:
 	s.terrain = p_terrain
 	s.player = p_player
 	s._home = pos
-	parent.add_child(s)
-	s.global_position = pos + Vector3(0, -2.0, 0)
+	s.position = pos + Vector3(0, -2.0, 0)
 	s.visible = false
+	parent.add_child(s)
 	return s
 
 
@@ -40,8 +40,8 @@ static func create_skull(parent: Node, p_terrain: Terrain, p_player: Player, pos
 	s.mode = "skull"
 	s.hp = 5.0
 	s.display_name = "骷髅头"
+	s.position = pos
 	parent.add_child(s)
-	s.global_position = pos
 	return s
 
 

@@ -15,8 +15,8 @@ var source: Node = null
 static func place(parent: Node, pos: Vector3, toss: Vector3, p_source: Node = null) -> RemoteBomb:
 	var b := RemoteBomb.new()
 	b.source = p_source
+	b.position = pos
 	parent.add_child(b)
-	b.global_position = pos
 	b.linear_velocity = toss
 	return b
 

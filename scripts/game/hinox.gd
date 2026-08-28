@@ -30,9 +30,9 @@ static func create(parent: Node, p_terrain: Terrain, p_player: Player, pos: Vect
 	var h := Hinox.new()
 	h.terrain = p_terrain
 	h.player = p_player
-	parent.add_child(h)
-	h.global_position = pos
+	h.position = pos
 	h._home = pos
+	parent.add_child(h)
 	return h
 
 

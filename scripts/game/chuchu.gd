@@ -22,8 +22,8 @@ static func create(parent: Node, p_terrain: Terrain, p_player: Player, pos: Vect
 	c.terrain = p_terrain
 	c.player = p_player
 	c.small = p_small
+	c.position = pos
 	parent.add_child(c)
-	c.global_position = pos
 	return c
 
 

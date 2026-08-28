@@ -659,13 +659,13 @@ func hide_shop() -> void:
 		_shop_panel = null
 
 
-# ---------- 林克时间 ----------
+# ---------- 专注时停 ----------
 
 # ---------- Boss 血条 ----------
 
 # ---------- 死亡画面 ----------
 
-# 旷野之息式死亡：红闪 + “你死了”，随后在最近神庙重生（由 main 调度）。
+# 原创旷野式死亡：红闪 + “你死了”，随后在最近神庙重生（由 main 调度）。
 func show_death_screen() -> void:
 	if _death_panel:
 		return
@@ -809,7 +809,7 @@ func show_map_selector(current_map: String) -> void:
 	title.size.x = 300
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_build_map_card(_map_panel, Vector2(145, 175), "1", "群岛战场", "500m 海岛 · 24 人战术吃鸡\n村庄、据点、载具、四季毒圈", current_map == "battlefield", Color(0.24, 0.49, 0.65))
-	_build_map_card(_map_panel, Vector2(685, 175), "2", "海拉鲁阔野", "旷野之息风格 · 高原河谷\n神庙、驿站、骑乘、生态与巨龙", current_map == "wild", Color(0.28, 0.58, 0.32))
+	_build_map_card(_map_panel, Vector2(685, 175), "2", "原创旷野", "原创旷野卡通风格 · 高原河谷\n神庙、驿站、骑乘、生态与巨龙", current_map == "wild", Color(0.28, 0.58, 0.32))
 	var hint := _mk_label(_map_panel, "按 1 / 2 进入地图    M 返回当前地图", 19, Color(0.76, 0.91, 0.88))
 	hint.position = Vector2(420, 640)
 	hint.size.x = 440

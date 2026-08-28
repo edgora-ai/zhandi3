@@ -115,15 +115,36 @@ func _cast() -> void:
 	projectile.global_position = from + dir * 0.6
 
 
+func _is_teleport_safe(pos: Vector3) -> bool:
+	# FIX: H18 shape_test占位：落点需通过物理空间碰撞校验，避免穿墙/落水/陡坡
+	if terrain == null:
+		return true
+	if terrain.is_in_water(pos.x, pos.z):
+		return false
+	if terrain.get_normal(pos.x, pos.z, 1.2).y < 0.52:
+		return false
+	# shape_test占位：未来用 PhysicsShapeQueryParameters3D 扫落点球体积
+	return true
+
 func _teleport() -> void:
 	_tp_cd = 2.5
 	FX.impact(global_position + Vector3(0, 1.0, 0))
 	var _sfx_tp := get_tree().get_first_node_in_group("sfx_bank")
 	if _sfx_tp:
 		_sfx_tp.play_at("stasis", global_position + Vector3(0, 1.0, 0), -7.0)
-	var offset := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * randf_range(8.0, 12.0)
-	var next := global_position + offset
-	global_position = Vector3(next.x, terrain.get_height(next.x, next.z) + 1.5, next.z)
+	var next := Vector3.ZERO
+	var found := false
+	for i in range(5):
+		var offset := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * randf_range(8.0, 12.0)
+		var cand := global_position + offset
+		cand = Vector3(cand.x, terrain.get_height(cand.x, cand.z) + 1.5, cand.z)
+		if _is_teleport_safe(cand):
+			next = cand
+			found = true
+			break
+	if not found:
+		return # FIX: H18 无安全落点则取消闪现，避免直写碰撞体内
+	global_position = next
 	FX.impact(global_position + Vector3(0, 1.0, 0))
 	DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.0, 0), "闪现!", Color(0.85, 0.50, 1.0))
 

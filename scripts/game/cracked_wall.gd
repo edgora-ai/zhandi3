@@ -25,7 +25,7 @@ func _build() -> void:
 	add_to_group("crackable")
 	var stone := Toon.make_material(Color(0.36, 0.38, 0.40), true, 0.014)
 	var crack_mat := Toon.make_material(Color(0.08, 0.08, 0.09), true, 0.006)
-	# 三块略有错动的岩板拼出墙体，裂缝用深色细条表达（旷野之息的可炸岩标志）。
+	# 三块略有错动的岩板拼出墙体，裂缝用深色细条表达（原创旷野卡通的可炸岩标志）。
 	for i in range(3):
 		var slab := MeshInstance3D.new()
 		var mesh := BoxMesh.new()

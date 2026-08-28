@@ -1,6 +1,6 @@
 class_name KorokProp
 extends StaticBody3D
-## 呀哈哈式小谜题：风车（射中会爆出种子）与可疑怪石（推倒露出种子）。
+## 探索式小谜题：风车（射中会爆出种子）与可疑怪石（推倒露出种子）。
 
 var mode := "pinwheel"
 var consumed := false

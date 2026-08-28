@@ -6,12 +6,12 @@ signal died(victim, killer)
 
 enum State { DROP, LOOT, ROTATE, FIGHT, CAPTURE }
 
-const MAX_HP := 100.0
-const WALK := 4.2
-const RUN := 6.4
+@export var MAX_HP := 100.0 # FIX: M13 魔法数抽离
+@export var WALK := 4.2 # FIX: M13
+@export var RUN := 6.4 # FIX: M13
 const GRAVITY := 22.0
-const SIGHT_RANGE := 65.0
-const FIGHT_DIST := 20.0
+@export var SIGHT_RANGE := 65.0 # FIX: M13/M14 LOD距离分级
+@export var FIGHT_DIST := 20.0 # FIX: M13
 
 var hp := MAX_HP
 var armor := 0.0

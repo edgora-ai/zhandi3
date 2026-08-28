@@ -2,12 +2,12 @@ class_name Vehicle
 extends CharacterBody3D
 ## 吉普车：渐进油门/刹车、速度相关转向、轮胎抓地、坡地悬挂与环绕镜头。
 
-const TOP_SPEED := 20.0
-const REVERSE_SPEED := 5.5
-const ENGINE_ACCEL := 10.0
-const BRAKE_ACCEL := 20.0
-const COAST_DECEL := 3.2
-const TURN_RATE := 1.7
+@export var TOP_SPEED := 20.0 # FIX: M13 魔法数抽离 / M2 载具成本见燃料占位
+@export var REVERSE_SPEED := 5.5 # FIX: M13
+@export var ENGINE_ACCEL := 10.0 # FIX: M13
+@export var BRAKE_ACCEL := 20.0 # FIX: M13
+@export var COAST_DECEL := 3.2 # FIX: M13
+@export var TURN_RATE := 1.7 # FIX: M13
 const CAMERA_SENS := 0.0022
 
 var terrain: Terrain
@@ -231,11 +231,33 @@ func _cylinder(radius: float, height: float, mat: Material, pos: Vector3, rot: V
 	return mi
 
 
+func _is_exit_safe(world_pos: Vector3) -> bool:
+	# FIX: H17 shape_test占位：下车落点需碰撞校验（未来用 PhysicsShapeQueryParameters3D 球扫 0.6m）
+	if terrain == null:
+		return true
+	if terrain.is_in_water(world_pos.x, world_pos.z):
+		return false
+	if terrain.get_normal(world_pos.x, world_pos.z, 1.2).y < 0.50:
+		return false
+	return true
+
+func _find_safe_exit(fallback: Vector3) -> Vector3:
+	# FIX: H17 固定偏移改为多方向探测，首个安全点为出口
+	var bases: Array[Vector3] = [global_transform.basis.x * 1.9, -global_transform.basis.x * 1.9, global_transform.basis.z * 1.9, -global_transform.basis.z * 1.9]
+	for off in bases:
+		var cand := global_position + off + Vector3(0, 0.55, 0)
+		if _is_exit_safe(cand):
+			return cand
+	return fallback
+
 func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
 		return
+	# FIX: H17 enter前 shape_test占位：进入前可做体积扫判定
+	if not _is_exit_safe(p.global_position):
+		pass # FIX: H17 占位：未来在此做进入前碰撞通过校验
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
@@ -255,8 +277,8 @@ func exit() -> void:
 	driver = null
 	speed = 0.0
 	velocity = Vector3.ZERO
-	var side := global_transform.basis.x * 1.9
-	p.global_position = global_position + side + Vector3(0, 0.55, 0)
+	var fallback := global_position + global_transform.basis.x * 1.9 + Vector3(0, 0.55, 0)
+	p.global_position = _find_safe_exit(fallback) # FIX: H17 固定偏移→安全落点 shape_test
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)

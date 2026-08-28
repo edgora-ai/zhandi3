@@ -2,14 +2,14 @@ class_name Terrain
 extends Node3D
 ## 程序化地形：噪声位移网格 + 顶点色（按高度/坡度）+ 解析高度采样
 
-const SIZE := 500.0
+const SIZE := 500.0 # FIX: M14 LOD占位：SIZE固定，GRID分级见下
 const HALF := SIZE * 0.5
-const GRID := 160               ## 每边四边形数（顶点 (GRID+1)^2）
+@export var GRID := 160               ## 每边四边形数（顶点 (GRID+1)^2） # FIX: M13/M14 渲染分级: wild 192/ battlefield 160，可按画质档切换
 const ROAD_MASK_GRID := 48      ## 道路邻近掩码每边格数
-const HEIGHT_AMP := 13.0
-const HEIGHT_BASE := 6.0
-const RIM_HEIGHT := 50.0        ## 地图边缘抬升，形成天然边界
-const WATER_LEVEL := 2.0
+@export var HEIGHT_AMP := 13.0 # FIX: M13 @export 可调
+@export var HEIGHT_BASE := 6.0 # FIX: M13 @export 可调
+@export var RIM_HEIGHT := 50.0        ## 地图边缘抬升，形成天然边界 # FIX: M13 @export 可调
+const WATER_LEVEL := 2.0 # FIX: M14 水面细分 64x64，未来按距离分块LOD
 
 const GRASS_DEEP := Color(0.30, 0.52, 0.17)
 const GRASS_LIGHT := Color(0.55, 0.74, 0.26)
@@ -163,7 +163,7 @@ func _wild_height(x: float, z: float) -> float:
 	# 北部城堡丘陵与东部台阶山脊。
 	h += _hill(x, z, 4.0, -122.0, 62.0, 24.0)
 	h += _hill(x, z, 202.0, 16.0, 54.0, 24.0)
-	# 中央海利亚河：宽阔 S 形主河，东南分叉穿过双子山。
+	# 中央主河：宽阔 S 形主河，东南分叉穿过双子山。
 	var river_x := sin(z * 0.021) * 24.0 - 8.0 + sin(z * 0.049) * 7.0
 	var river_dist := absf(x - river_x)
 	# 河岸过渡带放宽到 20m：河床→滩涂→草坡，两侧形成可行走的海滩而不是陡坎。

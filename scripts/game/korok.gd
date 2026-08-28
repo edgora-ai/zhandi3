@@ -1,6 +1,6 @@
 class_name Korok
 extends Node3D
-## 呀哈哈小精灵：谜题解开时从原地蹦出，挥手蹦跳几秒后缩小消失。
+## 探索精灵小精灵：谜题解开时从原地蹦出，挥手蹦跳几秒后缩小消失。
 
 var _t := 0.0
 var _arm_l: Node3D
@@ -8,7 +8,7 @@ var _arm_r: Node3D
 var _body: Node3D
 
 
-# 在 pos 处蹦出一只呀哈哈，并朝向 face（通常是玩家）。
+# 在 pos 处蹦出一只探索精灵，并朝向 face（通常是玩家）。
 static func spawn(parent: Node, pos: Vector3, face: Vector3 = Vector3.ZERO) -> void:
 	var k := Korok.new()
 	parent.add_child(k)
@@ -17,7 +17,7 @@ static func spawn(parent: Node, pos: Vector3, face: Vector3 = Vector3.ZERO) -> v
 	look.y = 0.0
 	if look.length_squared() > 0.01:
 		k.rotation.y = atan2(look.normalized().x, look.normalized().z) + PI
-	DamageNumber.spawn_at(parent, pos + Vector3(0, 1.30, 0), "呀哈哈！", Color(0.75, 1.0, 0.45))
+	DamageNumber.spawn_at(parent, pos + Vector3(0, 1.30, 0), "解谜成功！", Color(0.75, 1.0, 0.45))
 
 
 func _ready() -> void:

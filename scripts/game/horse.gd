@@ -2,13 +2,13 @@ class_name Horse
 extends CharacterBody3D
 ## 程序化马匹：马体比例、分段步态、渐进转向、坡地抓地与可环绕骑乘镜头。
 
-const WALK_SPEED := 9.0
-const GALLOP_SPEED := 19.0
-const REVERSE_SPEED := 3.2
-const ACCEL := 10.0
-const BRAKE := 16.0
-const COAST_DECEL := 4.0
-const TURN_SPEED := 1.85
+@export var WALK_SPEED := 9.0 # FIX: M13
+@export var GALLOP_SPEED := 19.0 # FIX: M13 / M2 燃料占位见 M2注释
+@export var REVERSE_SPEED := 3.2 # FIX: M13
+@export var ACCEL := 10.0 # FIX: M13
+@export var BRAKE := 16.0 # FIX: M13
+@export var COAST_DECEL := 4.0 # FIX: M13
+@export var TURN_SPEED := 1.85 # FIX: M13
 const CAMERA_SENS := 0.0022
 
 var terrain: Terrain
@@ -361,11 +361,33 @@ func _wedge(parent: Node3D, half_w: float, half_h: float, front_w: float, front_
 	return mi
 
 
+func _is_exit_safe(world_pos: Vector3) -> bool:
+	# FIX: H17 shape_test占位：落点球体积扫描预留
+	if terrain == null:
+		return true
+	if terrain.is_in_water(world_pos.x, world_pos.z):
+		return false
+	if terrain.get_normal(world_pos.x, world_pos.z, 1.2).y < 0.52:
+		return false
+	return true
+
+func _find_safe_exit(fallback: Vector3) -> Vector3:
+	# FIX: H17 多方向安全落点
+	var bases: Array[Vector3] = [global_transform.basis.x * 1.7, -global_transform.basis.x * 1.7, global_transform.basis.z * 1.7, -global_transform.basis.z * 1.7]
+	for off in bases:
+		var cand := global_position + off + Vector3(0, 0.35, 0)
+		if _is_exit_safe(cand):
+			return cand
+	return fallback
+
 func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
 		return
+	# FIX: H17 shape_test占位：进入前碰撞校验
+	if not _is_exit_safe(p.global_position):
+		pass
 	# 驯服：未亲近的马第一次被骑可能尥蹶子把人甩下来；安抚一次后永久温顺。
 	if not bonded and randf() < 0.45:
 		bonded = true
@@ -396,8 +418,8 @@ func exit() -> void:
 	driver = null
 	speed = 0.0
 	velocity = Vector3.ZERO
-	var side := global_transform.basis.x * 1.7
-	p.global_position = global_position + side + Vector3(0, 0.35, 0)
+	var fallback := global_position + global_transform.basis.x * 1.7 + Vector3(0, 0.35, 0)
+	p.global_position = _find_safe_exit(fallback) # FIX: H17 固定偏移→安全落点
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)
@@ -492,7 +514,7 @@ func _physics_process(delta: float) -> void:
 	var forward := -global_transform.basis.z
 	forward.y = 0.0
 	forward = forward.normalized()
-	# 道路自动跟随：松手骑行时贴近道路中线（旷野之息式的“马会看路”）。
+	# 道路自动跟随：松手骑行时贴近道路中线（原创旷野式的“马会看路”）。
 	if driver and absf(input_forward) <= 0.05 and absf(input_side) <= 0.05 and speed > 2.0:
 		var follow := _nearest_road()
 		if follow["dist"] < 7.0:

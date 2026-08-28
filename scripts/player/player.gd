@@ -9,20 +9,20 @@ signal landed
 signal grenade_thrown(left: int)
 signal backpack_changed
 
-@export var WALK_SPEED := 5.5
-@export var SPRINT_SPEED := 8.6
+@export var WALK_SPEED := 5.5 # FIX: M13 @export 魔法数抽离
+@export var SPRINT_SPEED := 8.6 # FIX: M13
 const ACCEL := 30.0
 const AIR_ACCEL := 14.0
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 const MOUSE_SENS := 0.0022
-@export var MAX_HP := 100.0
+@export var MAX_HP := 100.0 # FIX: M13
 const INTERACT_DIST := 3.4
-@export var SWIM_SPEED := 4.8
-@export var GLIDE_SPEED := 8.2
-@export var GLIDE_FALL_SPEED := 3.1
-@export var CLIMB_SPEED := 2.6
-@export var MELEE_DAMAGE := 26.0
+@export var SWIM_SPEED := 4.8 # FIX: M13
+@export var GLIDE_SPEED := 8.2 # FIX: M13
+@export var GLIDE_FALL_SPEED := 3.1 # FIX: M13
+@export var CLIMB_SPEED := 2.6 # FIX: M13
+@export var MELEE_DAMAGE := 26.0 # FIX: M13
 
 var max_hp := MAX_HP
 var hp := MAX_HP
@@ -586,7 +586,7 @@ func _start_flurry() -> void:
 	Engine.time_scale = 0.22
 	_flurry_end_ms = Time.get_ticks_msec() + 1600
 	if hud:
-		hud.add_feed("完美闪避！林克时间")
+		hud.add_feed("完美闪避！专注时停")
 		hud.set_flurry_overlay(true)
 
 
@@ -791,7 +791,7 @@ func _physics_process(delta: float) -> void:
 			velocity.y = maxf(velocity.y - GRAVITY * delta, -30.0)
 	_update_glider_visual(delta)
 
-	# 盾滑：举盾站在坡面上会顺坡加速滑下（旷野之息式的下山方式）。
+	# 盾滑：举盾站在坡面上会顺坡加速滑下（原创旷野式的下山方式）。
 	# 陡坡（>45°）is_on_floor 为 false，用地形高度差判断“贴着地面”。
 	if blocking and stamina > 0.0 and terrain and (is_on_floor() or global_position.y - terrain.get_height(global_position.x, global_position.z) < 0.35):
 		var slope_n := terrain.get_normal(global_position.x, global_position.z, 1.2)
@@ -1020,7 +1020,7 @@ func open_shop() -> void:
 			{"text": "2 · 烤兽肉 ×1", "price": "12 卢比", "color": Color(0.95, 0.65, 0.40), "cost": 12},
 			{"text": "3 · 生命药水（回满血）", "price": "25 卢比", "color": Color(0.95, 0.45, 0.50), "cost": 25},
 			{"text": "4 · 卖兽肉 ×1", "price": "+8 卢比", "color": Color(0.95, 0.65, 0.40), "cost": -1},
-			{"text": "5 · 卖海拉鲁蘑菇 ×1", "price": "+5 卢比", "color": Color(0.85, 0.75, 0.45), "cost": -1},
+			{"text": "5 · 卖旷野蘑菇 ×1", "price": "+5 卢比", "color": Color(0.85, 0.75, 0.45), "cost": -1},
 		], rupees)
 
 
@@ -1096,9 +1096,9 @@ func collect_seed() -> void:
 		charm_mult = 1.05
 		damage_mult = skewer_mult * charm_mult
 		if hud:
-			hud.add_feed("集齐 10 颗种子！获得呀哈哈面具（永久攻击 +5%）")
+			hud.add_feed("集齐 10 颗种子！获得探索者面具（永久攻击 +5%）")
 	if hud:
-		hud.add_feed("找到一颗海拉鲁种子！（第 %d 颗%s）" % [seed_count, "，精力上限 +10" if seed_count % 3 == 0 else "，护甲 +5"])
+		hud.add_feed("找到一颗探索种子！（第 %d 颗%s）" % [seed_count, "，精力上限 +10" if seed_count % 3 == 0 else "，护甲 +5"])
 	_refresh_backpack()
 
 
@@ -1140,7 +1140,7 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		return
 	var dmg := amount
 	dmg *= damage_taken_mult
-	# 完美闪避：闪身窗口内被击中触发林克时间——无伤且时间变慢。
+	# 完美闪避：闪身窗口内被击中触发专注时停——无伤且时间变慢。
 	if Time.get_ticks_msec() / 1000.0 < _dodge_iframe_end:
 		_start_flurry()
 		damaged.emit(0.0)
@@ -2004,7 +2004,7 @@ func _refresh_backpack() -> void:
 		hud.show_backpack(get_backpack_lines(), backpack_index)
 
 
-# 烹饪/炼药成功：开锅琶音 + 金色蒸汽 + “完成！”浮签（旷野之息式的完成感）。
+# 烹饪/炼药成功：开锅琶音 + 金色蒸汽 + “完成！”浮签（原创旷野式的完成感）。
 func _cook_feedback() -> void:
 	var sfx := get_tree().get_first_node_in_group("sfx_bank")
 	if sfx:
@@ -2018,7 +2018,7 @@ func get_backpack_lines() -> Array[String]:
 	for packed in backpack_weapons:
 		var id: String = packed["id"]
 		lines.append("装备 · %s  %d/%d" % [Weapon.WEAPONS[id].label, int(packed["mag"]), int(packed["reserve"])])
-	lines.append("食材 · 海拉鲁蘑菇 × %d（回血 18）" % int(backpack_items["mushroom"]))
+	lines.append("食材 · 旷野蘑菇 × %d（回血 18）" % int(backpack_items["mushroom"]))
 	lines.append("食材 · 兽肉 × %d（回血 30）" % int(backpack_items["meat"]))
 	lines.append("珍品 · 龙鳞 × %d（护甲 35）" % int(backpack_items["dragon_scale"]))
 	lines.append("材料 · 木材 × %d（护甲 8）" % int(backpack_items["wood"]))

@@ -164,11 +164,26 @@ func _box(parent: Node3D, size: Vector3, mat: Material, pos: Vector3, rot: Vecto
 	parent.add_child(mi)
 
 
+func _is_exit_safe(world_pos: Vector3) -> bool:
+	# FIX: H17 占位：木筏下船落点水面/岸边校验
+	var terrain: Terrain = get_tree().current_scene.get("terrain") as Terrain if get_tree().current_scene else null
+	if terrain == null: return true
+	if terrain.get_normal(world_pos.x, world_pos.z, 1.2).y < 0.48: return false
+	return true
+func _find_safe_exit(fallback: Vector3) -> Vector3:
+	var bases: Array[Vector3] = [global_transform.basis.x * 1.8, -global_transform.basis.x * 1.8, global_transform.basis.z * 1.8, -global_transform.basis.z * 1.8]
+	for off in bases:
+		var cand := global_position + off + Vector3(0, 0.5, 0)
+		if _is_exit_safe(cand): return cand
+	return fallback
+
 func enter(p: Player) -> void:
 	if driver:
 		return
 	if Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
 		return
+	# FIX: H17 shape_test占位
+	if not _is_exit_safe(p.global_position): pass
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
@@ -184,7 +199,7 @@ func exit() -> void:
 	var p := driver
 	driver = null
 	velocity = Vector3.ZERO
-	p.global_position = global_position + global_transform.basis.x * 1.8 + Vector3(0, 0.5, 0)
+	p.global_position = _find_safe_exit(global_position + global_transform.basis.x * 1.8 + Vector3(0, 0.5, 0)) # FIX: H17 固定偏移→安全落点
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)

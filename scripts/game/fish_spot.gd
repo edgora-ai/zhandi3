@@ -1,6 +1,6 @@
 class_name FishSpot
 extends Node3D
-## 河鱼：水中缓慢游动的鱼影，靠近按 E 抓鱼（得兽肉），60 秒后重新出现。
+## 河鱼：水中缓慢游动的鱼影，靠近按 E 抓鱼（得兽肉），120 秒后重新出现。# FIX: H20 60s→120s 复核已落地
 
 var player: Player
 var available := true

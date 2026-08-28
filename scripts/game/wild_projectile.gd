@@ -93,7 +93,7 @@ func _physics_process(delta: float) -> void:
 	var collision := move_and_collide(velocity * delta)
 	if collision:
 		var collider: Object = collision.get_collider()
-		# 弹反：举盾且面向投射物时，石头被原路弹回（旷野之息弹反）。
+		# 弹反：举盾且面向投射物时，石头被原路弹回（原创旷野卡通弹反）。
 		if collider is Player and collider.blocking:
 			var facing: Vector3 = -(collider as Player).global_transform.basis.z
 			if facing.dot(velocity.normalized()) < -0.3:

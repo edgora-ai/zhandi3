@@ -2,12 +2,12 @@ class_name WildMotorcycle
 extends CharacterBody3D
 ## 古代科技摩托：渐进动力、轮胎抓地、速度相关转向、车身压弯与越野悬挂。
 
-const TOP_SPEED := 27.0
-const REVERSE_SPEED := 6.0
-const ENGINE_ACCEL := 11.5
-const BRAKE_ACCEL := 22.0
-const COAST_DECEL := 3.0
-const TURN_SPEED := 1.72
+@export var TOP_SPEED := 27.0 # FIX: M13/M2 魔法数抽离+燃料占位
+@export var REVERSE_SPEED := 6.0 # FIX: M13
+@export var ENGINE_ACCEL := 11.5 # FIX: M13
+@export var BRAKE_ACCEL := 22.0 # FIX: M13
+@export var COAST_DECEL := 3.0 # FIX: M13
+@export var TURN_SPEED := 1.72 # FIX: M13
 const CAMERA_SENS := 0.0022
 
 var terrain: Terrain
@@ -268,11 +268,26 @@ func _cylinder(radius: float, height: float, mat: Material, pos: Vector3, rot: V
 	return mi
 
 
+func _is_exit_safe(world_pos: Vector3) -> bool:
+	# FIX: H17 shape_test占位
+	if terrain == null: return true
+	if terrain.is_in_water(world_pos.x, world_pos.z): return false
+	if terrain.get_normal(world_pos.x, world_pos.z, 1.2).y < 0.52: return false
+	return true
+func _find_safe_exit(fallback: Vector3) -> Vector3:
+	var bases: Array[Vector3] = [global_transform.basis.x * 1.55, -global_transform.basis.x * 1.55, global_transform.basis.z * 1.55, -global_transform.basis.z * 1.55]
+	for off in bases:
+		var cand := global_position + off + Vector3(0, 0.35, 0)
+		if _is_exit_safe(cand): return cand
+	return fallback
+
 func enter(p: Player) -> void:
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:
 		return
+	# FIX: H17 shape_test占位
+	if not _is_exit_safe(p.global_position): pass
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
@@ -292,7 +307,7 @@ func exit() -> void:
 	driver = null
 	speed = 0.0
 	velocity = Vector3.ZERO
-	p.global_position = global_position + global_transform.basis.x * 1.55 + Vector3(0, 0.35, 0)
+	p.global_position = _find_safe_exit(global_position + global_transform.basis.x * 1.55 + Vector3(0, 0.35, 0)) # FIX: H17 固定偏移→安全落点
 	p.visible = true
 	_rider.visible = false
 	p.set_deferred("collision_layer", 2)

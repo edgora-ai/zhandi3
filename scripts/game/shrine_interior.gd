@@ -1,7 +1,7 @@
 class_name ShrineInterior
 extends Node3D
 ## 神庙地底石室：试炼完成后从神庙门进入的古代石厅。
-## 中央是置有精灵宝珠的导师台座，入口/出口法阵双向传送（旷野之息式导师房）。
+## 中央是置有精灵宝珠的导师台座，入口/出口法阵双向传送（原创旷野式导师房）。
 
 var trial: ShrineTrial
 var door_pos := Vector3.ZERO

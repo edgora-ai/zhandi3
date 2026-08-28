@@ -622,7 +622,7 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 
 	if victim == player:
 		if _map_id == "wild":
-			# 旷野之息式死亡：不终局，红闪“你死了”，2.2 秒后在最近神庙满血重生。
+			# 原创旷野式死亡：不终局，红闪“你死了”，2.2 秒后在最近神庙满血重生。
 			sfx.play("defeat", -2.0)
 			sfx.play("heavy_impact", -4.0, 0.62)
 			hud.show_death_screen()
@@ -706,7 +706,7 @@ func _on_npc_talk(npc: Node) -> void:
 				0:
 					quest_states[qid] = 1
 					_quest_mushroom_base = int(player.backpack_items["mushroom"])
-					hud.add_feed("%s：最近蘑菇不够用了，帮我摘 3 个海拉鲁蘑菇好吗？（任务：蘑菇 0/3）" % npc_name)
+					hud.add_feed("%s：最近蘑菇不够用了，帮我摘 3 个旷野蘑菇好吗？（任务：蘑菇 0/3）" % npc_name)
 				1:
 					var got := int(player.backpack_items["mushroom"]) - _quest_mushroom_base
 					if got >= 3:
@@ -757,7 +757,7 @@ func _on_npc_talk(npc: Node) -> void:
 				0:
 					quest_states[qid] = 1
 					_escort_npc = npc as WildNPC
-					hud.add_feed("%s：陪我走到海利亚大桥东头吧，这段路最近不太平。（护送出发）" % npc_name)
+					hud.add_feed("%s：陪我走到主河大桥东头吧，这段路最近不太平。（护送出发）" % npc_name)
 				1:
 					hud.add_feed("%s：跟紧我，过了桥就安全了。" % npc_name)
 				3:
@@ -787,15 +787,17 @@ func _on_dragon_killed(from: Variant) -> void:
 	match_over = true
 	player.input_locked = true
 	sfx.play("victory", -2.0)
-	# L2 Stinger: 胜利动机额外打击强化记忆点
+	# L2 Stinger: 胜利动机额外打击强化记忆点（窗口通过 [stinger] 日志验证，复用已有音轨无外部资产）
 	sfx.play("heavy_impact", -6.0, 0.72)
+	if sfx.has_method("play_boss_victory_stinger"):
+		sfx.play_boss_victory_stinger()
 	var quest_done := 0
 	for q in quest_states.values():
 		if int(q) == 3:
 			quest_done += 1
 	var lines: Array[String] = [
 		"焚天者已被讨伐",
-		"海拉鲁种子  %d / 10+" % player.seed_count,
+		"探索种子  %d / 10+" % player.seed_count,
 		"完成任务  %d / %d" % [quest_done, quest_states.size()],
 		"弹反  %d 次    击败  %d" % [player.parry_count, player.kills],
 	]
@@ -811,10 +813,10 @@ func get_journal_entries() -> Array:
 			dragon_alive = true
 			break
 	entries.append({"name": "焚天之怒（主线）", "desc": "讨伐火山口的焚天巨龙", "state": 1 if dragon_alive else 3, "progress": "进行中" if dragon_alive else "已讨伐"})
-	entries.append({"name": "蘑菇茶歇", "desc": "驿站老板想要 3 朵海拉鲁蘑菇", "state": quest_states.get("mushroom3", 0), "progress": _quest_progress_text("mushroom3")})
+	entries.append({"name": "蘑菇茶歇", "desc": "驿站老板想要 3 朵旷野蘑菇", "state": quest_states.get("mushroom3", 0), "progress": _quest_progress_text("mushroom3")})
 	entries.append({"name": "谷地除害", "desc": "讨伐 2 只莫布林（它们前摇长，盾反伺候）", "state": quest_states.get("moblin2", 0), "progress": _quest_progress_text("moblin2")})
 	entries.append({"name": "学者的样本", "desc": "给遗迹学者带回一片巨龙鳞", "state": quest_states.get("scale1", 0), "progress": _quest_progress_text("scale1")})
-	entries.append({"name": "一路顺风", "desc": "护送行商到海利亚大桥东头", "state": quest_states.get("escort", 0), "progress": _quest_progress_text("escort")})
+	entries.append({"name": "一路顺风", "desc": "护送行商到主河大桥东头", "state": quest_states.get("escort", 0), "progress": _quest_progress_text("escort")})
 	var shrine_done := 0
 	if wild_world:
 		for t in wild_world.trials:
@@ -1142,10 +1144,10 @@ func _process(delta: float) -> void:
 		elif not player.is_on_floor() and player.velocity.y < -0.55:
 			state = " · 按住 Space 展开滑翔伞"
 		hud.set_zone_text(wild_world.get_region_name(player.global_position))
-		hud.set_world_state("海拉鲁阔野 · %s%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
+		hud.set_world_state("原创旷野 · %s%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
 		var quest_text := quest_status_text()
 		if quest_text != "":
-			hud.set_world_state("海拉鲁阔野 · %s%s\n%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state, quest_text])
+			hud.set_world_state("原创旷野 · %s%s\n%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state, quest_text])
 	else:
 		hud.set_zone_text(zone.status_text())
 		hud.set_world_state("群岛战场\nM 地图选择")
@@ -1652,7 +1654,7 @@ func _update_wild_test() -> void:
 			daynight.advance(0.05)
 			var enemy_after := get_tree().get_nodes_in_group("wild_enemy").size()
 			print("[wildtest] bloodmoon active=%s enemies %d->%d" % [str(daynight.blood_moon), enemy_before, enemy_after])
-			# 呀哈哈谜题回归：风车命中产出种子。
+			# 探索精灵谜题回归：风车命中产出种子。
 			var prop := get_tree().get_first_node_in_group("korok") as KorokProp
 			var seed_before := 0
 			for item in get_tree().get_nodes_in_group("loot"):
@@ -1734,7 +1736,7 @@ func _update_wild_test() -> void:
 			player.blocking = false
 			var surf_d := player.global_position - _wild_test_surf_start
 			print("[wildtest] shield_surf moved=%.2f speed=%.1f" % [Vector2(surf_d.x, surf_d.z).length(), Vector2(player.velocity.x, player.velocity.z).length()])
-			# 林克时间回归：闪避窗口内被击中触发慢动作且无伤。
+			# 专注时停回归：闪避窗口内被击中触发慢动作且无伤。
 			player._dodge_iframe_end = Time.get_ticks_msec() / 1000.0 + 0.3
 			var hp_f := player.hp
 			player.take_damage(20.0, get_tree().get_first_node_in_group("wild_enemy"))
@@ -1872,7 +1874,7 @@ func _update_wild_test() -> void:
 				player.global_position = merchant.global_position + Vector3(1.5, 0, 0)
 				_update_escort_quest()
 			print("[wildtest] scale_quest=%d stam=%.0f->%.0f escort=%d" % [quest_states["scale1"], stam_before, player.max_stamina, quest_states["escort"]])
-			# 血月全类型苏醒回归；呀哈哈面具回归。
+			# 血月全类型苏醒回归；探索者面具回归。
 			var enemies_before := get_tree().get_nodes_in_group("wild_enemy").size()
 			var respawned := wild_world.respawn_monsters()
 			player.seed_count = 9
@@ -1962,7 +1964,7 @@ func _setup_environment() -> void:
 	# 卡通渲染用 Linear 保持颜色饱和（ACES 会把亮色洗白）
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.tonemap_exposure = 1.0
-	# 远景蓝色大气雾（旷野之息的空气感）
+	# 远景蓝色大气雾（原创旷野卡通的空气感）
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.68, 0.80, 0.92)
 	env.fog_light_energy = 0.8
@@ -2018,7 +2020,7 @@ var _clouds: Array[Node3D] = []
 func _spawn_clouds() -> void:
 	if OS.get_cmdline_user_args().has("--noclouds"):
 		return
-	# 扁平大朵白云，缓慢漂移（旷野之息招牌天空）
+	# 扁平大朵白云，缓慢漂移（原创卡通天空）
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 88
 	var mat := StandardMaterial3D.new()

@@ -204,7 +204,7 @@ func _build_card_multimesh(name: String, transforms: Array[Transform3D], colors:
 
 
 func _scatter_forest(terrain: Terrain) -> void:
-	# 60% 树木聚成若干片林子，其余散生（旷野之息式的疏林草原）
+	# 60% 树木聚成若干片林子，其余散生（原创旷野式的疏林草原）
 	var centers: Array[Vector3] = []
 	for i in range(9):
 		var c := _rand_point(terrain, 0.72)

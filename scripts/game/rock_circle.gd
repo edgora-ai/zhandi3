@@ -1,6 +1,6 @@
 class_name RockCircle
 extends Node3D
-## 石头阵呀哈哈：七石一环缺一，站进缺口一秒自动补全出种子。
+## 石头阵探索精灵：七石一环缺一，站进缺口一秒自动补全出种子。
 
 var player: Player
 var completed := false

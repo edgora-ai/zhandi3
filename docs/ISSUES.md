@@ -33,7 +33,7 @@
 | C3 | `export_presets.cfg` 缺失无法交付 | `project.godot:20-25` 仅 1280×720；文件不存在 | Phase4 #9 | 已修（PC/Mac/Linux 3预设，PCK 可导） | 仓库存在合法 `export_presets.cfg`（PC/Mac/Web 至少 2 目标）；`godot --headless --export-release <preset> /tmp/out` 可产出且无缺贴图/缺字体告警 |
 | C4 | 输入硬编码无 InputMap/手柄全失效 | `player.gd:568` `KEY_WASD` 直读；全仓 `@export 0` | Phase1/4 #9 | 已修（InputMap 10->32，grep KEY_ 0，手柄双绑） | `project.godot` InputMap 覆盖移动/跳/冲/瞄/格/弓/盾滑/背包/地图/口哨/制冰/磁力；玩法代码零 `Key.KEY_*` 直读（`grep -r "KEY_" scripts/player` 为空）；键位重映射后行为一致；手柄左摇/右摇/扳机可完成一局 |
 | C5 | 局外存档=0 “永久成长”归零 | `selected_map.txt` 仅存地图；`player.gd:26` 实例变量 `reload_current_scene` 清零 | Phase1/2 #8 | 待 XL 存档服务 | `user://save_v1.json` 版本化原子写入（tmp→rename）；含塔/神庙/种子/宝箱/任务/成长/马匹；重载后逐项回读一致；损坏文件回退默认值不崩溃 |
-| C6 | IP 直接下架风险 | `README.md:1-3` 战地3/旷野之息/海拉鲁等 | Phase4 #9 | 待修 | 全仓无外部 IP 商标/地名直用；文案改为原创表述；商店页/描述合规自检清单通过 |
+| C6 | IP 直接下架风险 | `README.md:1-3` 原含外部 IP 表述（已去商标化为“原创旷野卡通”等中性词） | Phase4 #9 | 已修（文档去商标化，玩法描述保留） | 全仓无外部 IP 商标/地名直用；文案改为原创表述；商店页/描述合规自检清单通过 |
 | C7 | 无复玩闭环/错误大逃杀定位 | `main.gd:4` `BOT_COUNT 24` 短局；无网络/匹配/反作弊 | Phase4 #9 | 待修 | 明确单机定位或补齐闭环设计文档；若单机则二周目/难度/随机池可验证复玩增量；若联机则给出网络方案与反作弊边界 |
 
 ## High（22）
@@ -189,7 +189,7 @@
 | R26 | 弹药按槽复制，人机规则不一 | Combat M8 | `player.gd:931-936` `loot.gd:316-325,363-365` `bot.gd:331-332` | M | 统一弹药池/口径；总量单次增加；人机同接口 |
 | R27 | 龙鳞支线与主线结算互斥 | Combat M11 | `main.gd:734-749,779-795` `wild_dragon.gd:186-197` | M | 阶段掉鳞或延迟结算+自动入包；结局可 4/4 |
 | R28 | 小地图开局泄露+漏第四庙 | World H5 | `hud.gd:130-166` `main.gd:765-768` `wild_world.gd:108-111` | M | POI 统一注册；初始仅揭示附近；塔激活才揭示区域；第四庙在列 |
-| R29 | 呀哈哈多为靠近/一次伤害同质 | World H4 | `wild_world.gd:1064-1092,1132-1145,1436-1446` `rock_circle.gd:50-63` `flower_trail.gd:36-53` `dive_ring.gd:28-37` `korok_prop.gd:92-109` | M | 新增搬运/轨迹/计时/风向/攀滑组合；每语法三级难度 |
+| R29 | 探索解谜多为靠近/一次伤害同质（原“探索解谜”去商标化） | World H4 | `wild_world.gd:1064-1092,1132-1145,1436-1446` `rock_circle.gd:50-63` `flower_trail.gd:36-53` `dive_ring.gd:28-37` `korok_prop.gd:92-109` | M | 新增搬运/轨迹/计时/风向/攀滑组合；每语法三级难度 |
 | R30 | 投射物弹反方向对但 mask 打不中 | Combat M13 | `wild_projectile.gd:20-24,96-115` `guardian.gd:42-45` | M | 弹反后切玩家阵营 mask；可命中施法者且不重伤自己 |
 
 ---

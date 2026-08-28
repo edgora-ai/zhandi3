@@ -183,7 +183,7 @@ func _build_log() -> void:
 
 
 func _build_seed() -> void:
-	# 呀哈哈式金种子：自发光小金球 + 两片小叶。
+	# 探索式金种子：自发光小金球 + 两片小叶。
 	var gold := StandardMaterial3D.new()
 	gold.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	gold.albedo_color = Color(1.0, 0.85, 0.25)
@@ -324,7 +324,7 @@ func describe() -> String:
 		"ammo":
 			return "弹药 +%d" % amount
 		"mushroom":
-			return "海拉鲁蘑菇 ×%d（收入背包）" % amount
+			return "旷野蘑菇 ×%d（收入背包）" % amount
 		"meat":
 			return "兽肉 ×%d（收入背包）" % amount
 		"dragon_scale":
@@ -332,7 +332,7 @@ func describe() -> String:
 		"wood":
 			return "木材 ×%d（收入背包）" % amount
 		"seed":
-			return "海拉鲁种子（闪光）"
+			return "探索种子（闪光）"
 		"orb":
 			return "精灵宝珠（生命上限 +10）"
 		"fairy":

@@ -1118,7 +1118,7 @@ func _enemy_near(p: Vector3, radius: float, type_filter: String = "") -> bool:
 	return false
 
 
-# 河鱼与石头阵呀哈哈。
+# 河鱼与石头阵探索精灵。
 func _spawn_fish_and_circles() -> void:
 	for i in range(6):
 		var z := -120.0 + i * 48.0
@@ -1133,14 +1133,14 @@ func _spawn_fish_and_circles() -> void:
 		circle.configure(player, float(i) * 1.7 + 0.4)
 		circle.position = _ground(circle_spots[i], 0.02)
 		add_child(circle)
-	# 两条花径呀哈哈。
+	# 两条花径探索精灵。
 	var trail1 := FlowerTrail.new()
 	add_child(trail1)
 	trail1.configure(player, [_ground(Vector3(-80, 0, 40), 0.5), _ground(Vector3(-70, 0, 45), 0.5), _ground(Vector3(-60, 0, 50), 0.5), _ground(Vector3(-50, 0, 55), 0.5), _ground(Vector3(-40, 0, 60), 0.5)])
 	var trail2 := FlowerTrail.new()
 	add_child(trail2)
 	trail2.configure(player, [_ground(Vector3(90, 0, 60), 0.5), _ground(Vector3(100, 0, 65), 0.5), _ground(Vector3(110, 0, 70), 0.5)])
-	# 两处跳水环呀哈哈。
+	# 两处跳水环探索精灵。
 	for rz in [-60.0, 70.0]:
 		var rx := sin(rz * 0.021) * 24.0 - 8.0 + sin(rz * 0.049) * 7.0
 		var ring := DiveRing.new()
@@ -1149,7 +1149,7 @@ func _spawn_fish_and_circles() -> void:
 		add_child(ring)
 
 
-# 林克之家：高原上的小屋与床铺，睡到天亮回满状态。
+# 高原小屋：高原上的小屋与床铺，睡到天亮回满状态。
 func _build_home(world_pos: Vector3) -> void:
 	var home := Node3D.new()
 	home.name = "LinksHouse"
@@ -1186,7 +1186,7 @@ func _build_home(world_pos: Vector3) -> void:
 		_part(Vector3(0.3, 0.25, 0.3), Toon.make_material(Color(0.35, 0.60, 0.20), true, 0.006), Vector3(-3.9 + float(i % 2) * 0.5, 0.15, -1.5 + float(i / 2) * 0.5), home)
 
 
-# 呀哈哈式小谜题：三座风车 + 四块可疑怪石，打中即出种子。
+# 探索式小谜题：三座风车 + 四块可疑怪石，打中即出种子。
 func _spawn_korok_props() -> void:
 	var pinwheels := [Vector3(-95, 0, 60), Vector3(40, 0, 55), Vector3(20, 0, -60)]
 	var rocks := [Vector3(-120, 0, 45), Vector3(75, 0, 95), Vector3(-30, 0, -50), Vector3(150, 0, -60)]
@@ -1437,7 +1437,7 @@ func _make_region_loop(path: String, pos: Vector3, vol_db: float, unit: float) -
 
 func _spawn_npcs() -> void:
 	var specs := [
-		[Vector3(-70.5, 0, 24.5), "驿站老板", ["骑马过河小心深水，马匹不会游泳。", "北边海利亚大桥是过河的正道。", "山上的测绘塔能爬上去，顶上视野极好。"], Color(0.55, 0.35, 0.20), 0],
+		[Vector3(-70.5, 0, 24.5), "驿站老板", ["骑马过河小心深水，马匹不会游泳。", "北边主河大桥是过河的正道。", "山上的测绘塔能爬上去，顶上视野极好。"], Color(0.55, 0.35, 0.20), 0],
 		[Vector3(103.0, 0, 27.0), "火山研究员", ["奥尔汀的巨龙其实怕射手步枪。", "这座神庙的符文我研究了三年。", "双子山谷的野猪脾气很差，绕开走。"], Color(0.25, 0.45, 0.55), 1],
 		[Vector3(2.5, 0, -134.5), "城堡卫兵", ["城堡平台上有守军留下的装备。", "遗迹那边的断柱可以当掩体。", "滑翔伞从城墙一跃而下最省力。"], Color(0.35, 0.38, 0.50), 2],
 		[Vector3(30.5, 0, 20.5), "旅行商人", ["桥两头的石阶是前人修的，别小看它们。", "河滩的芦苇荡里常有蘑菇。", "森林里的树砍倒有木材，木材能换护甲。"], Color(0.45, 0.55, 0.25), 0],
@@ -1458,7 +1458,7 @@ func _spawn_npcs() -> void:
 		npc.position = _ground(spec[0], 0.02)
 		add_child(npc)
 		npc.rotation.y = randf_range(0.0, TAU)
-	# 行商：沿道路在驿站与海利亚大桥之间往返（旷野之息式的流动商人）。
+	# 行商：沿道路在驿站与主河大桥之间往返（原创旷野式的流动商人）。
 	var merchant := WildNPC.new()
 	merchant.setup(terrain, player, "行商多戈", ["这条商路我走了十年，桥修好后好走多了。", "驿站收兽肉，蘑菇在河滩芦苇边最多。", "马上了路会自己认路，你尽管看风景。"], Color(0.60, 0.42, 0.20), 0)
 	merchant.position = _ground(Vector3(-40, 0, 20), 0.02)
@@ -1493,7 +1493,7 @@ func _spawn_wild_loot() -> void:
 	Loot.spawn(scene, _ground(Vector3(5, 0, -123), 32.35 - terrain.get_height(5, -123)), "armor", "", 50, 2)
 	Loot.spawn(scene, _ground(Vector3(-132, 0, -78), 18.6), "armor", "", 50, 2)
 	Loot.spawn(scene, _ground(Vector3(20, 0, -91), 0.6), "armor", "", 25, 1)
-	# 呀哈哈式探索种子：藏在峰顶、遗迹、雪线、火山口等“专门走过去”的位置。
+	# 探索式探索种子：藏在峰顶、遗迹、雪线、火山口等“专门走过去”的位置。
 	var seed_spots := [
 		Vector3(63, 0, 72), Vector3(-140, 0, 120), Vector3(18, 0, -100), Vector3(-150, 0, -128),
 		Vector3(150, 0, -132), Vector3(-50, 0, 62), Vector3(58, 0, 52), Vector3(-20, 0, 8),
@@ -1524,7 +1524,7 @@ func is_near_campfire(pos: Vector3, radius: float = 4.0) -> bool:
 
 func _region_name_impl(pos: Vector3) -> String:
 	if Vector2(pos.x, pos.z).distance_to(Vector2(4, -124)) < 42.0:
-		return "海拉鲁城堡"
+		return "北境城堡"
 	if Vector2(pos.x, pos.z).distance_to(Vector2(164, -145)) < 80.0:
 		return "奥尔汀火山"
 	if Vector2(pos.x, pos.z).distance_to(Vector2(-166, -142)) < 90.0:
@@ -1536,7 +1536,7 @@ func _region_name_impl(pos: Vector3) -> String:
 	if pos.z < -60.0 and absf(pos.x) < 78.0:
 		return "中央遗迹"
 	if terrain.is_in_water(pos.x, pos.z):
-		return "海利亚河"
+		return "主河"
 	return "中央草原"
 
 

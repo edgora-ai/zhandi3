@@ -208,7 +208,7 @@ func _process(delta: float) -> void:
 		_env.ambient_light_energy = move_toward(_env.ambient_light_energy, 0.5, delta * 3.0)
 
 
-# 落雷：玩家附近 25~45m 随机点；手持金属武器时 35% 概率劈向玩家（旷野之息式引雷）。
+# 落雷：玩家附近 25~45m 随机点；手持金属武器时 35% 概率劈向玩家（原创旷野式引雷）。
 func _strike_lightning() -> void:
 	if player == null or terrain == null:
 		return

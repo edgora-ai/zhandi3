@@ -1,6 +1,6 @@
 class_name FlowerTrail
 extends Node3D
-## 花径呀哈哈：按顺序碰完一串发光花，出种子。
+## 花径探索精灵：按顺序碰完一串发光花，出种子。
 
 var player: Player
 var completed := false

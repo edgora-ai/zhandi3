@@ -1,6 +1,6 @@
 class_name DiveRing
 extends Node3D
-## 跳水环呀哈哈：河面睡莲环，游进环心得种子。
+## 跳水环探索精灵：河面睡莲环，游进环心得种子。
 
 var player: Player
 var completed := false

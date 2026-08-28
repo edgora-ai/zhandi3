@@ -76,22 +76,24 @@ func status_text() -> String:
 
 
 func _process(delta: float) -> void:
-	if not active or phase >= PHASES.size():
+	if not active:
 		return
-	timer -= delta
-	if shrinking:
-		var t := clampf(1.0 - timer / _shrink_total, 0.0, 1.0)
-		center = _from_center.lerp(_target_center, t)
-		radius = lerpf(_from_radius, _target_radius, t)
-		if timer <= 0.0:
-			shrinking = false
-			phase += 1
-			if phase < PHASES.size():
-				timer = PHASES[phase].wait
-				shrinking_changed.emit(false)
-	elif timer <= 0.0:
-		_begin_shrink()
-	_update_wall()
+	# 即使已到决赛圈后（phase==size）仍保持最后阶段 DPS，不提前 return
+	if phase < PHASES.size():
+		timer -= delta
+		if shrinking:
+			var t := clampf(1.0 - timer / _shrink_total, 0.0, 1.0)
+			center = _from_center.lerp(_target_center, t)
+			radius = lerpf(_from_radius, _target_radius, t)
+			if timer <= 0.0:
+				shrinking = false
+				phase += 1
+				if phase < PHASES.size():
+					timer = PHASES[phase].wait
+					shrinking_changed.emit(false)
+		elif timer <= 0.0:
+			_begin_shrink()
+		_update_wall()
 	_damage_tick(delta)
 
 

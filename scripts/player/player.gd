@@ -630,11 +630,17 @@ func _physics_process(delta: float) -> void:
 	wish = wish.normalized()
 
 	var water_now := terrain != null and terrain.is_in_water(global_position.x, global_position.z) and global_position.y < terrain.get_water_level(global_position.x, global_position.z) + 0.9
+	# 游泳扫描需在 _update_swimming 前完成，否则首帧抓鱼不可达
+	_scan_loot()
 	if water_now:
 		_update_swimming(delta, wish)
 		return
 	if is_swimming:
 		is_swimming = false
+		# 恢复趴下碰撞体（游泳时可能通过 C 误触 prone）
+		if _col and _col.shape is CapsuleShape3D:
+			_col.shape.height = 0.9 if prone else 1.7
+			_col.position.y = 0.45 if prone else 0.85
 
 	var speed := WALK_SPEED
 	if Input.is_key_pressed(KEY_SHIFT) and f > 0.0 and not weapon.is_ads and not prone and stamina > 0.0:
@@ -778,7 +784,6 @@ func _physics_process(delta: float) -> void:
 			blocking = false
 		if _shield_root:
 			_shield_root.visible = blocking
-	_scan_loot()
 	_melee_cd = maxf(0.0, _melee_cd - delta)
 	# 顿帧恢复：墙钟计时，不受 time_scale 影响。
 	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:

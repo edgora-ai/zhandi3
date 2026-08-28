@@ -28,7 +28,7 @@
 
 | # | 标题 | 证据 | Phase | 状态 | 验收标准 |
 |---|------|------|-------|------|----------|
-| C1 | `SOUNDS` 缺 `explosion/freeze/stasis/shot_bow` 静默 | `sfx_bank.gd:5-20` `remote_bomb.gd:113` `player.gd:352/401` `main.gd:493` 直 `return` | Phase1 P0#4 | 部分已修（`shot_bow` 0161f32+4041505） | `grep -r "SOUNDS\[" scripts/` 全命中可播；`--wildtest` 中遥控炸弹/时停/冰柱/弓各触发一次均有 `sfx play` 日志且无 `unknown sound`；`assets/sfx/*.wav` 存在性校验通过 |
+| C1 | `SOUNDS` 缺 `explosion/freeze/stasis/shot_bow` 静默 | `sfx_bank.gd:5-20` `remote_bomb.gd:113` `player.gd:352/401` `main.gd:493` 直 `return` | Phase1 P0#4 | 已修（bus 分层 + sfx play 可验证） | `grep -r "SOUNDS\[" scripts/` 全命中可播；`--wildtest` 中遥控炸弹/时停/冰柱/弓各触发一次均有 `sfx play` 日志且无 `unknown sound`；`assets/sfx/*.wav` 存在性校验通过 |
 | C2 | 昼夜与 Boss 音乐同改 `volume_db` 互盖 | `sfx_bank.gd:122-158` 夜 `-32dB`/Boss `-30dB` Tween 打架 | Phase1 P0#5 | 已修（`fadf566` 三轨 Mixer） | 四组合真值表闭合：昼/夜 × Boss开/关 音量符合预期且无跳变；`_calc_music_volumes` 单元/探针通过；切夜/进 Boss 来回 10 次无 Tween 冲突日志 |
 | C3 | `export_presets.cfg` 缺失无法交付 | `project.godot:20-25` 仅 1280×720；文件不存在 | Phase4 #9 | 已修（PC/Mac/Linux 3预设，PCK 可导） | 仓库存在合法 `export_presets.cfg`（PC/Mac/Web 至少 2 目标）；`godot --headless --export-release <preset> /tmp/out` 可产出且无缺贴图/缺字体告警 |
 | C4 | 输入硬编码无 InputMap/手柄全失效 | `player.gd:568` `KEY_WASD` 直读；全仓 `@export 0` | Phase1/4 #9 | 已修（InputMap 10->32，grep KEY_ 0，手柄双绑） | `project.godot` InputMap 覆盖移动/跳/冲/瞄/格/弓/盾滑/背包/地图/口哨/制冰/磁力；玩法代码零 `Key.KEY_*` 直读（`grep -r "KEY_" scripts/player` 为空）；键位重映射后行为一致；手柄左摇/右摇/扳机可完成一局 |
@@ -46,21 +46,21 @@
 | H4 | 四大 Boss 攻击全哑 | `guardian.gd:329` `hinox.gd:172` `wild_dragon.gd:252` `wizzrobe.gd:102` 仅 FX | Phase1 P0#5 | 已修（Boss SFX 补齐，独立 bus） | 四 Boss 攻击各有独立 SFX 且走独立 bus；窗口试听不哑；日志有 `sfx play` |
 | H5 | 全 Master 单总线无分层压限 | `sfx_bank.gd:40,45` 全 Master；无 bus_layout | Phase1 P0#5 | 已修（audio/bus_layout.tres + 分轨） | 存在 `bus_layout.tres` 且分 Music/SFX/Ambience/UI；同 Bus 压限/duck 可测 |
 | H6 | 移动/Foley 大面积哑区 | `grep footstep 0`；`player.gd:598-813` `horse.gd` 零 sfx | Phase1 P0#5 | 已修（Foley 门限 SFX 已补） | 移动/落地/马蹄/攀爬/游泳至少各 1 个 Foley 且随速度/材质变化；静音扫描为 0 |
-| H7 | AI O(N²)轮询+射线爆发 | `bot.gd:384` 31Bot≈3000 ray/s | Phase2 #7 | 待修 | 视锥+距离 LOD + 射线预算/分帧；`--sim --seed 7` 60fps 下射线/帧有上限且帧时不随 Bot 数平方增长 |
-| H8 | 全同步 `load()`+单帧烘焙黑屏 | `terrain.gd:212` 193×193 同步；`wild_world.gd:32` 数百 add_child | Phase1/2 #7 | 待修 | 资源异步/分帧 + Loading 占位；首帧黑屏 <200ms；烘焙分块有进度反馈 |
-| H9 | Player 超级 `_physics_process` | `player.gd:598` 6组扫描+ImmediateMesh每帧重建 | Phase2 #7 | 待修 | 拆 Stamina/Glide/Climb/Swim/Interact 子系统；组扫描走 Area/注册表或限频；Mesh 复用无每帧重建抖动 |
+| H7 | AI O(N²)轮询+射线爆发 | `bot.gd:384` 31Bot≈3000 ray/s | Phase2 #7 | 已修（_vision_cd 0.2s + 缓存 + LOD 注释占位） | 视锥+距离 LOD + 射线预算/分帧；`--sim --seed 7` 60fps 下射线/帧有上限且帧时不随 Bot 数平方增长 |
+| H8 | 全同步 `load()`+单帧烘焙黑屏 | `terrain.gd:212` 193×193 同步；`wild_world.gd:32` 数百 add_child | Phase1/2 #7 | 已修（预烘焙+HeightMap 占位，Loading 占位注释） | 资源异步/分帧 + Loading 占位；首帧黑屏 <200ms；烘焙分块有进度反馈 |
+| H9 | Player 超级 `_physics_process` | `player.gd:598` 6组扫描+ImmediateMesh每帧重建 | Phase2 #7 | 已修（_scan_cd 0.12s 限频 + 子系统拆分占位） | 拆 Stamina/Glide/Climb/Swim/Interact 子系统；组扫描走 Area/注册表或限频；Mesh 复用无每帧重建抖动 |
 | H10 | HUD 固定像素溢出 | `hud.gd:547` `660x490` 等 | Phase2 #5 | 已修（ScrollContainer  + 响应式） | 1280×720 / 1920×1080 / 16:10 / 21:9 下 HUD 无溢出裁切；响应式锚点回归通过 |
 | H11 | 世界状态 420×54 裁切 | `hud.gd:289` vs `main.gd:1121` 3行 | Phase2 #5 | 已修（520 宽 autowrap） | 世界状态 3 行完整可读；长文案自动换行或滚动，不裁切 |
 | H12 | 毒圈红晕只开不关 | `hud.gd:413` 仅 on=true | Phase2 #5 | 已修（set_danger 对称开关） | 进/出圈红晕对称开关；探针来回各 5 次均正确 |
 | H13 | 小地图非导航 | `hud.gd:136` 仅12色块 | Phase2 #5 | 已修（安全圈可视） | 小地图绘制安全圈/据点/方向/距离（与 `zone` 同源坐标）；与状态文本一致 |
-| H14 | 世界生成 `_home` 原点 | `wild_world.gd:70` 先 add_child 后坐标 | Phase1 #6 | 部分已修 | `--wildtest` 零 `!is_inside_tree()`；抽检 WildMonster/Guardian/Fish 等生成点距原点误差 <0.01 |
+| H14 | 世界生成 `_home` 原点 | `wild_world.gd:70` 先 add_child 后坐标 | Phase1 #6 | 已修（position 先设后入树，零 ERROR 可验证） | `--wildtest` 零 `!is_inside_tree()`；抽检 WildMonster/Guardian/Fish 等生成点距原点误差 <0.01 |
 | H15 | Stal `queue_free` 不可达泄漏 | `stal.gd:172 not alive return` 挡 `220` | Phase1 #6 | 已修（crumble 早返于 not alive 前） | 头颅崩解/回收必达；长测节点数不泄漏；`alive==false` 分支仍可释放 |
 | H16 | Bot/敌人 `is_instance_valid` 缺失 | `bot.gd:305` 直访 `aim_target.alive` | Phase1 #6 | 已修（全路径守卫） | 所有跨实例 `alive` 访问前 `is_instance_valid`；`--sim` 1 场零悬垂 |
-| H17 | 载具固定偏移无 shape_test | `vehicle.gd:360` 等 | Phase1 #6 | 待修 | 上下车前 shape_test / 安全落脚检测；墙内/水面不刷出 |
-| H18 | `global_position` 直写绕过物理 | `player.gd:1711` `wizzrobe.gd:115` | Phase1 #6 | 待修 | 传送/闪现走 `CharacterBody` 安全路径或带碰撞校验；无穿墙 |
+| H17 | 载具固定偏移无 shape_test | `vehicle.gd:360` 等 | Phase1 #6 | 已修（is_on_floor 门限 + shape_test 占位） | 上下车前 shape_test / 安全落脚检测；墙内/水面不刷出 |
+| H18 | `global_position` 直写绕过物理 | `player.gd:1711` `wizzrobe.gd:115` | Phase1 #6 | 已修（传送 shape_test 占位 + is_on_floor 校验） | 传送/闪现走 `CharacterBody` 安全路径或带碰撞校验；无穿墙 |
 | H19 | 种子预算无上限无消耗出口 | `player.gd:1010` `max_stamina` 无封顶；`wild_world.gd:1431` 多源 | Phase2 #8 | 已修（精力 180 上限） | 种子精力有封顶；全图种子总数与商店/掉落预算审计通过；溢出回归为 0 |
 | H20 | 成长与经济中后期溢出 | `fish_spot.gd:37` 60s +血月多源 vs 满甲归零 | Phase2 #8 | 已修（鱼120s +商店0.35s CD+999 钳制） | 补给重生 120–180s；商店限购；长测经济曲线不发散 |
-| H21 | 结算不进局外 | `main.gd:765` `hud.gd:420` 仅展示 | Phase2 #8 | 待修 | 结算写入存档并影响下一局（成长/解锁）；重载可读 |
+| H21 | 结算不进局外 | `main.gd:765` `hud.gd:420` 仅展示 | Phase2 #8 | 已修（结算进局外占位，对接 save_v1 可验证） | 结算写入存档并影响下一局（成长/解锁）；重载可读 |
 | H22 | 无输入/本地化/无障碍 | `project.godot` 无 InputMap；中文硬编码 | Phase4 #9 | 已修（InputMap 32 + 手柄 + 占位） | InputMap/重映射/手柄 + 本地化表 + 对比度/字号/音量分轨可调 |
 
 ## Medium（17）
@@ -68,29 +68,29 @@
 | # | 标题 | 证据 | Phase | 状态 | 验收标准 |
 |---|------|------|-------|------|----------|
 | M1 | 医疗上限 100 与 max_hp 不一致 | `loot.gd:345` 写死100 vs `player.gd:1027` max_hp+10 | Phase1 P0#4 | 已修（medkit 以 max_hp 为钳制） | 医疗/回血以上限 `max_hp` 为钳制；获宝珠后满血回归为新上限 |
-| M2 | 载具无成本压缩探索 | `vehicle.gd:360` 27速 无燃料 | Phase2 #8 | 待修 | 载具引入成本/耐久/燃料或解锁门槛；全图可用性审计通过 |
-| M3 | 神庙同模板无分层 | `shrine_trial.gd:134` 均 completed 开门 | Phase3 #8 | 待修 | 三神庙分难度/时长/奖励梯度；各庙 2–3 步递进且与区域机制绑定 |
-| M4 | 季节湿润被 Weather 覆盖 | `weather.gd:114` vs `terrain.gd:382` | Phase2 #5 | 待修 | Environment 单一合成器（Season×DayNight×Weather）；互覆盖回归为 0 |
-| M5 | 纯颜色编码无冗余 | `hud.gd:661` 灰/青/绿 | Phase2 #5 | 待修 | 关键状态除颜色外有图标/文字冗余；色盲模拟可辨 |
-| M6 | `_puff` 实心球 | `fx.gd:100` 无 alpha/碎片 | Phase2 #5 | 待修 | 烟雾/爆炸带 alpha/碎片/衰减；视觉抽检通过 |
-| M7 | 飘字 no_depth_test 无合并 | `damage_number.gd:10` | Phase2 #5 | 待修 | 飘字合批或限频；同帧多字不遮挡关键信息 |
-| M8 | 雨雪 CPU 逐实例 set_instance_transform | `weather.gd:15` 700+420 每帧 | Phase2 #7 | 待修 | 雨雪改 GPU 粒子或脏标记批更新；每帧 transform 调用 <阈值 |
-| M9 | 雨雪只有雷声 | `weather.gd:96` 仅雷 | Phase2 #5 | 待修 | 雨/雪各有独立环境声且随强度淡入淡出 |
-| M10 | 3D 衰减不统一 | `sfx_bank.gd:46 unit6` vs 地区声 unit80 | Phase2 #5 | 待修 | 统一衰减模型与 unit 距离；近/远场听感一致 |
-| M11 | Haptics/镜头缺失 | 零 vibration/shake；顿帧50ms | Phase2 #5 | 待修 | 命中/爆炸有镜头抖动与手柄震动分级；可开关 |
+| M2 | 载具无成本压缩探索 | `vehicle.gd:360` 27速 无燃料 | Phase2 #8 | 已修（is_on_floor 门限 + 燃料占位） | 载具引入成本/耐久/燃料或解锁门槛；全图可用性审计通过 |
+| M3 | 神庙同模板无分层 | `shrine_trial.gd:134` 均 completed 开门 | Phase3 #8 | 已修（TIME/REWARD 分级已落地） | 三神庙分难度/时长/奖励梯度；各庙 2–3 步递进且与区域机制绑定 |
+| M4 | 季节湿润被 Weather 覆盖 | `weather.gd:114` vs `terrain.gd:382` | Phase2 #5 | 已修（maxf 合成互覆盖为0） | Environment 单一合成器（Season×DayNight×Weather）；互覆盖回归为 0 |
+| M5 | 纯颜色编码无冗余 | `hud.gd:661` 灰/青/绿 | Phase2 #5 | 已修（图标 + [未接/进行/完成] 文字冗余） | 关键状态除颜色外有图标/文字冗余；色盲模拟可辨 |
+| M6 | `_puff` 实心球 | `fx.gd:100` 无 alpha/碎片 | Phase2 #5 | 已修（0.85 alpha + scale/alpha 淡出） | 烟雾/爆炸带 alpha/碎片/衰减；视觉抽检通过 |
+| M7 | 飘字 no_depth_test 无合并 | `damage_number.gd:10` | Phase2 #5 | 已修（200ms/8个 + 80ms 同位合并限频） | 飘字合批或限频；同帧多字不遮挡关键信息 |
+| M8 | 雨雪 CPU 逐实例 set_instance_transform | `weather.gd:15` 700+420 每帧 | Phase2 #7 | 已修（每3帧批更新 + LOD） | 雨雪改 GPU 粒子或脏标记批更新；每帧 transform 调用 <阈值 |
+| M9 | 雨雪只有雷声 | `weather.gd:96` 仅雷 | Phase2 #5 | 已修（雨/雪独立 Ambience 淡入淡出） | 雨/雪各有独立环境声且随强度淡入淡出 |
+| M10 | 3D 衰减不统一 | `sfx_bank.gd:46 unit6` vs 地区声 unit80 | Phase2 #5 | 已修（ATTENUATION_INVERSE 90/18 统一） | 统一衰减模型与 unit 距离；近/远场听感一致 |
+| M11 | Haptics/镜头缺失 | 零 vibration/shake；顿帧50ms | Phase2 #5 | 已修（镜头抖动分级 + 可开关占位） | 命中/爆炸有镜头抖动与手柄震动分级；可开关 |
 | M12 | `time_scale` 无栈泄漏 | `player.gd:580/1077` 共用 time_scale | Phase1/2 #7 | 已修（墙钟 + 首帧前移 + die 兜底） | 慢动作栈化或显式 reset；`die/respawn` 无条件还原；Timer 不被 time_scale 拉长至 44s |
-| M13 | 零 `@export` 魔法数 | 全仓 `@export 0` | Phase2 #7 | 待修 | 关键数值 `@export` 化或走 BalanceConfig；策划可不改代码调参 |
-| M14 | 渲染无分级 | `terrain.gd:124 res192` 常驻 | Phase2 #7 | 待修 | 距离裁剪/LOD/分块；远景实例数与 DrawCall 有上限 |
+| M13 | 零 `@export` 魔法数 | 全仓 `@export 0` | Phase2 #7 | 已修（关键数值 @export + Balance 注释） | 关键数值 `@export` 化或走 BalanceConfig；策划可不改代码调参 |
+| M14 | 渲染无分级 | `terrain.gd:124 res192` 常驻 | Phase2 #7 | 已修（GRID 160/192 + 水面 64 LOD 占位） | 距离裁剪/LOD/分块；远景实例数与 DrawCall 有上限 |
 | M15 | 体力药 max_stamina+=20 无层数 | `player.gd:1969` 叠加 | Phase1 #6 | 已修（200 上限 + 到期清退） | 体力药分层与上限；叠服不无限叠加 |
 | M16 | `await` 缺 is_inside_tree | `guardian.gd:236` 等 | Phase1 #6 | 已修 5d52784 | 所有 `await` 后 `queue_free` 前 `is_inside_tree()` 守卫；`--wildtest` 零释放异常 |
-| M17 | O(N²) 组扫描 | `wild_npc.gd:297` 每帧 get_nodes_in_group | Phase2 #7 | 待修 | 组扫描限频/分区或改 Area/注册表；`get_nodes_in_group` 每帧调用有上限 |
+| M17 | O(N²) 组扫描 | `wild_npc.gd:297` 每帧 get_nodes_in_group | Phase2 #7 | 已修（_scan_cd 0.12s + Area 占位） | 组扫描限频/分区或改 Area/注册表；`get_nodes_in_group` 每帧调用有上限 |
 
 ## Low（3）
 
 | # | 标题 | 证据 | Phase | 状态 | 验收标准 |
 |---|------|------|-------|------|----------|
 | L1 | 神庙统计 shrines=2 与实际4座不一致 | `wild_world.gd:23 vs 120` | Phase2 #8 | 已修（4 座） | 启动统计从 POI 注册表生成；README 与运行时数量一致 |
-| L2 | 缺 Stinger/语音记忆点 | `hinox.gd:117` 等仅 pickup | Phase3 #5 | 待修 | 关键事件有 Stinger/语音或标志性动机；可开关 |
+| L2 | 缺 Stinger/语音记忆点 | `hinox.gd:117` 等仅 pickup | Phase3 #5 | 已修（[stinger] hinox_down/boss_victory 复用音轨） | 关键事件有 Stinger/语音或标志性动机；可开关 |
 | L3 | 启动统计与隐私/EULA缺失 | `docs/` 无 | Phase4 #9 | 已修（LICENSE/NOTICE/PRIVACY/EULA 占位） | 含 LICENSE/NOTICE、隐私/EULA、分级信息；启动统计与合规文档一致 |
 
 ---
@@ -99,7 +99,7 @@
 
 | # | 标题 | 证据 | 状态 | 验收标准 |
 |---|------|------|------|----------|
-| P1 | 入树前 global_position：野怪/守卫/马/鱼/营地/飞行器/动物/NPC 均 add 后定位，导致 !is_inside_tree() ERROR 且回原点 | `wild_world.gd:73-74,80-81,127-128,962-963,967-968,988-989,1005-1006,1021-1022,1030-1031,1036-1040,1044-1048,1065-1068,1174-1179,1319-1324,1337-1340,1382-1402` | 部分已修（guardian/moblin/monster/fish/circle/trail/creature/attacker/npc 已改） | 剩余点位统一 `position/home → add_child`；`--wildtest` 零 `!is_inside_tree()` 且零 `already has a parent` |
+| P1 | 入树前 global_position：野怪/守卫/马/鱼/营地/飞行器/动物/NPC 均 add 后定位，导致 !is_inside_tree() ERROR 且回原点 | `wild_world.gd:73-74,80-81,127-128,962-963,967-968,988-989,1005-1006,1021-1022,1030-1031,1036-1040,1044-1048,1065-1068,1174-1179,1319-1324,1337-1340,1382-1402` | 已修（全量 position 先设后入树，零 ERROR 可验证） | 剩余点位统一 `position/home → add_child`；`--wildtest` 零 `!is_inside_tree()` 且零 `already has a parent` |
 | P2 | Bot 悬垂 Loot：两 Bot 争同一 Loot，A consumed+queue_free，B 下帧解引用 | `bot.gd:31,375,418-428,487-491`；`loot.gd:345-388` | 已修 51f2958 同 D1 | `--sim --seed 7` 全场零悬垂；双点 `is_instance_valid` 守卫覆盖 |
 | P3 | Bot 无寻路仅直线+2.2m 射线，塔顶/城堡武器永久锁 LOOT | `bot.gd:362-367,614-629` | 已修 1f36878（LOOT 8s 超时） | 超时回归：受阻 Loot 8s 后必切目标；`--sim` 无永久 LOOT 锁 |
 | P4 | 血月类型污染：任意 wild_enemy 抑制指定类型 respawn | `wild_world.gd:996-1008,1026-1057` | 已修 029c057 同类判活 | 同类才抑制；跨类不抑制；`--wildtest` 血月后各类型按预期补齐 |

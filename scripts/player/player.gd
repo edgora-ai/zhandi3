@@ -118,6 +118,7 @@ var _pillars: Array[IcePillar] = []
 var _stasis_target: CharacterBody3D = null
 var _stasis_end_ms := 0
 var _stasis_dmg := 0.0
+var _stasis_prev_mode := Node.PROCESS_MODE_INHERIT
 var _stasis_shell: MeshInstance3D
 var _magnet_prop: MetalProp = null
 var _magnet_beam: MeshInstance3D
@@ -363,6 +364,8 @@ func _toggle_stasis() -> void:
 	var best_dot := 0.82
 	for group in ["wild_enemy", "wildlife", "combatant"]:
 		for target in get_tree().get_nodes_in_group(group):
+			if target == self:
+				continue
 			if not (target is CharacterBody3D) or not target.alive:
 				continue
 			var to_t: Vector3 = target.global_position + Vector3(0, 1.0, 0) - camera.global_position
@@ -378,6 +381,7 @@ func _toggle_stasis() -> void:
 	_stasis_target = best
 	_stasis_dmg = 0.0
 	_stasis_end_ms = Time.get_ticks_msec() + 5000
+	_stasis_prev_mode = best.get_process_mode()
 	best.set_process_mode(Node.PROCESS_MODE_DISABLED)
 	_stasis_shell = MeshInstance3D.new()
 	var sm := SphereMesh.new()
@@ -411,7 +415,7 @@ func _release_stasis() -> void:
 	_stasis_shell = null
 	if t == null or not is_instance_valid(t):
 		return
-	t.set_process_mode(Node.PROCESS_MODE_INHERIT)
+	t.set_process_mode(_stasis_prev_mode)
 	if t.alive and _stasis_dmg > 0.0:
 		var dir := t.global_position - global_position
 		dir.y = 0.0
@@ -596,7 +600,26 @@ func _end_flurry() -> void:
 		hud.set_flurry_overlay(false)
 
 
+func _check_timed_consumables() -> void:
+	# 墙钟计时，不受 Engine.time_scale 影响；需在所有 early return 前调用
+	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
+		_hitstop_end_ms = 0
+		if not flurry:
+			Engine.time_scale = 1.0
+	if _stasis_end_ms > 0 and Time.get_ticks_msec() >= _stasis_end_ms:
+		_release_stasis()
+	if _elixir_stam_end_ms > 0 and Time.get_ticks_msec() >= _elixir_stam_end_ms:
+		_elixir_stam_end_ms = 0
+		max_stamina -= 20.0
+		stamina = minf(stamina, max_stamina)
+		if hud:
+			hud.add_feed("药剂效果消退了")
+	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
+		_end_flurry()
+
+
 func _physics_process(delta: float) -> void:
+	_check_timed_consumables()
 	if not alive:
 		return
 	# 测试钩子：无头环境下输入分支不执行，举盾状态在这里维护。
@@ -785,13 +808,7 @@ func _physics_process(delta: float) -> void:
 		if _shield_root:
 			_shield_root.visible = blocking
 	_melee_cd = maxf(0.0, _melee_cd - delta)
-	# 顿帧恢复：墙钟计时，不受 time_scale 影响。
-	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
-		_hitstop_end_ms = 0
-		if not flurry:
-			Engine.time_scale = 1.0
-	if _stasis_end_ms > 0 and Time.get_ticks_msec() >= _stasis_end_ms:
-		_release_stasis()
+	# 顿帧/时停/药剂/疾风已在帧头墙钟处理（不受 time_scale 与 early return 影响）
 	# 时停壳呼吸脉动，并随剩余时间收缩（壳体本身就是倒计时）。
 	if _stasis_shell and is_instance_valid(_stasis_shell):
 		var remain := clampf((_stasis_end_ms - Time.get_ticks_msec()) / 5000.0, 0.0, 1.0)
@@ -806,8 +823,6 @@ func _physics_process(delta: float) -> void:
 	if not is_climbing and _climb_arms:
 		_climb_arms.visible = false
 	dodge_cd = maxf(0.0, dodge_cd - delta)
-	if flurry and Time.get_ticks_msec() >= _flurry_end_ms:
-		_end_flurry()
 	# 烤串增益倒计时。
 	if _skewer_t > 0.0:
 		_skewer_t -= delta
@@ -1115,6 +1130,8 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 func die(from: Variant = null) -> void:
 	if not alive:
 		return
+	if _stasis_target:
+		_release_stasis()
 	Engine.time_scale = 1.0
 	_hitstop_end_ms = 0
 	_end_flurry()
@@ -1939,7 +1956,17 @@ func get_backpack_lines() -> Array[String]:
 	return lines
 
 
+func _check_and_clear_expired_elixir() -> void:
+	if _elixir_stam_end_ms > 0 and Time.get_ticks_msec() >= _elixir_stam_end_ms:
+		_elixir_stam_end_ms = 0
+		max_stamina -= 20.0
+		stamina = minf(stamina, max_stamina)
+		if hud:
+			hud.add_feed("药剂效果消退了")
+
+
 func _use_backpack_selection() -> void:
+	_check_and_clear_expired_elixir()
 	if backpack_index < backpack_weapons.size():
 		_retrieve_weapon(backpack_index)
 		return

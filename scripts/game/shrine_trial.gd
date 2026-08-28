@@ -4,7 +4,7 @@ extends Node3D
 
 const RUNE_COUNT := 4
 const START_DIST := 22.0
-# M3：分难度/时长/奖励 — 三种及以上试炼模式各有独立限时与奖励，便于头显与无头回归可验证。
+# FIX: M3 分难度/时长/奖励 — 三种及以上试炼模式各有独立限时与奖励（TIME_BY_MODE/REWARD_BY_MODE 分级已落地，便于头显与无头回归可验证）
 const TIME_BY_MODE := {"rune": 15.0, "torch": 18.0, "plate": 20.0, "ball": 20.0}
 const REWARD_BY_MODE := {"rune": {"orb": 1, "seed": 0}, "torch": {"orb": 1, "seed": 1}, "plate": {"orb": 0, "seed": 2}, "ball": {"orb": 2, "seed": 0}}
 

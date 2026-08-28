@@ -1,5 +1,6 @@
 class_name Terrain
 extends Node3D
+# FIX: H8 预烘焙+HeightMap 占位说明（Loading 占位由预烘焙承载，HeightMapShape 复用避免黑屏，后续仅需 Loading UI 分帧占位）
 ## 程序化地形：噪声位移网格 + 顶点色（按高度/坡度）+ 解析高度采样
 
 const SIZE := 500.0 # FIX: M14 LOD占位：SIZE固定，GRID分级见下

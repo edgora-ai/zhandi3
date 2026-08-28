@@ -773,9 +773,7 @@ func _physics_process(delta: float) -> void:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			if _magnet_prop:
 				_throw_magnet()
-			elif false:
-				pass
-			if weapon.weapon_id == "bow":
+			elif weapon.weapon_id == "bow":
 				_bow_draw = minf(1.0, _bow_draw + delta * 1.3)
 				weapon.set_ads(_bow_draw > 0.15)
 			elif weapon.weapon_id != "":

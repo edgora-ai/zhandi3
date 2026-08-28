@@ -997,7 +997,9 @@ func respawn_monsters() -> int:
 	for p in _monster_points:
 		var occupied := false
 		for e in get_tree().get_nodes_in_group("wild_enemy"):
-			if e.alive and e.global_position.distance_to(_ground(p, 0.05)) < 12.0:
+			if not e.alive or not e.get_script() or e.get_script().resource_path.get_file().get_basename() != "wild_monster":
+				continue
+			if e.global_position.distance_to(_ground(p, 0.05)) < 12.0:
 				occupied = true
 				break
 		if not occupied:
@@ -1012,7 +1014,9 @@ func respawn_monsters() -> int:
 		var p2: Vector3 = entry[1]
 		var occupied2 := false
 		for c in get_tree().get_nodes_in_group("wildlife"):
-			if c.alive and c.global_position.distance_to(_ground(p2, 0.05)) < 12.0:
+			if not c.alive or c.get("species") != kind:
+				continue
+			if c.global_position.distance_to(_ground(p2, 0.05)) < 12.0:
 				occupied2 = true
 				break
 		if not occupied2:

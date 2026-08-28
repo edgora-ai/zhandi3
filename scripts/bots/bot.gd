@@ -30,6 +30,8 @@ var move_target := Vector3.ZERO
 var aim_target: CharacterBody3D = null
 var target_loot: Loot = null
 var _loot_time := 0.0
+var _loot_failed_ids: Dictionary = {}
+var _loot_failed_pos := Vector3.ZERO
 var capture_goal: CapturePoint = null
 
 var _think := 0.0
@@ -363,16 +365,18 @@ func _think_tick() -> void:
 	if weapon.weapon_id == "":
 		var loot := _find_nearest_loot("weapon")
 		if loot:
+			if target_loot != loot or state != State.LOOT:
+				_loot_time = 0.0
 			state = State.LOOT
 			target_loot = loot
-			_loot_time = 0.0
 			return
 	if weapon.reserve == 0 and weapon.mag_left == 0:
 		var ammo_loot := _find_nearest_loot("ammo")
 		if ammo_loot:
+			if target_loot != ammo_loot or state != State.LOOT:
+				_loot_time = 0.0
 			state = State.LOOT
 			target_loot = ammo_loot
-			_loot_time = 0.0
 			return
 	if state != State.CAPTURE and randf() < 0.15:
 		var cp := _find_capture_point()
@@ -382,8 +386,7 @@ func _think_tick() -> void:
 			move_target = cp.global_position
 			return
 	if state == State.LOOT:
-		_loot_time += 0.3
-		if target_loot == null or not is_instance_valid(target_loot) or target_loot.consumed or _loot_time > 8.0:
+		if target_loot == null or not is_instance_valid(target_loot) or target_loot.consumed:
 			state = State.ROTATE
 			_loot_time = 0.0
 	if state in [State.ROTATE, State.CAPTURE, State.DROP]:
@@ -433,10 +436,21 @@ func _find_nearest_loot(kind: String) -> Loot:
 	for item in get_tree().get_nodes_in_group("loot"):
 		if item.consumed or item.kind != kind:
 			continue
+		if _loot_failed_ids.has(item.get_instance_id()):
+			continue
 		var d := global_position.distance_to(item.global_position)
 		if d < best_d:
 			best = item
 			best_d = d
+	# Fallback: if all filtered, allow retry after 12s
+	if best == null:
+		for item in get_tree().get_nodes_in_group("loot"):
+			if item.consumed or item.kind != kind:
+				continue
+			var d2 := global_position.distance_to(item.global_position)
+			if d2 < best_d:
+				best = item
+				best_d = d2
 	return best
 
 
@@ -497,10 +511,19 @@ func _physics_process(delta: float) -> void:
 			_fight_fire(delta)
 		State.LOOT:
 			if target_loot and is_instance_valid(target_loot) and not target_loot.consumed:
-				move_dir = _seek(target_loot.global_position)
-				speed = RUN
-				if global_position.distance_to(target_loot.global_position) < 1.8:
-					target_loot.apply_to(self)
+				_loot_time += delta
+				if _loot_time > 8.0:
+					_loot_failed_ids[target_loot.get_instance_id()] = true
+					_loot_failed_pos = target_loot.global_position
+					target_loot = null
+					_loot_time = 0.0
+					state = State.ROTATE
+				else:
+					move_dir = _seek(target_loot.global_position)
+					speed = RUN
+					if global_position.distance_to(target_loot.global_position) < 1.8:
+						target_loot.apply_to(self)
+						_loot_time = 0.0
 			else:
 				state = State.ROTATE
 		State.ROTATE, State.CAPTURE:

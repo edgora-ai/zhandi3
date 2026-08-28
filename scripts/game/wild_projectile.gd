@@ -98,11 +98,13 @@ func _physics_process(delta: float) -> void:
 			var facing: Vector3 = -(collider as Player).global_transform.basis.z
 			if facing.dot(velocity.normalized()) < -0.3:
 				var back_dir := Vector3.ZERO
-				if source and source is Node3D:
+				if source and is_instance_valid(source) and source is Node3D:
 					back_dir = ((source as Node3D).global_position + Vector3(0, 1.2, 0) - global_position).normalized()
 				else:
 					back_dir = -velocity.normalized()
 				velocity = back_dir * maxf(18.0, velocity.length() * 1.4)
+				lifetime = maxf(lifetime, 3.0)
+				collision_mask = 1 | 4
 				source = collider
 				lifetime = 3.0
 				collider.parry_count += 1
@@ -111,8 +113,9 @@ func _physics_process(delta: float) -> void:
 				return
 		if OS.get_cmdline_user_args().has("--wildtest"):
 			print("[wildtest] projectile collision kind=%s collider=%s pos=%s" % [kind, str(collider), str(global_position)])
-		if collider and collider != source and collider.has_method("take_damage"):
-			collider.take_damage(damage, source)
+		var valid_source: Node = source if source and is_instance_valid(source) else null
+		if collider and collider != valid_source and collider.has_method("take_damage"):
+			collider.take_damage(damage, valid_source)
 		FX.impact(global_position, Color(1.0, 0.25, 0.05) if kind == "fire" else Color(0.25, 0.88, 1.0) if kind == "energy" else Color(0.62, 0.52, 0.38))
 		queue_free()
 	rotate_x(delta * 7.0)

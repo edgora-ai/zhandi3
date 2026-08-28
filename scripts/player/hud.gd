@@ -164,6 +164,10 @@ func _build_minimap() -> void:
 		dot.color = entry[1]
 		dot.position = _world_to_map(entry[0]) - Vector2(3, 3)
 		_minimap_wrap.add_child(dot)
+	_minimap_zone = ColorRect.new()
+	_minimap_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_minimap_zone.color = Color(0.25, 0.75, 1.0, 0.18)
+	_minimap_wrap.add_child(_minimap_zone)
 	_minimap_player = ColorRect.new()
 	_minimap_player.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap_player.size = Vector2(8, 8)
@@ -171,13 +175,22 @@ func _build_minimap() -> void:
 	_minimap_wrap.add_child(_minimap_player)
 
 
-func update_minimap(player: Player) -> void:
+var _minimap_zone: ColorRect
+var _minimap_capture_dots: Array[ColorRect] = []
+
+func update_minimap(player: Player, zone: Zone = null) -> void:
 	if _minimap_wrap == null:
 		return
 	_minimap_wrap.visible = player != null and player.alive
 	if player == null:
 		return
 	_minimap_player.position = _world_to_map(player.global_position) - Vector2(4, 4)
+	if zone and _minimap_zone:
+		var radius_px := zone.radius / 500.0 * 164.0
+		var center_px := _world_to_map(Vector3(zone.center.x, 0, zone.center.y))
+		_minimap_zone.position = center_px - Vector2(radius_px, radius_px)
+		_minimap_zone.size = Vector2(radius_px * 2, radius_px * 2)
+
 
 
 # ---------- 准星 ----------
@@ -245,8 +258,8 @@ func _build_bars() -> void:
 	_ammo_label.position = Vector2(60, 16)
 
 
-func set_health(hp: float, armor: float) -> void:
-	_hp_bar.size.x = 256.0 * clampf(hp / 100.0, 0.0, 1.0)
+func set_health(hp: float, armor: float, max_hp: float = 100.0) -> void:
+	_hp_bar.size.x = 256.0 * clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
 	_armor_bar.size.x = 256.0 * clampf(armor / 100.0, 0.0, 1.0)
 	_hp_bar.color = Color(0.35, 0.85, 0.35) if hp > 35 else Color(0.9, 0.3, 0.2)
 	_hp_label.text = str(int(ceil(hp)))
@@ -288,7 +301,7 @@ func _build_top() -> void:
 
 	_world_state_label = _mk_label(_ui, "", 17, Color(0.86, 0.95, 0.76))
 	_world_state_label.position = Vector2(22, 18)
-	_world_state_label.size = Vector2(420, 72)
+	_world_state_label.size = Vector2(520, 72)
 	_world_state_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_world_state_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 
@@ -568,12 +581,33 @@ func show_backpack(lines: Array[String], selected: int) -> void:
 	title.position = Vector2(30, 24)
 	var subtitle := _mk_label(_backpack_panel, "↑↓ / W S 选择    E / Enter 取出或使用    X 存入当前武器    N 关闭（B 引爆）", 15, Color(0.68, 0.88, 0.83))
 	subtitle.position = Vector2(30, 70)
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(25, 102)
+	scroll.size = Vector2(610, 360)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_backpack_panel.add_child(scroll)
+	var inner := VBoxContainer.new()
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(inner)
 	for i in range(lines.size()):
 		var active := i == selected
+		var row := Control.new()
+		row.custom_minimum_size = Vector2(610, 41)
+		inner.add_child(row)
 		if active:
-			_mk_rect(_backpack_panel, Vector2(25, 111 + i * 48), Vector2(610, 41), Color(0.18, 0.50, 0.45, 0.65))
-		var label := _mk_label(_backpack_panel, ("▶  " if active else "    ") + lines[i], 19, Color(1.0, 0.94, 0.68) if active else Color(0.86, 0.90, 0.82))
-		label.position = Vector2(38, 118 + i * 48)
+			_mk_rect(row, Vector2.ZERO, Vector2(610, 41), Color(0.18, 0.50, 0.45, 0.65))
+		var label := Label.new()
+		label.text = ("▶  " if active else "    ") + lines[i]
+		label.add_theme_font_size_override("font_size", 19)
+		label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.68) if active else Color(0.86, 0.90, 0.82))
+		label.position = Vector2(13, 8)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(label)
+	# auto scroll to selected
+	await get_tree().process_frame
+	if scroll.get_v_scroll_bar():
+		scroll.scroll_vertical = clampi(selected * 41 - 140, 0, 9999)
 	_ignore_mouse(_backpack_panel)
 
 

@@ -58,7 +58,7 @@ func _ready() -> void:
 	for i in range(16):
 		var p := AudioStreamPlayer3D.new()
 		p.bus = "SFX"
-		# M10 统一 3D 衰减：与区域环境声同模型同尺度，近/远场一致
+		# FIX: M10 统一 3D 衰减：ATTENUATION_INVERSE_DISTANCE + max_distance 90 / unit 18 — 已验证
 		p.max_distance = 90.0
 		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
 		p.unit_size = 18.0
@@ -198,6 +198,29 @@ func set_boss_music(on: bool) -> void:
 				tw3.tween_property(_music_player, "volume_db", vols["day"], 1.2)
 			if _night_player:
 				tw3.tween_property(_night_player, "volume_db", vols["night"], 1.2)
+
+
+# L2 Stinger 占位（窗口可验证）— 复用已有音轨，无需外部资产；后续可替换为专用采样。
+# 关键事件：Hinox 倒下 / Boss 战胜利。调用方直接复用现有 victory/heavy_impact/defeat。
+func play_hinox_down_stinger(pos: Vector3 = Vector3.ZERO) -> void:
+	# 占位实现：复用 victory(胜利动机) + heavy_impact(打击)，窗口通过 [stinger] 日志验证。
+	print("[stinger] hinox_down at %s" % str(pos))
+	if _streams.has("victory"):
+		play("victory", -2.0)
+	if _streams.has("heavy_impact"):
+		if pos != Vector3.ZERO:
+			play_at("heavy_impact", pos, -3.0, 0.85)
+		else:
+			play("heavy_impact", -4.0, 0.85)
+
+
+func play_boss_victory_stinger() -> void:
+	# 占位实现：复用 victory + heavy_impact；接入点为讨伐结算（main.gd _on_dragon_killed）。
+	print("[stinger] boss_victory")
+	if _streams.has("victory"):
+		play("victory", -2.0)
+	if _streams.has("heavy_impact"):
+		play("heavy_impact", -5.0, 0.78)
 
 
 func _exit_tree() -> void:

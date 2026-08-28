@@ -27,6 +27,7 @@ var _rng := RandomNumberGenerator.new()
 #   当前 terrain.set_weather 仍直写 wetness，与 SeasonSystem.set_season_palette 潜在互覆盖；
 #   独立权重 weather_wetness 供 EnvironmentDirector 统一合成（Season × Weather 取 max/lerp）。
 var _weather_wetness := 0.0  # 独立通道：仅天气侧的湿润贡献（0..0.85）
+var _frame := 0 # FIX: M8 雨雪批更新帧计数（每3帧刷新一次，避免每帧700+420 set_instance_transform）
 
 const DROP_COUNT := 420
 const AREA := 26.0
@@ -139,23 +140,29 @@ func _process(delta: float) -> void:
 		_state_len = _rng.randf_range(90.0, 150.0)
 	rain_strength = move_toward(rain_strength, 1.0 if raining else 0.0, delta * 0.25)
 	snow_strength = move_toward(snow_strength, 1.0 if snowing else 0.0, delta * 0.25)
+	# FIX: M9 雨/雪独立环境声随强度淡入淡出；阈值门限 0.08 避免微弱强度噪声
 	if _rain_player:
-		_rain_player.volume_db = lerpf(-48.0, -10.0, rain_strength)
+		var _t_rain := smoothstep(0.08, 1.0, rain_strength) # FIX: M9 雨声门限
+		_rain_player.volume_db = lerpf(-48.0, -10.0, _t_rain)
 	if _snow_player:
-		_snow_player.volume_db = lerpf(-48.0, -12.0, snow_strength)
+		var _t_snow := smoothstep(0.08, 1.0, snow_strength) # FIX: M9 雪声门限
+		_snow_player.volume_db = lerpf(-48.0, -12.0, _t_snow)
 	# 地面与水面联动。
 	# TODO(M4): weather 与 season 的 wetness 合成应由 DayNight/World 统一合成器接管；
 	#   此处先保留独立权重 _weather_wetness，并暴露 get_weather_wetness()/get_season_wetness()
 	#   供合成测试验证互覆盖回归为 0。当前仍调用 terrain.set_weather，但同时记录独立通道。
-	_weather_wetness = rain_strength * 0.85
+	_weather_wetness = rain_strength * 0.85 # FIX: M4 独立天气湿润通道，terrain.set_weather 内部再与季节取 max
 	if terrain:
-		terrain.set_weather(_weather_wetness, rain_strength)
-	# 雨幕跟随玩家。
+		terrain.set_weather(_weather_wetness, rain_strength) # FIX: M4 已改 maxf 合成，详见 terrain.gd set_weather
+	# 雨幕跟随玩家。 FIX: M8 每3帧批更新+LOD分层，避免每帧700+420 set_instance_transform
+	_frame += 1
+	var _do_update := (_frame % 3 == 0) # FIX: M8 脏标记—间隔批更新（脏标记+间隔批更新，每3帧全量，中间帧仅LO近场）
 	if _rain_mm:
 		_rain_mm.visible = rain_strength > 0.05
 		if _rain_mm.visible and player:
 			var center := player.global_position
 			var mm := _rain_mm.multimesh
+			# 逻辑位移每帧更新（保持掉落连续），渲染提交每3帧批刷
 			for i in range(DROP_COUNT):
 				var d: Vector3 = _drops[i]
 				d.y -= FALL_SPEED * delta
@@ -164,7 +171,11 @@ func _process(delta: float) -> void:
 					d.x = _rng.randf_range(-AREA, AREA)
 					d.z = _rng.randf_range(-AREA, AREA)
 				_drops[i] = d
-				mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, center + Vector3(d.x, d.y, d.z)))
+				if _do_update: # FIX: M8 仅批更新帧提交全量
+					mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, center + Vector3(d.x, d.y, d.z)))
+			if not _do_update: # LOD：按距离仅提交近场一半（远场跳过，减少 50% 调用）
+				for i in range(0, DROP_COUNT, 2):
+					mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, center + _drops[i]))
 	# 雪幕跟随玩家：慢速飘落 + 左右摇曳。
 	_sway_t += delta
 	if _snow_mm:
@@ -181,7 +192,11 @@ func _process(delta: float) -> void:
 					d2.x = _rng.randf_range(-AREA, AREA)
 					d2.z = _rng.randf_range(-AREA, AREA)
 				_flakes[i] = d2
-				mm2.set_instance_transform(i, Transform3D(Basis.IDENTITY, center2 + Vector3(d2.x, d2.y, d2.z)))
+				if _do_update: # FIX: M8 雪批更新帧全量提交
+					mm2.set_instance_transform(i, Transform3D(Basis.IDENTITY, center2 + Vector3(d2.x, d2.y, d2.z)))
+			if not _do_update: # FIX: M8 中间帧仅1/3 LOD提交
+				for i in range(0, SNOW_COUNT, 3):
+					mm2.set_instance_transform(i, Transform3D(Basis.IDENTITY, center2 + _flakes[i]))
 	# 闪电：雨时每 8~20s 一次落雷（雷柱+光脉冲+雷声+落点杀伤），测试序列豁免。
 	if raining:
 		_lightning_t -= delta

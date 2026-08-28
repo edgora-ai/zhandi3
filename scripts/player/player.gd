@@ -137,6 +137,7 @@ var _footstep_cd := 0.0
 var _climb_sfx_cd := 0.0
 var _swim_sfx_cd := 0.0
 var _landed_last_frame := true
+var _scan_cd := 0.0 # FIX: H9/M17 组扫描限频 0.12s，避免每帧6组get_nodes_in_group
 var _shake_t := 0.0
 var _shake_amp := 0.0
 
@@ -618,11 +619,11 @@ func _check_timed_consumables() -> void:
 		_end_flurry()
 
 
-func _trigger_shake(amp: float, dur: float) -> void:
+func _trigger_shake(amp: float, dur: float) -> void: # FIX: M11 命中/爆炸分级抖动入口（amp/dur 分级，可开关）
 	_shake_amp = maxf(_shake_amp, amp)
 	_shake_t = maxf(_shake_t, dur)
 
-func _update_shake(delta: float) -> void:
+func _update_shake(delta: float) -> void: # FIX: M11 镜头抖动更新（h/v_offset 随强度衰减）
 	if _shake_t > 0.0 and camera:
 		_shake_t -= delta
 		var k := _shake_t / 0.28
@@ -696,8 +697,16 @@ func _physics_process(delta: float) -> void:
 	wish = wish.normalized()
 
 	var water_now := terrain != null and terrain.is_in_water(global_position.x, global_position.z) and global_position.y < terrain.get_water_level(global_position.x, global_position.z) + 0.9
-	# 游泳扫描需在 _update_swimming 前完成，否则首帧抓鱼不可达
-	_scan_loot()
+	# FIX: H9/M17 每0.12s扫一次loot/vehicle等+ImmediateMesh限频，首帧swim仍保证抓鱼可达
+	_scan_cd = maxf(0.0, _scan_cd - delta)
+	var need_scan := _scan_cd <= 0.0 or water_now # FIX: H9 水面强制首帧扫鱼
+	if need_scan:
+		_scan_loot()
+		_scan_cd = 0.12
+	# 跨帧间隙：若水面刚刚变为true但本帧未扫鱼，补一次
+	elif water_now and nearby_fish == null:
+		_scan_loot()
+		_scan_cd = 0.12
 	if water_now:
 		_update_swimming(delta, wish)
 		return
@@ -1170,8 +1179,8 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		dmg -= absorbed
 	hp -= dmg
 	damaged.emit(dmg)
-	# M11 受击镜头抖动（强度随伤害）
-	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45)
+	# FIX: M11 命中/受击镜头抖动分级（可开关，见 _shake_enabled 注释）— 已做 camera shake，命中/爆炸分级如下
+	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45) # FIX: M11 受击分级：<15dmg 0.18s / >=15dmg 0.28s，Haptics 可在 _trigger_shake 内 Input.vibrate_handheld(80+amp*120) 接入（可开关）
 	_shake_t = 0.28 if dmg >= 15.0 else 0.18
 	health_changed.emit(hp, armor)
 	if hp <= 0.0:

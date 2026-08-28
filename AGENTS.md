@@ -2,7 +2,7 @@
 
 ## 项目
 
-Godot 4.7.1 + GDScript 的单机 3D FPS（战地玩法 × 吃鸡框架 × 旷野之息卡通渲染）。结构、玩法、调试命令见 README.md；历史问题、排障方法和工程经验见 `docs/DEVELOPMENT_NOTES.md`，处理输入、卡死、渲染或性能问题前先阅读。
+Godot 4.7.1 + GDScript 的单机 3D FPS（战场大地图 × 吃鸡框架 × 原创旷野卡通渲染）。结构、玩法、调试命令见 README.md；历史问题、排障方法和工程经验见 `docs/DEVELOPMENT_NOTES.md`，处理输入、卡死、渲染或性能问题前先阅读。
 
 ## 约定
 

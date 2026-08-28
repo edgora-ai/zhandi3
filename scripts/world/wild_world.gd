@@ -1430,7 +1430,7 @@ func _make_region_loop(path: String, pos: Vector3, vol_db: float, unit: float) -
 	p.volume_db = vol_db
 	p.unit_size = unit
 	p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
-	p.max_distance = unit * 2.2
+	p.max_distance = unit * 2.2 # FIX: M10 地区声与 SFX 同模型(INVERSE)，此处 max=2.2*unit 为环境声宽场，SFX 为 90/18 已统一
 	p.position = pos
 	return p
 

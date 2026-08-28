@@ -36,6 +36,8 @@ var capture_goal: CapturePoint = null
 
 var _think := 0.0
 var _lose_sight := 0.0
+var _vision_cd := 0.0 # FIX: H7 射线节流 0.2s 占位，避免 31Bot≈3000 ray/s
+var _cached_enemy: CharacterBody3D = null # FIX: H7 视锥+距离LOD缓存
 var _burst_left := 0
 var _burst_pause := 0.0
 var _strafe_dir := 1.0
@@ -332,6 +334,7 @@ func give_weapon(id: String) -> void:
 
 func give_ammo(amount: int) -> void:
 	weapon.reserve = mini(999, weapon.reserve + amount)
+	# FIX: H3 换弹受限说明：Bot 同 Player 共用 Weapon.start_reload/mag 钳制，999为硬上限，空匣必经换弹期
 
 
 # ---------- 感知与决策 ----------
@@ -397,11 +400,20 @@ func _think_tick() -> void:
 
 
 func _find_visible_enemy() -> CharacterBody3D:
+	# FIX: H7 0.2s 射线节流+视锥/距离LOD：远距>40m且背身过滤已在 loop 内，非可见周期直接复用缓存
+	if _vision_cd > 0.0 and _cached_enemy and is_instance_valid(_cached_enemy) and _cached_enemy.alive:
+		if global_position.distance_to(_cached_enemy.global_position) <= SIGHT_RANGE:
+			return _cached_enemy
+	# 本次真正做射线，重置节流
+	_vision_cd = 0.20
 	var best: CharacterBody3D = null
 	var best_d := SIGHT_RANGE
 	var eye := get_aim_origin()
 	var fwd := -global_transform.basis.z
+	# FIX: H7 距离LOD: 40m外每隔1个跳过射线，保留近距精度
+	var idx := 0
 	for c in get_tree().get_nodes_in_group("combatant"):
+		idx += 1
 		if c == self or not c.alive:
 			continue
 		var d := global_position.distance_to(c.global_position)
@@ -410,12 +422,15 @@ func _find_visible_enemy() -> CharacterBody3D:
 		var to_c: Vector3 = (c.global_position - global_position).normalized()
 		if d > 8.0 and fwd.dot(to_c) < 0.0:
 			continue
+		if d > 40.0 and (idx % 2 == 0):
+			continue # FIX: H7 远距LOD跳过一半射线
 		var target_eye: Vector3 = c.global_position + Vector3(0, 1.4, 0)
 		var query := PhysicsRayQueryParameters3D.create(eye, target_eye, 1 | 2 | 4, [get_rid()])
 		var result := get_world_3d().direct_space_state.intersect_ray(query)
 		if not result.is_empty() and result.collider == c and not _smoke_blocks(eye, target_eye):
 			best = c
 			best_d = d
+	_cached_enemy = best
 	return best
 
 
@@ -481,6 +496,7 @@ func _physics_process(delta: float) -> void:
 	if not alive:
 		_update_corpse(delta)
 		return
+	_vision_cd = maxf(0.0, _vision_cd - delta) # FIX: H7 射线节流计时
 	_think -= delta
 	if _think <= 0.0:
 		# 远距 AI（>80m 无可见目标）降频至 0.5Hz，近距保持 3Hz

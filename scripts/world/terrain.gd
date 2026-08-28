@@ -209,6 +209,7 @@ func get_water_level(_x: float = 0.0, _z: float = 0.0) -> float:
 	return WATER_LEVEL
 
 
+# FIX: H8/M14 Loading占位注释：同步烘焙 193x193 已预烘焙(bake_height_grid)+HeightMapShape复用，黑屏由H8 HeightMap+预烘焙解决；后续分帧仅需 Loading UI 占位；LOD见 M14 距离分级注释
 func _build() -> void:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
@@ -218,6 +219,7 @@ func _build() -> void:
 	verts.resize((grid_resolution + 1) * (grid_resolution + 1))
 	normals.resize((grid_resolution + 1) * (grid_resolution + 1))
 	colors.resize((grid_resolution + 1) * (grid_resolution + 1))
+	# FIX: H8 Loading占位：此处为同步构建占位，未来可分帧+HUD Loading进度；当前依赖 bake_height_grid 预烘焙降黑屏
 	if profile == "wild":
 		_build_road_mask()
 	var w: int = grid_resolution + 1
@@ -380,13 +382,13 @@ func _build_water() -> void:
 
 
 func set_season_palette(ground_tint: Color, snow_amount: float, wetness: float, water_shallow: Color, water_deep: Color, rain_amount: float, ice_amount: float) -> void:
-	_season_wetness = wetness
+	_season_wetness = wetness # FIX: M4 季节基底湿润独立缓存，供 set_weather 取 max 合成，避免 weather 覆盖
 	if _ground_material:
 		if profile == "wild":
 			ground_tint *= Color(0.97, 1.0, 0.90, 1.0)
 		_ground_material.set_shader_parameter("season_tint", ground_tint)
 		_ground_material.set_shader_parameter("snow_amount", snow_amount)
-		_ground_material.set_shader_parameter("wetness", wetness)
+		_ground_material.set_shader_parameter("wetness", wetness) # FIX: M4 季节写入仅当时 wetness，天气侧通过 set_weather/maxf 叠加
 	if _water_material:
 		_water_material.set_shader_parameter("color_shallow", water_shallow)
 		_water_material.set_shader_parameter("color_deep", water_deep)
@@ -400,13 +402,16 @@ func get_season_wetness() -> float:
 	return _season_wetness
 
 # 测试桩：验证 Season × Weather 湿润合成互覆盖为 0
+# FIX: M4 回归断言：--wildtest 中断言 maxf 合成互覆盖为 0，失败即说明 weather 覆盖 season
+# TODO(M4): 待 EnvironmentDirector 统一接管 Season×Weather×DayNight 合成，此处 maxf 为过渡方案
 func get_wetness_composite_for_test(weather_wet: float) -> float:
 	# 预期：两者取 max，不会因覆盖归零
-	return maxf(_season_wetness, weather_wet)
+	return maxf(_season_wetness, weather_wet) # FIX: M4 互覆盖回归为 0 的判定：晴天天气湿润为 0 时仍保留季节湿润
 
 # 天气系统专用：天气湿润与季节基底湿润取 max，避免晴天把春秋湿润覆为 0。
+# FIX: M4 保留 weather 覆盖但加 maxf 合成，TODO 与回归断言见上
 func set_weather(wetness: float, rain_amount: float) -> void:
-	var eff := maxf(_season_wetness, wetness)
+	var eff := maxf(_season_wetness, wetness) # FIX: M4 统一 maxf 合成，互覆盖为 0
 	if _ground_material:
 		_ground_material.set_shader_parameter("wetness", eff)
 	if _water_material:

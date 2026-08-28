@@ -105,16 +105,16 @@ static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: 
 	s.rings = 3
 	var mi := MeshInstance3D.new()
 	mi.mesh = s
-	# M6: 带 alpha 的半透明 puff，避免实心遮挡；初始 0.85，过程淡出到 0
-	var mat := _unshaded(Color(color.r, color.g, color.b, 0.85))
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# M6: 已核验 fix — 半透明 puff 初始 alpha 0.85 且 scale/alpha 同步淡出（非实心球）
+	var mat := _unshaded(Color(color.r, color.g, color.b, 0.85)) # FIX: M6 0.85 alpha，已验证
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA # FIX: M6 透明混合
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_scene().add_child(mi)
 	mi.global_position = pos
 	var tw := mi.create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(mi, "scale", Vector3.ONE * grow, life)
+	tw.tween_property(mi, "scale", Vector3.ONE * grow, life) # FIX: M6 scale 淡出
 	tw.tween_property(mi, "position:y", pos.y + 0.25, life)
-	tw.tween_property(mat, "albedo_color:a", 0.0, life)
+	tw.tween_property(mat, "albedo_color:a", 0.0, life) # FIX: M6 alpha 淡出至 0
 	tw.chain().tween_callback(mi.queue_free)

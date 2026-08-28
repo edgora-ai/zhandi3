@@ -135,7 +135,7 @@ func generate(p_terrain: Terrain, p_player: Player) -> void:
 	_build_forest_floor()
 	_build_volcano_basalt()
 	_build_snow_rocks()
-	print("[wild] shrines=2 stable=1 bridge=1 towers=3 castle=1 monsters=8 wildlife=19 horses=4 npcs=4 dragon=1 flyers=3")
+	print("[wild] shrines=4 stable=1 bridge=1 towers=3 castle=1 monsters=8 wildlife=19 horses=4 npcs=4 dragon=1 flyers=3")
 
 
 func _build_materials() -> void:

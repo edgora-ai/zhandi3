@@ -58,7 +58,7 @@
 | H16 | Bot/敌人 `is_instance_valid` 缺失 | `bot.gd:305` 直访 `aim_target.alive` | Phase1 #6 | 已修（全路径守卫） | 所有跨实例 `alive` 访问前 `is_instance_valid`；`--sim` 1 场零悬垂 |
 | H17 | 载具固定偏移无 shape_test | `vehicle.gd:360` 等 | Phase1 #6 | 待修 | 上下车前 shape_test / 安全落脚检测；墙内/水面不刷出 |
 | H18 | `global_position` 直写绕过物理 | `player.gd:1711` `wizzrobe.gd:115` | Phase1 #6 | 待修 | 传送/闪现走 `CharacterBody` 安全路径或带碰撞校验；无穿墙 |
-| H19 | 种子预算无上限无消耗出口 | `player.gd:1010` `max_stamina` 无封顶；`wild_world.gd:1431` 多源 | Phase2 #8 | 待修 | 种子精力有封顶；全图种子总数与商店/掉落预算审计通过；溢出回归为 0 |
+| H19 | 种子预算无上限无消耗出口 | `player.gd:1010` `max_stamina` 无封顶；`wild_world.gd:1431` 多源 | Phase2 #8 | 已修（精力 180 上限） | 种子精力有封顶；全图种子总数与商店/掉落预算审计通过；溢出回归为 0 |
 | H20 | 成长与经济中后期溢出 | `fish_spot.gd:37` 60s +血月多源 vs 满甲归零 | Phase2 #8 | 待修 | 补给重生 120–180s；商店限购；长测经济曲线不发散 |
 | H21 | 结算不进局外 | `main.gd:765` `hud.gd:420` 仅展示 | Phase2 #8 | 待修 | 结算写入存档并影响下一局（成长/解锁）；重载可读 |
 | H22 | 无输入/本地化/无障碍 | `project.godot` 无 InputMap；中文硬编码 | Phase4 #9 | 待修 | InputMap/重映射/手柄 + 本地化表 + 对比度/字号/音量分轨可调 |
@@ -78,10 +78,10 @@
 | M9 | 雨雪只有雷声 | `weather.gd:96` 仅雷 | Phase2 #5 | 待修 | 雨/雪各有独立环境声且随强度淡入淡出 |
 | M10 | 3D 衰减不统一 | `sfx_bank.gd:46 unit6` vs 地区声 unit80 | Phase2 #5 | 待修 | 统一衰减模型与 unit 距离；近/远场听感一致 |
 | M11 | Haptics/镜头缺失 | 零 vibration/shake；顿帧50ms | Phase2 #5 | 待修 | 命中/爆炸有镜头抖动与手柄震动分级；可开关 |
-| M12 | `time_scale` 无栈泄漏 | `player.gd:580/1077` 共用 time_scale | Phase1/2 #7 | 待修 | 慢动作栈化或显式 reset；`die/respawn` 无条件还原；Timer 不被 time_scale 拉长至 44s |
+| M12 | `time_scale` 无栈泄漏 | `player.gd:580/1077` 共用 time_scale | Phase1/2 #7 | 已修（墙钟 + 首帧前移 + die 兜底） | 慢动作栈化或显式 reset；`die/respawn` 无条件还原；Timer 不被 time_scale 拉长至 44s |
 | M13 | 零 `@export` 魔法数 | 全仓 `@export 0` | Phase2 #7 | 待修 | 关键数值 `@export` 化或走 BalanceConfig；策划可不改代码调参 |
 | M14 | 渲染无分级 | `terrain.gd:124 res192` 常驻 | Phase2 #7 | 待修 | 距离裁剪/LOD/分块；远景实例数与 DrawCall 有上限 |
-| M15 | 体力药 max_stamina+=20 无层数 | `player.gd:1969` 叠加 | Phase1 #6 | 待修 | 体力药分层与上限；叠服不无限叠加 |
+| M15 | 体力药 max_stamina+=20 无层数 | `player.gd:1969` 叠加 | Phase1 #6 | 已修（200 上限 + 到期清退） | 体力药分层与上限；叠服不无限叠加 |
 | M16 | `await` 缺 is_inside_tree | `guardian.gd:236` 等 | Phase1 #6 | 已修 5d52784 | 所有 `await` 后 `queue_free` 前 `is_inside_tree()` 守卫；`--wildtest` 零释放异常 |
 | M17 | O(N²) 组扫描 | `wild_npc.gd:297` 每帧 get_nodes_in_group | Phase2 #7 | 待修 | 组扫描限频/分区或改 Area/注册表；`get_nodes_in_group` 每帧调用有上限 |
 
@@ -89,7 +89,7 @@
 
 | # | 标题 | 证据 | Phase | 状态 | 验收标准 |
 |---|------|------|-------|------|----------|
-| L1 | 神庙统计 shrines=2 与实际4座不一致 | `wild_world.gd:23 vs 120` | Phase2 #8 | 待修 | 启动统计从 POI 注册表生成；README 与运行时数量一致 |
+| L1 | 神庙统计 shrines=2 与实际4座不一致 | `wild_world.gd:23 vs 120` | Phase2 #8 | 已修（4 座） | 启动统计从 POI 注册表生成；README 与运行时数量一致 |
 | L2 | 缺 Stinger/语音记忆点 | `hinox.gd:117` 等仅 pickup | Phase3 #5 | 待修 | 关键事件有 Stinger/语音或标志性动机；可开关 |
 | L3 | 启动统计与隐私/EULA缺失 | `docs/` 无 | Phase4 #9 | 待修 | 含 LICENSE/NOTICE、隐私/EULA、分级信息；启动统计与合规文档一致 |
 
@@ -115,13 +115,13 @@
 | # | 标题 | 证据 | 优先级 | 验收标准 |
 |---|------|------|--------|----------|
 | P11 | 骑乘死亡未 exit：vehicle/driver/可见/碰撞/相机均不清，四载具逐帧拉回 | `player.gd:1110-1128` `main.gd:642-663` `horse:526-528` `vehicle:340` `motorcycle:391` `raft:215` | S | 四载具各测：骑乘中死亡→重生后玩家可见/有碰撞/可移动，载具无 driver 残留 |
-| P12 | hitstop 全局 0.05 卡慢，Timer 受 time_scale 拉长至 44s | `player.gd:1078,1568,783-787,599-635` `main.gd:611-638` | S | 慢动作栈化或独立计时；`time_scale` 0.22 期间 Timer 不被拉长；`die` 兜底还原 |
-| P13 | 背包 +6 但实际 10 项，后 4 项不可达 | `player.gd:1890-1892,1913-1931` `main.gd:1416,1420,1508` | S | `entry_count` 按实际行数；10 项均可选中/取出/存入；回归不绕过导航写索引 |
+| P12 | hitstop 全局 0.05 卡慢，Timer 受 time_scale 拉长至 44s | `player.gd:1078,1568,783-787,599-635` `main.gd:611-638` | S | 已修（墙钟 + 早返前移 + die 兜底） | 慢动作栈化或独立计时；`time_scale` 0.22 期间 Timer 不被拉长；`die` 兜底还原 |
+| P13 | 背包 +6 但实际 10 项，后 4 项不可达 | `player.gd:1890-1892,1913-1931` `main.gd:1416,1420,1508` | S | 已修（entry_count 去重 + 越界守卫） | `entry_count` 按实际行数；10 项均可选中/取出/存入；回归不绕过导航写索引 |
 | P14 | N/B 文字与 InputMap 不一致 | `project.godot:57-64` `player.gd:207-287` `main.gd:1126` `hud.gd:569` | S | 全局统一 N 背包 / B 引爆（或 InputMap 语义名）；HUD/提示/商店一致 |
-| P15 | 游泳时 _scan_loot 前 return，抓鱼不可达；缩胶囊未恢复 | `player.gd:632-635,781,845-855,513-520,1738-1746` `fish_spot:37-45` | S | 游泳态仍可抓鱼；离水后碰撞胶囊恢复；`--wildtest` 抓鱼断言通过 |
-| P16 | 盾滑无 stamina gate，0 精力可继续 | `player.gd:712-721` | M | 0 精力不可盾滑；精力耗尽自动结束并有反馈 |
+| P15 | 游泳时 _scan_loot 前 return，抓鱼不可达；缩胶囊未恢复 | `player.gd:632-635,781,845-855,513-520,1738-1746` `fish_spot:37-45` | S | 已修（water_in 扫鱼 + 三态胶囊） | 游泳态仍可抓鱼；离水后碰撞胶囊恢复；`--wildtest` 抓鱼断言通过 |
+| P16 | 盾滑无 stamina gate，0 精力可继续 | `player.gd:712-721` | M | 已修（stamina>0 门限） | 0 精力不可盾滑；精力耗尽自动结束并有反馈 |
 | P17 | 大 delta 跨过 swipe 窗口/滑翔精力/台阶无 sweep | `player.gd:1612-1632,681-705,1722-1735` | M | 大 delta 下窗口/精力/台阶用 sweep/子步；60fps 与 30fps 行为一致 |
-| P18 | 精力药到期清退与重服窗口可永久多留 +20 | `player.gd:795-799,1970-1974` | S | 到期必清退；重服不叠加；早退亦不残留；用真实时间计时 |
+| P18 | 精力药到期清退与重服窗口可永久多留 +20 | `player.gd:795-799,1970-1974` | S | 已修（墙钟 + 重服前清过期） | 到期必清退；重服不叠加；早退亦不残留；用真实时间计时 |
 
 ## 本轮增量 3（D1–D10，评分 4.5/10，再次确认）
 
@@ -163,10 +163,10 @@
 |---|------|------|------|--------|----------|
 | R1 | 胜负非终态：吃鸡后仍可被毒圈改判失败（match_over 未幂等） | Combat S1 | `main.gd:611-638` `zone.gd:78-97,119-132` `player.gd:84` | S | 唯一 `_finish_match(result)` 幂等；终局后停 `zone`、禁新伤害、冻 AI/输入；同 tick 多死顺序无关 |
 | R2 | 阔野双漏洞：无限重生必胜 vs Bot 补刀永久无结局 | Combat S2 | `main.gd:620-674,779-795` `wild_dragon.gd:179-198` `weapon.gd:156-173` `wild_world.gd:995-1050` | S | 定义死亡契约（Boss 重置或消耗精灵/材料）；Boss 死亡无条件推进主线，归属仅影响奖励；Bot 伤害不使 Boss 永久消失 |
-| R3 | 时停可选中自身并冻结控制器 | Combat S3 | `player.gd:136-139,356-381,793-804` | S | 候选过滤 `self`/友军；冻结走目标 `frozen` 状态而非 `DISABLED`；解冻由独立计时器驱动 |
+| R3 | 时停可选中自身并冻结控制器 | Combat S3 | `player.gd:136-139,356-381,793-804` | S | 已修（self 过滤 + 原 mode 恢复） | 候选过滤 `self`/友军；冻结走目标 `frozen` 状态而非 `DISABLED`；解冻由独立计时器驱动 |
 | R4 | 猎弓绕过 60 RPM 并双扣弹药 | Combat S4 | `player.gd:242-245,756-771,1447-1465` `weapon.gd:26-30,123-132` | S | 弓/枪输入分流；单次 `can→consume→cooldown→spawn` 原子；快点不超 RPM；单发单扣 |
 | R5 | 所有 PvE 只打真人，Bot 免疫野怪 | Combat S5 | `bot.gd:396-416` `wild_projectile.gd:20-24` `wild_monster.gd:30-32,183-226` `wild_dragon.gd:22-24` `guardian.gd:37-45` | S | 统一 `Faction/ThreatTarget`；野怪按距离/威胁选目标；projectile mask 按阵营而非“只打玩家” |
-| R6 | 骷髅头贴身每帧 4 伤≈240 DPS | Combat S6 | `stal.gd:181-195` | S | 独立 `_bite_cd` 限伤；贴身 DPS ≤ 设计值且有可读窗口 |
+| R6 | 骷髅头贴身每帧 4 伤≈240 DPS | Combat S6 | `stal.gd:181-195` | S | 已在现版限伤（_hop_cd 门限） | 独立 `_bite_cd` 限伤；贴身 DPS ≤ 设计值且有可读窗口 |
 | R7 | 装饰先于 POI 生成，无占地保留 | World S2 | `main.gd:92-102,168-173` `props.gd:206-243,509-537` `terrain.gd:294-304` | S | 先 `WorldLayout` 注册道路/POI/视线/谜题占地，再散布植被；POI 门前/路中线净空可验证 |
 | R8 | 生物群落仅视觉分区 | World S3 | `terrain.gd:294-334` `props.gd:237-281,519-583` `weather.gd:86-103` `wild_world.gd:1312-1328,1465-1480` | S | 统一 `BiomeQuery` 驱动地表/树种/资源/动物/天气/音效/地名；雪区雨雪一致 |
 | R9 | 神庙同外壳同奖励房 | World S4 | `wild_world.gd:36-43` `shrine_trial.gd:20-46,49-122,166-214` `shrine_interior.gd:25-101` | S | 每庙 2–3 步递进且与地区机制绑定；内部空间/奖励差异化 |

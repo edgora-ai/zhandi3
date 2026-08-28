@@ -2021,7 +2021,7 @@ func _use_backpack_selection() -> void:
 			var has_elixir := _elixir_stam_end_ms > Time.get_ticks_msec()
 			_elixir_stam_end_ms = Time.get_ticks_msec() + 60000
 			if not has_elixir:
-				max_stamina += 20.0
+				max_stamina = minf(200.0, max_stamina + 20.0)
 			stamina = max_stamina
 			hud.add_feed("炼成精力药剂：精力全满，上限 +20（60 秒）")
 			_cook_feedback()

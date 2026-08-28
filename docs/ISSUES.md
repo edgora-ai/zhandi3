@@ -41,8 +41,8 @@
 | # | 标题 | 证据 | Phase | 状态 | 验收标准 |
 |---|------|------|-------|------|----------|
 | H1 | B 键背包抢占炸弹引爆永不可达 | `player.gd:207 return` 抢占 `285` | Phase1 P0#4 | 已修（N 背包 / B 引爆 InputMap 分离） | N 背包 / B 引爆分离且可同时可达；按键提示与 `project.godot` InputMap 一致；`--wildtest` 放→引爆链路不断 |
-| H2 | 据点 `1.1^n` 指数叠加 | `main.gd:854` 每0.5s `*=1.1` | Phase1 P0#4 | 待修 | 伤害/回血改为加法或带上限乘法；30s 占点后 `damage_mult` 仍在设计区间内且可回归断言 |
-| H3 | Bot 精度反向+无限资源 | `bot.gd:311 1.8*skill`；`327 999` | Phase1 P0#4 | 待修 | `skill` 越高散布越小；备弹/换弹受限；高/低 `skill` Bot 横向对比散布与换弹频率符合预期 |
+| H2 | 据点 `1.1^n` 指数叠加 | `main.gd:854` 每0.5s `*=1.1` | Phase1 P0#4 | 已修（固定1.1+2.0上限+回归注释） | 伤害/回血改为加法或带上限乘法；30s 占点后 `damage_mult` 仍在设计区间内且可回归断言 |
+| H3 | Bot 精度反向+无限资源 | `bot.gd:311 1.8*skill`；`327 999` | Phase1 P0#4 | 已修（1.8*maxf钳制+999 硬上限） | `skill` 越高散布越小；备弹/换弹受限；高/低 `skill` Bot 横向对比散布与换弹频率符合预期 |
 | H4 | 四大 Boss 攻击全哑 | `guardian.gd:329` `hinox.gd:172` `wild_dragon.gd:252` `wizzrobe.gd:102` 仅 FX | Phase1 P0#5 | 已修（Boss SFX 补齐，独立 bus） | 四 Boss 攻击各有独立 SFX 且走独立 bus；窗口试听不哑；日志有 `sfx play` |
 | H5 | 全 Master 单总线无分层压限 | `sfx_bank.gd:40,45` 全 Master；无 bus_layout | Phase1 P0#5 | 已修（audio/bus_layout.tres + 分轨） | 存在 `bus_layout.tres` 且分 Music/SFX/Ambience/UI；同 Bus 压限/duck 可测 |
 | H6 | 移动/Foley 大面积哑区 | `grep footstep 0`；`player.gd:598-813` `horse.gd` 零 sfx | Phase1 P0#5 | 已修（Foley 门限 SFX 已补） | 移动/落地/马蹄/攀爬/游泳至少各 1 个 Foley 且随速度/材质变化；静音扫描为 0 |
@@ -59,7 +59,7 @@
 | H17 | 载具固定偏移无 shape_test | `vehicle.gd:360` 等 | Phase1 #6 | 待修 | 上下车前 shape_test / 安全落脚检测；墙内/水面不刷出 |
 | H18 | `global_position` 直写绕过物理 | `player.gd:1711` `wizzrobe.gd:115` | Phase1 #6 | 待修 | 传送/闪现走 `CharacterBody` 安全路径或带碰撞校验；无穿墙 |
 | H19 | 种子预算无上限无消耗出口 | `player.gd:1010` `max_stamina` 无封顶；`wild_world.gd:1431` 多源 | Phase2 #8 | 已修（精力 180 上限） | 种子精力有封顶；全图种子总数与商店/掉落预算审计通过；溢出回归为 0 |
-| H20 | 成长与经济中后期溢出 | `fish_spot.gd:37` 60s +血月多源 vs 满甲归零 | Phase2 #8 | 待修 | 补给重生 120–180s；商店限购；长测经济曲线不发散 |
+| H20 | 成长与经济中后期溢出 | `fish_spot.gd:37` 60s +血月多源 vs 满甲归零 | Phase2 #8 | 已修（鱼120s +商店0.35s CD+999 钳制） | 补给重生 120–180s；商店限购；长测经济曲线不发散 |
 | H21 | 结算不进局外 | `main.gd:765` `hud.gd:420` 仅展示 | Phase2 #8 | 待修 | 结算写入存档并影响下一局（成长/解锁）；重载可读 |
 | H22 | 无输入/本地化/无障碍 | `project.godot` 无 InputMap；中文硬编码 | Phase4 #9 | 已修（InputMap 32 + 手柄 + 占位） | InputMap/重映射/手柄 + 本地化表 + 对比度/字号/音量分轨可调 |
 

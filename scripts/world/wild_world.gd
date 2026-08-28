@@ -248,13 +248,14 @@ func _box_collision(body: StaticBody3D, size: Vector3, pos: Vector3, rot: Vector
 	body.add_child(col)
 
 
-func _cylinder_collision(body: StaticBody3D, radius: float, height: float, pos: Vector3) -> void:
+func _cylinder_collision(body: StaticBody3D, radius: float, height: float, pos: Vector3, rot_deg: Vector3 = Vector3.ZERO) -> void:
 	var col := CollisionShape3D.new()
 	var shape := CylinderShape3D.new()
 	shape.radius = radius
 	shape.height = height
 	col.shape = shape
 	col.position = pos
+	col.rotation_degrees = rot_deg
 	body.add_child(col)
 
 
@@ -1022,9 +1023,9 @@ func respawn_monsters() -> int:
 			add_child(creature)
 			creature.rotation.y = randf_range(0, TAU)
 			respawned += 1
-	# 莫布林/蜥蜴战士/古代守卫同样按刷新点补齐。
+	# 莫布林/蜥蜴战士/古代守卫同样按刷新点补齐（同类判活，避免邻类抑制）。
 	for mp in _moblin_points:
-		if not _enemy_near(mp, 12.0):
+		if not _enemy_near(mp, 12.0, "wild_moblin"):
 			var moblin := WildMoblin.new()
 			moblin.setup(terrain, player)
 			moblin.global_position = _ground(mp, 0.05)
@@ -1032,7 +1033,7 @@ func respawn_monsters() -> int:
 			moblin.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	for lp in _liz_points:
-		if not _enemy_near(lp, 12.0):
+		if not _enemy_near(lp, 12.0, "wild_lizalfos"):
 			var liz := WildLizalfos.new()
 			liz.setup(terrain, player)
 			add_child(liz)
@@ -1040,7 +1041,7 @@ func respawn_monsters() -> int:
 			liz.rotation.y = randf_range(0, TAU)
 			respawned += 1
 	for gp in _guardian_points:
-		if not _enemy_near(gp, 14.0):
+		if not _enemy_near(gp, 14.0, "guardian"):
 			var guardian := Guardian.new()
 			guardian.setup(terrain, player)
 			add_child(guardian)
@@ -1049,11 +1050,14 @@ func respawn_monsters() -> int:
 	return respawned
 
 
-func _enemy_near(p: Vector3, radius: float) -> bool:
+func _enemy_near(p: Vector3, radius: float, type_filter: String = "") -> bool:
 	var ground_p := _ground(p, 0.05)
 	for e in get_tree().get_nodes_in_group("wild_enemy"):
-		if e.alive and e.global_position.distance_to(ground_p) < radius:
-			return true
+		if not e.alive or e.global_position.distance_to(ground_p) >= radius:
+			continue
+		if type_filter != "" and e.get_script() and e.get_script().resource_path.get_file().get_basename() != type_filter:
+			continue
+		return true
 	return false
 
 
@@ -1200,7 +1204,7 @@ func _build_forest_floor() -> void:
 		var body := _body(log)
 		var length := rng.randf_range(2.6, 4.5)
 		_cylinder(rng.randf_range(0.24, 0.34), length, bark, Vector3(0, 0, 0), log, Vector3(0, 0, 90), 8)
-		_cylinder_collision(body, 0.32, length, Vector3.ZERO)
+		_cylinder_collision(body, 0.32, length, Vector3.ZERO, Vector3(0, 0, 90))
 		_sphere(0.26, moss, Vector3(0, 0.24, 0), log, Vector3(1.4, 0.4, 0.9))
 		var ring := _cylinder(0.20, 0.05, Toon.make_material(Color(0.62, 0.48, 0.28), true, 0.006), Vector3(length * 0.5, 0, 0), log, Vector3(0, 0, 90), 8)
 		ring.rotation_degrees.z = 90.0

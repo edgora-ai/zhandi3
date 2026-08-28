@@ -245,7 +245,8 @@ func _physics_process(delta: float) -> void:
 			velocity.z = 0.0
 			_wander_target = _home
 	move_and_slide()
-	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
+	if not is_on_floor():
+		global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
 	if move_dir.length_squared() > 0.05:
 		rotation.y = lerp_angle(rotation.y, atan2(move_dir.x, move_dir.z) + PI, delta * 8.0)
 	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 6.2, 0.0, 1.0) * 0.65

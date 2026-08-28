@@ -303,7 +303,9 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, atan2(to_player.x, to_player.z) + PI, delta * 2.5)
 	velocity.y = -4.0
 	move_and_slide()
-	global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
+	# 仅在贴地时回落到地形，避免覆盖桥/平台高度
+	if not is_on_floor():
+		global_position.y = terrain.get_height(global_position.x, global_position.z) + 0.05
 	var stride := clampf(Vector2(velocity.x, velocity.z).length() / 2.0, 0.0, 1.0) * 0.3
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(_anim * 6.0 + float(i) * PI * 0.67) * stride

@@ -108,7 +108,6 @@ static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: 
 	# M6: 带 alpha 的半透明 puff，避免实心遮挡；初始 0.85，过程淡出到 0
 	var mat := _unshaded(Color(color.r, color.g, color.b, 0.85))
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(color.r, color.g, color.b, 0.85)
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_scene().add_child(mi)

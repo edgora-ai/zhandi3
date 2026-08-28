@@ -599,7 +599,7 @@ func _end_flurry() -> void:
 
 
 func _check_timed_consumables() -> void:
-	_shop_cd = maxf(0.0, _shop_cd - get_physics_process_delta_time())
+	_shop_cd = maxf(0.0, _shop_cd - get_process_delta_time())
 	# 墙钟计时，不受 Engine.time_scale 影响；需在所有 early return 前调用
 	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
 		_hitstop_end_ms = 0

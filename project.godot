@@ -20,9 +20,8 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 window/size/viewport_width=1280
 window/size/viewport_height=720
 
-[audio]
-
-bus_layout="res://audio/bus_layout.tres"
+[audio/buses]
+default_bus_layout="res://audio/bus_layout.tres"
 
 [rendering]
 

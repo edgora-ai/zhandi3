@@ -119,7 +119,7 @@ func take_damage(amount: float, from: Variant = null, part_name: String = "body"
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(-1.2, 0, 0.5), "monster_part", "", 4, 1)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 5.0, 0), "巨人倒下!", Color(1.0, 0.55, 0.20))
 		await get_tree().create_timer(1.4).timeout
-		queue_free()
+		if is_inside_tree() and not is_queued_for_deletion(): queue_free()
 		return
 	# 睡眠中被打出醒；眼睛命中触发护目硬直。
 	if _state == "sleep":

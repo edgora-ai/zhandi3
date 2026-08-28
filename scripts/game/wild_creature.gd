@@ -276,7 +276,7 @@ func _die(from: Variant) -> void:
 		collision_layer = 0
 		collision_mask = 0
 		await get_tree().create_timer(0.9).timeout
-	queue_free()
+	if is_inside_tree() and not is_queued_for_deletion(): queue_free()
 
 
 func _physics_process(delta: float) -> void:

@@ -90,7 +90,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(0.5, 0, 0), "seed", "", 1, 2)
 		Loot.spawn(get_tree().current_scene, global_position + Vector3(-0.5, 0, 0.3), "monster_part", "", 3, 1)
 		await get_tree().create_timer(0.8).timeout
-		queue_free()
+		if is_inside_tree() and not is_queued_for_deletion(): queue_free()
 		return
 	_play(&"hit")
 	_anim_hold = 0.3

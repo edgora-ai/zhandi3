@@ -219,7 +219,7 @@ func take_damage(amount: float, from: Variant = null, _part_name: String = "body
 		collision_layer = 0
 		collision_mask = 0
 		await get_tree().create_timer(0.8).timeout
-	queue_free()
+	if is_inside_tree() and not is_queued_for_deletion(): queue_free()
 
 
 func _physics_process(delta: float) -> void:

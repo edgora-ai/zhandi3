@@ -18,6 +18,7 @@ var _sun: DirectionalLight3D
 var _fill: DirectionalLight3D
 var _rim: DirectionalLight3D
 var _daylight_gp_ready := false # // FIX: OPT-F2 全局 shader 参数只注册一次
+var season_palette := {} # // FIX: OPT-F3-light 季节调色板（由 SeasonSystem 发布）
 
 const SKY_TOP_DAY := Color(0.24, 0.56, 0.95)
 const SKY_TOP_DUSK := Color(0.42, 0.26, 0.48)
@@ -104,9 +105,13 @@ func _apply() -> void:
 	var day := _daylight()
 	var dusk := clampf(_duskness(), 0.0, 1.0)
 	var night := 1.0 - day
-	# 天空与雾。
-	var top := SKY_TOP_NIGHT.lerp(SKY_TOP_DAY, day).lerp(SKY_TOP_DUSK, dusk * 0.6)
-	var horizon := SKY_HORIZON_NIGHT.lerp(SKY_HORIZON_DAY, day).lerp(SKY_HORIZON_DUSK, dusk * 0.8)
+	# 天空与雾。// FIX: OPT-F3-light/TA4 季节调色板参与合成：冬季冷白蓝天空/秋橙霞真正生效
+	var season_top: Color = season_palette.get("sky_top", SKY_TOP_DAY)
+	var season_horizon: Color = season_palette.get("sky_horizon", SKY_HORIZON_DAY)
+	var season_fog: Color = season_palette.get("fog", FOG_DAY)
+	var season_sun: Color = season_palette.get("sun", SUN_DAY)
+	var top := SKY_TOP_NIGHT.lerp(season_top, day).lerp(SKY_TOP_DUSK, dusk * 0.6)
+	var horizon := SKY_HORIZON_NIGHT.lerp(season_horizon, day).lerp(SKY_HORIZON_DUSK, dusk * 0.8)
 	if blood_moon:
 		top = top.lerp(Color(0.35, 0.05, 0.08), 0.75)
 		horizon = horizon.lerp(Color(0.85, 0.18, 0.12), 0.75)
@@ -115,7 +120,11 @@ func _apply() -> void:
 	_sky_mat.ground_bottom_color = horizon.darkened(0.55)
 	_sky_mat.ground_horizon_color = horizon
 	_env.ambient_light_energy = lerpf(0.12, 0.5, day)
-	_env.fog_light_color = FOG_NIGHT.lerp(FOG_DAY, day).lerp(FOG_DUSK, dusk * 0.5)
+	_env.fog_light_color = FOG_NIGHT.lerp(season_fog, day).lerp(FOG_DUSK, dusk * 0.5)
+	if season_palette.has("fog_density"):
+		_env.fog_density = lerpf(0.0016, float(season_palette["fog_density"]) * (0.68 if _env.get("meta_wild") else 1.0), day)
+	if season_palette.has("exposure"):
+		_env.tonemap_exposure = float(season_palette["exposure"])
 	if blood_moon:
 		_env.fog_light_color = _env.fog_light_color.lerp(Color(0.55, 0.12, 0.10), 0.7)
 	_env.fog_density = lerpf(0.0016, 0.0009, day)
@@ -138,7 +147,10 @@ func _apply() -> void:
 		elev_deg = sin(PI * night_u) * 40.0
 		yaw_deg = lerpf(110.0, 250.0, night_u)
 	_sun.rotation_degrees = Vector3(-(90.0 - elev_deg), yaw_deg, 0.0)
-	_sun.light_color = SUN_NIGHT.lerp(SUN_DAY, day).lerp(SUN_DUSK, dusk * 0.7)
+	_sun.light_color = SUN_NIGHT.lerp(season_sun, day).lerp(SUN_DUSK, dusk * 0.7)
+	if not season_palette.is_empty() and _fill:
+		_fill.light_color = season_palette.get("fill", _fill.light_color)
+		_rim.light_color = season_palette.get("rim", _rim.light_color)
 	if blood_moon:
 		_sun.light_color = Color(1.0, 0.22, 0.15)
 		_sun.light_energy = 0.35

@@ -22,6 +22,10 @@ static func spawn(parent: Node, pos: Vector3, face: Vector3 = Vector3.ZERO) -> v
 
 func _ready() -> void:
 	_build()
+	# // FIX: OPT-E3/FX14 探索精灵奖励音（原只有飘字）
+	var _sfx_k := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_k:
+		_sfx_k.play("korok_reward", -6.0)
 
 
 func _build() -> void:

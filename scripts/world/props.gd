@@ -193,7 +193,8 @@ func _build_card_multimesh(name: String, transforms: Array[Transform3D], colors:
 	mmi.name = name
 	mmi.multimesh = mm
 	mmi.material_override = mat
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# // FIX: OPT-F5/TA6 冠层卡片开投影：森林地表有树影斑驳（草/花仍关闭，控影子预算）
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if "Cards" in name else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
 	if name == "BroadleafCards":
 		_broad_mm = mm
@@ -382,7 +383,7 @@ func _make_broadleaf() -> Node3D:
 func _make_bigtree() -> Node3D:
 	var t := Node3D.new()
 	t.name = "TreeBig"
-	var trunk_mat := Toon.make_material(TRUNK_COLOR.darkened(0.08), true, 0.025)
+	var trunk_mat := Toon.make_material(TRUNK_COLOR.darkened(0.08), true, 0.018) # // FIX: OPT-F7/TA10 道具规范宽
 	var t1 := MeshInstance3D.new()
 	var c1 := CylinderMesh.new()
 	c1.top_radius = 0.42
@@ -490,7 +491,7 @@ func _make_rock() -> Node3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	var col_tint := ROCK_COLOR.lerp(Color(0.62, 0.58, 0.50), _rng.randf() * 0.5)
-	mi.material_override = Toon.make_material(col_tint, true, 0.03)
+	mi.material_override = Toon.make_material(col_tint, true, 0.02) # // FIX: OPT-F7/TA10 岩石描边 0.03→0.02
 	mi.position.y = 0.35
 	t.add_child(mi)
 
@@ -528,11 +529,14 @@ func _scatter_grass(terrain: Terrain) -> void:
 			var pz := gz + _rng.randf_range(0.0, step)
 			var py := terrain.get_height_baked(px, pz)
 			gz += step
-			if py < Terrain.WATER_LEVEL + 0.8 or py > 26.0:
+			if py < Terrain.WATER_LEVEL + 1.3 or py > 26.0:
 				continue
 			if terrain.get_patch_baked(px, pz) < -0.05:
 				continue
 			if terrain.get_normal_baked(px, pz).y <= 0.78:
+				continue
+			# // FIX: OPT-F6/TA7 路面 4.2m 与沙滩带内不种草（原草长在路中央/河滩）
+			if terrain.is_near_road(px, pz):
 				continue
 			spots.append(Vector3(px, py, pz))
 		gx += step

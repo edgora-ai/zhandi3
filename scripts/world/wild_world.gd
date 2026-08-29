@@ -1291,9 +1291,10 @@ func _build_forest_floor() -> void:
 	for i in range(mm.instance_count):
 		var p2 := Vector3(rng.randf_range(-150, 130), 0, rng.randf_range(-90, 130))
 		p2 = _ground(p2, 0.02)
-		if p2.y < Terrain.WATER_LEVEL + 0.5 or p2.y > 17.0:
-			p2.y = Terrain.WATER_LEVEL + 1.0
 		var basis := Basis(Vector3.UP, rng.randf_range(0, TAU)).scaled(Vector3.ONE * rng.randf_range(0.7, 1.3))
+		if p2.y < Terrain.WATER_LEVEL + 0.5 or p2.y > 17.0:
+			# // FIX: OPT-F9/TA12 不合格点缩为不可见（原钉在水面漂"剪纸蕨"/山体埋地下）
+			basis = basis.scaled(Vector3.ONE * 0.001)
 		mm.set_instance_transform(i, Transform3D(basis, p2))
 	var ferns := MultiMeshInstance3D.new()
 	ferns.name = "Ferns"

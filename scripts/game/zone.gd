@@ -15,6 +15,8 @@ const PHASES := [
 	{"wait": 16.0, "shrink": 1.6, "radius": 14.0, "dps": 32.0},
 ]
 
+var rng := RandomNumberGenerator.new() # // FIX: OPT-G7/REG4 毒圈漂移可播种（原全局 randf 不受 --seed 控制）
+
 var center := Vector2.ZERO
 var radius := 265.0
 var phase := -1
@@ -109,13 +111,16 @@ func _begin_shrink() -> void:
 	var ph: Dictionary = PHASES[phase]
 	_target_radius = ph.radius
 	var max_off := maxf(0.0, (radius - _target_radius) * 0.6)
-	var ang := randf() * TAU
-	_target_center = center + Vector2.from_angle(ang) * randf() * max_off
+	var ang := rng.randf() * TAU
+	_target_center = center + Vector2.from_angle(ang) * rng.randf() * max_off
 	_from_center = center
 	_from_radius = radius
 	_shrink_total = ph.shrink
 	timer = ph.shrink
 	shrinking = true
+	# // FIX: OPT-G7 缩圈中心序列日志（headless 断言 --seed 复现）
+	if OS.get_cmdline_user_args().has("--sim"):
+		print("[zone][seed] phase=%d center=(%.2f,%.2f) r=%.1f" % [phase, _target_center.x, _target_center.y, _target_radius])
 	shrinking_changed.emit(true)
 
 

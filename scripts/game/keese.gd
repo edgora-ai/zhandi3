@@ -48,6 +48,7 @@ func _try_glb_visual() -> bool:
 		return false
 	_glb = scene_res.instantiate()
 	add_child(_glb)
+	Toon.apply_to_glb(_glb) # // FIX: OPT-F1/TA1 glb 卡通化重染（描边+色带）
 	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _ap != null:
 		_ap.playback_default_blend_time = 0.12

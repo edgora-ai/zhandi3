@@ -69,6 +69,7 @@ func _try_glb_visual() -> bool:
 		return false
 	_glb = scene_res.instantiate()
 	add_child(_glb)
+	Toon.apply_to_glb(_glb) # // FIX: OPT-F1/TA1 glb 卡通化重染（描边+色带）
 	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _ap != null:
 		_ap.playback_default_blend_time = 0.12
@@ -162,8 +163,8 @@ func _build_model() -> void:
 	eye_mat.emission_enabled = true
 	eye_mat.emission = Color(1.0, 0.75, 0.10)
 	eye_mat.emission_energy_multiplier = 1.6
-	_eye_l = _sphere(self, 0.07, eye_mat, Vector3(-0.16, 2.30, -0.44), Vector3.ONE)
-	_eye_r = _sphere(self, 0.07, eye_mat, Vector3(0.16, 2.30, -0.44), Vector3.ONE)
+	_eye_l = _sphere(self, 0.07, eye_mat, Vector3(-0.16, 2.30, -0.50), Vector3.ONE) # // FIX: OPT-F9/TA17 眼睛贴出头面（原 -0.44 嵌入）
+	_eye_r = _sphere(self, 0.07, eye_mat, Vector3(0.16, 2.30, -0.50), Vector3.ONE)
 	# 持棒右臂：高举猛击的枢轴。
 	_club_arm = Node3D.new()
 	_club_arm.position = Vector3(0.85, 1.75, 0)

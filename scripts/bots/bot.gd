@@ -31,7 +31,8 @@ var aim_target: CharacterBody3D = null
 var target_loot: Loot = null
 var _loot_time := 0.0
 # // FIX: OPT-A2 拾取失败带时间戳，12s 冷却后允许重试（原注释占位无实现）
-var _loot_failed_at: Dictionary = {}
+var _loot_failed_at: Dictionary = {}   # 存到期时刻（now+冷却）
+var _loot_fail_counts: Dictionary = {} # // FIX: OPT-A2 强化：指数退避防"不可达物资无限重试"
 # // FIX: OPT-A3 受击警觉期：转向但不开火，无视线不锁定
 var _alert_t := 0.0
 var _alert_from_pos := Vector3.ZERO
@@ -68,12 +69,18 @@ var _ap: AnimationPlayer
 var _cur_anim := ""
 
 
-func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3) -> void:
+func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3, seed_value: int = -1) -> void:
 	display_name = p_name
 	zone = p_zone
 	terrain = p_terrain
 	move_target = drop_to
-	skill = randf_range(0.7, 1.5)
+	# // FIX: OPT-G7/REG4 bot skill 纳入 --seed 派生子流（原全局 randf 每局不同）
+	if seed_value >= 0:
+		var brng := RandomNumberGenerator.new()
+		brng.seed = hash(str(seed_value, "_", p_name))
+		skill = brng.randf_range(0.7, 1.5)
+	else:
+		skill = randf_range(0.7, 1.5)
 
 
 func _ready() -> void:
@@ -388,9 +395,9 @@ func _think_tick() -> void:
 		move_target = _random_point_in_zone()
 		return
 	# 非战斗决策：找枪 > 补甲/回血 > 找弹药 > 占点 > 游荡
-	# // FIX: OPT-A1 bot 资源行为：缺武器优先找枪；重伤找医疗、无甲找护甲（45m 需求半径）
+	# // FIX: OPT-A1 bot 资源行为：缺武器优先找枪（空手搜索半径 140m）；重伤找医疗、无甲找护甲（45m）
 	if weapon.weapon_id == "":
-		var loot := _find_nearest_loot("weapon")
+		var loot := _find_nearest_loot("weapon", 140.0)
 		if loot:
 			if target_loot != loot or state != State.LOOT:
 				_loot_time = 0.0
@@ -505,9 +512,9 @@ func _smoke_blocks(a: Vector3, b: Vector3) -> bool:
 func _find_nearest_loot(kind: String, max_dist: float = 90.0) -> Loot:
 	# // FIX: OPT-A2 失败物资 12s 冷却（原注释占位无实现导致 8s 死循环）；_loot_failed_pos 已删除
 	var now_ms := Time.get_ticks_msec()
-	# 清理过期失败记录
+	# 清理过期失败记录（存的是到期时刻）
 	for fid in _loot_failed_at.keys():
-		if now_ms - int(_loot_failed_at[fid]) > 12000:
+		if now_ms > int(_loot_failed_at[fid]):
 			_loot_failed_at.erase(fid)
 	var best: Loot = null
 	var best_d := max_dist
@@ -583,8 +590,11 @@ func _physics_process(delta: float) -> void:
 			if target_loot and is_instance_valid(target_loot) and not target_loot.consumed:
 				_loot_time += delta
 				if _loot_time > 8.0:
-					# // FIX: OPT-A2/P3 失败记录带时刻，12s 冷却后可重试（原 8s 死循环）
-					_loot_failed_at[target_loot.get_instance_id()] = Time.get_ticks_msec()
+					# // FIX: OPT-A2/P3 失败指数退避：12s→24→48→96→192s，不可达物资不再无限重试
+					var fid: int = target_loot.get_instance_id()
+					var cnt: int = int(_loot_fail_counts.get(fid, 0)) + 1
+					_loot_fail_counts[fid] = cnt
+					_loot_failed_at[fid] = Time.get_ticks_msec() + 12000 * (1 << mini(cnt, 4))
 					target_loot = null
 					_loot_time = 0.0
 					state = State.ROTATE

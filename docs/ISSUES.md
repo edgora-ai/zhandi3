@@ -52,6 +52,26 @@
 | H3 | 结算新增存活时长/总伤害统计（卡片自适应）；击杀确认 | `hud.gd show_end` + `main.gd _end_stats` |
 | H5a | 飘字开深度测试不穿墙；AOE 同帧合并不吞字 | `damage_number.gd` |
 | H5b | 落地扬尘（速度分级）/近水面水花 | `player.gd` 落地段 |
+| F1 | glb 角色卡通化重染：`Toon.apply_to_glb` helper，10 个角色（莫布林/蜥蜴/西诺克斯/守卫/龙/骷髅/法师/蝙蝠/野兽/NPC）统一描边+色带 | `toon.gd` + 10 文件接入 |
+| F3-light | 季节调色板由 DayNight 单点合成（季节不再直写天空被覆盖）——冬季截图天空已变冷灰蓝 | `season_system.gd` + `day_night.gd`；截图 /tmp/r_winter2.png |
+| F5 | 树冠卡片开投影：森林地表有树影斑驳（截图可见） | `props.gd`；截图 /tmp/r_final_day.png |
+| F6a | 草过滤：路面 4.2m（`is_near_road` 公开查询）+ 沙滩带不种草 | `terrain.gd` + `props.gd` |
+| F7 | 描边宽度规范化：树干 0.025→0.018、岩石 0.03→0.02、龙 0.035→0.014（三类比值 ≤2×） | `props.gd`/`wild_dragon.gd` |
+| F8a | 建筑墙面三面映射程序化贴图（灰泥/木板/砖缝），近看不再纯色平板 | `tex_gen.gd` + `buildings.gd` |
+| F9a | 蕨类不合格点缩为不可见（原漂水面/埋地下） | `wild_world.gd` |
+| F9b | 阴影距离 250→320m、bias 0.03→0.02 | `main.gd` |
+| F9c | 莫布林眼睛外移贴出头面 | `wild_moblin.gd` |
+| C6c | 巨龙喷火预判（飞行时间 50% 提前量）+ 二阶段每 14s 俯冲掠地 8m（近战窗口 2.5s） | `wild_dragon.gd` |
+| D5 | 弹孔 decal 池（64 个 LRU，径向贴图）；命中材质区分：木屑/金属火花/泥土/血雾 | `fx.gd decal` + `weapon.gd` |
+| E3 | 音效缺口 12 类补齐：UI/切枪/闪避/入水/烟雾/引擎循环/精灵奖励/猪狼熊叫/马嘶/宝箱 | `gen_sfx.py` + `sfx_bank.gd` + 10 处接线 |
+| E5 | 日间音乐扩写 18s→102s（6 遍和弦循环）；血月 stinger + 音乐压低联动 | `gen_sfx.py` + `main.gd _on_blood_moon` |
+| G4 | medkit 玩家 3s 读条（受击打断不消耗）；备弹上限 240；决赛圈前空投（phase≥2 共 3 次：DMR/r3甲/医疗/弹药/油桶） | `loot.gd` + `player.gd` + `main.gd` |
+| G6 | 旷野每 bot 落点保底武器+弹药（原 7 件/9 人）；HUD 明示"探索模式" | `main.gd _spawn_wild_bots` |
+| G7a | --seed 真复现：毒圈漂移/bot skill/天气序列全部种子派生；`[zone][seed]` 日志断言同 seed 两次 md5 一致、异 seed 不同（已实测通过） | `zone.gd rng` + `bot.gd setup(seed)` + `weather.gd setup(seed)` |
+| H4 | 龙火球/能量弹去逐颗 OmniLight（自发光 4.2 代替）+ 0.08s 拖尾 | `wild_projectile.gd` |
+| H6 | 云三种形制+高度带 135-190m；花瓣/雪径向渐变贴图（去"坏点"感） | `main.gd _spawn_clouds` + `season_system.gd` |
+| A2b | 拾取失败指数退避 12→24→48→96→192s（修"不可达物资无限重试"，空手搜索半径 90→140m） | `bot.gd _loot_fail_counts` |
+| B6b | 部位判定类型守卫（修 ShrineRune 698 次类型错误） | `wild_projectile.gd` |
 
 > 未完成（下一批，多为 L/XL 或需分块/资产再生成）：C6c 巨龙阶段、D5 弹孔、E3 音效缺口 12 类、E5 音乐扩写、F1 glb 卡通化、F3 EnvironmentDirector、F5 森林阴影、F6 草分块淡出（单 MultiMesh 的 visibility_range 为节点级，须分块）、F7 描边规范、F8 建筑细节、F9 渲染杂项、G4 空投/medkit 读条、G6 旷野定位、G7 seed 真复现、H4 特效性能包、H6 天空元素——见 `docs/OPTIMIZATION_PLAN.md` 总表。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。
 

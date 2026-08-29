@@ -596,6 +596,10 @@ func _dodge() -> void:
 	dir = dir.normalized()
 	velocity.x = dir.x * 11.0
 	velocity.z = dir.z * 11.0
+	# // FIX: OPT-E3 闪避呼啸
+	var _sfx_d := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_d:
+		_sfx_d.play("dodge_whoosh", -8.0)
 	_dodge_iframe_end = Time.get_ticks_msec() / 1000.0 + 0.30
 
 
@@ -869,6 +873,7 @@ func _physics_process(delta: float) -> void:
 	if regen_rate > 0.0 and hp < max_hp:
 		hp = minf(max_hp, hp + regen_rate * delta)
 		health_changed.emit(hp, armor)
+	_update_med_channel(delta) # // FIX: OPT-G4 医疗读条推进
 	# 精力回复：停手 1.5s 后以 15/s 回复（原 0.45s/26s 近乎免费，滑翔撤离无机会成本）
 	_stamina_wait = maxf(0.0, _stamina_wait - delta)
 	if not _stamina_used and _stamina_wait <= 0.0:
@@ -1053,11 +1058,42 @@ func give_weapon(id: String) -> void:
 
 
 func give_ammo(amount: int) -> void:
+	# // FIX: OPT-G4/PG11/R26 单武器位备弹上限 240，溢出不吸收并提示
 	for id in weapon_slots:
-		reserves[id] = reserves.get(id, 0) + amount
+		var cur: int = reserves.get(id, 0)
+		reserves[id] = mini(240, cur + amount)
 	if slot_index >= 0:
 		weapon.reserve = reserves[weapon_slots[slot_index]]
 		weapon.ammo_changed.emit(weapon.mag_left, weapon.reserve)
+		var total: int = reserves[weapon_slots[slot_index]]
+		if total >= 240 and hud:
+			hud.add_feed("备弹已满（240）")
+
+
+# ---------- 医疗包读条（G4/PG11） ----------
+
+var _med_channel_t := -1.0
+var _med_amount := 0.0
+
+func start_med_channel(amount: float) -> void:
+	# // FIX: OPT-G4/PG11 medkit 3s 读条：受伤 >2 取消且不消耗
+	if _med_channel_t > 0.0:
+		hp = minf(max_hp, hp + _med_amount * 0.5) # 连拾叠加按半额立即结算上一份
+	_med_channel_t = 3.0
+	_med_amount = amount
+	if hud:
+		hud.add_feed("使用医疗包...（3 秒，受击会打断）")
+
+func _update_med_channel(delta: float) -> void:
+	if _med_channel_t <= 0.0:
+		return
+	_med_channel_t -= delta
+	if _med_channel_t <= 0.0:
+		hp = minf(max_hp, hp + _med_amount)
+		health_changed.emit(hp, armor)
+		if hud:
+			hud.add_feed("治疗完成 +%d" % int(_med_amount))
+		_med_amount = 0.0
 
 
 # 卢比：敌人掉落，行商处消费。
@@ -1181,6 +1217,10 @@ func equip_master_sword() -> void:
 
 
 func switch_slot(i: int) -> void:
+	# // FIX: OPT-E3 切枪音
+	var _sfx_sw := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_sw and weapon_slots.size() > 0:
+		_sfx_sw.play("weapon_switch", -10.0)
 	if i < 0 or i >= weapon_slots.size() or i == slot_index:
 		return
 	if slot_index >= 0:
@@ -1246,6 +1286,12 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		var absorbed := minf(armor, dmg * absorb_ratio)
 		armor -= absorbed
 		dmg -= absorbed
+	# // FIX: OPT-G4 医疗读条被打断（不消耗）
+	if _med_channel_t > 0.0 and dmg > 2.0:
+		_med_channel_t = -1.0
+		_med_amount = 0.0
+		if hud:
+			hud.add_feed("治疗被打断！")
 	hp -= dmg
 	damaged.emit(dmg)
 	# // FIX: OPT-D3 受击方向指示：玩家系内计算攻击者方位角传 HUD（屏幕上方=前方）
@@ -1929,6 +1975,11 @@ func _update_swimming(delta: float, wish: Vector3) -> void:
 		is_dropping = false
 		landed.emit()
 	is_swimming = true
+	# // FIX: OPT-E3/FX20 入水水花+水声
+	var _sfx_sp := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_sp:
+		_sfx_sp.play_at("water_splash", global_position, -6.0)
+		FX.impact(global_position + Vector3(0, 0.2, 0), Color(0.80, 0.92, 1.0))
 	prone = false
 	var surface := terrain.get_water_level(global_position.x, global_position.z)
 	var swim_speed := SWIM_SPEED * (1.18 if Input.is_action_pressed("sprint") else 1.0)

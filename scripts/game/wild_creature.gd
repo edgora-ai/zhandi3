@@ -24,6 +24,7 @@ var _glb: Node3D
 var _ap: AnimationPlayer
 var _cur_anim := ""
 var _anim_hold := 0.0
+var _call_cd := 0.0 # // FIX: OPT-E3 动物叫声计时
 
 
 func setup(p_species: String, p_terrain: Terrain, p_player: Player) -> void:
@@ -79,6 +80,7 @@ func _try_glb_visual() -> bool:
 		return false
 	_glb = scene_res.instantiate()
 	add_child(_glb)
+	Toon.apply_to_glb(_glb) # // FIX: OPT-F1/TA1 glb 卡通化重染（描边+色带）
 	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _ap != null:
 		_ap.playback_default_blend_time = 0.12
@@ -280,6 +282,20 @@ func _die(from: Variant) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# // FIX: OPT-E3/FX14 动物 idle 叫声（猪哼/狼嚎/熊吼/鸟鸣），8-20s 随机
+	_call_cd -= delta
+	if _call_cd <= 0.0:
+		_call_cd = randf_range(8.0, 20.0)
+		var sname := "animal_pig"
+		if species == "wolf":
+			sname = "animal_wolf"
+		elif species == "bear":
+			sname = "animal_bear"
+		elif species == "bird":
+			sname = "animal_wolf"
+		var _sfx_a := get_tree().get_first_node_in_group("sfx_bank")
+		if _sfx_a and global_position.distance_to(player.global_position) < 60.0:
+			_sfx_a.play_at(sname, global_position, -10.0, randf_range(0.9, 1.1))
 	if not alive or terrain == null or player == null or not is_instance_valid(player):
 		return
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)

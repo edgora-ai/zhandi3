@@ -355,6 +355,11 @@ func _build_road_mask() -> void:
 					break
 
 
+# // FIX: OPT-F6/TA7 公开道路临近查询（供植被过滤，路面 4.2m 内不种草）
+func is_near_road(x: float, z: float) -> bool:
+	return _road_near(x, z)
+
+
 func _road_near(x: float, z: float) -> bool:
 	if _road_mask.is_empty():
 		return true

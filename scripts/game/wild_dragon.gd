@@ -8,6 +8,8 @@ var alive := true
 var hp := 260.0
 var _enraged := false
 var _rage_light: OmniLight3D
+var _dive_t := -1.0 # // FIX: OPT-C6c 俯冲计时（>=0 俯冲中）
+var _dive_cd := 6.0
 var display_name := "赤焰巨龙"
 var damage_mult := 1.0
 var kills := 0
@@ -54,6 +56,7 @@ func _try_glb_visual() -> bool:
 		return false
 	_glb = scene_res.instantiate()
 	add_child(_glb)
+	Toon.apply_to_glb(_glb) # // FIX: OPT-F1/TA1 glb 卡通化重染（描边+色带）
 	_ap = _glb.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _ap != null:
 		_ap.playback_default_blend_time = 0.12
@@ -78,7 +81,7 @@ func _play(clip: StringName) -> void:
 
 
 func _build_model() -> void:
-	var scale_mat := Toon.make_material(Color(0.54, 0.08, 0.045), true, 0.035)
+	var scale_mat := Toon.make_material(Color(0.54, 0.08, 0.045), true, 0.014) # // FIX: OPT-F7/TA10 角色规范宽
 	var belly := Toon.make_material(Color(0.92, 0.42, 0.12), true, 0.02)
 	var horn := Toon.make_material(Color(0.30, 0.19, 0.12), true, 0.012)
 	var membrane := Toon.make_material(Color(0.76, 0.16, 0.075), true, 0.018)
@@ -228,7 +231,12 @@ func _physics_process(delta: float) -> void:
 	var rate := 0.26 if _enraged else 0.16
 	var chase := 2.6 if _enraged else 1.6
 	var angle := _time * rate
-	var next := center + Vector3(cos(angle) * 42.0, 45.0 + sin(_time * 0.43) * 9.0, sin(angle) * 42.0)
+	var hover_h := 45.0 + sin(_time * 0.43) * 9.0
+	# // FIX: OPT-C6c 俯冲阶段：低空 8m 掠地（可近战/可盾反），结束后自动回高空
+	if _dive_t >= 0.0:
+		_dive_t -= delta
+		hover_h = 8.0
+	var next := center + Vector3(cos(angle) * 42.0, hover_h, sin(angle) * 42.0)
 	var forward := (next - global_position).normalized()
 	global_position = global_position.lerp(next, minf(1.0, delta * chase))
 	if forward.length_squared() > 0.01:
@@ -238,9 +246,18 @@ func _physics_process(delta: float) -> void:
 		_wing_right.rotation.z = -sin(_time * 2.4) * 0.42 + 0.08
 	for i in range(_tail_segments.size()):
 		_tail_segments[i].rotation.y = sin(_time * 1.8 - i * 0.42) * (0.10 + i * 0.018)
-	if global_position.distance_to(player.global_position) < 145.0 and _fire_cooldown <= 0.0:
+	if global_position.distance_to(player.global_position) < 145.0 and _fire_cooldown <= 0.0 and _dive_t < 0.0:
 		_breathe_fire()
 		_fire_cooldown = 1.8 if _enraged else 3.4
+	# // FIX: OPT-C6c/CB14 二阶段俯冲掠地：每 14s 降到 8m 扫射（近战可及窗口 2.5s）再爬升
+	if _enraged:
+		_dive_cd -= delta
+		if _dive_t < 0.0 and _dive_cd <= 0.0:
+			_dive_t = 2.5
+			_dive_cd = 14.0
+			var scene := get_tree().current_scene
+			if scene and scene.get("hud") != null:
+				scene.hud.add_feed("焚天者俯冲下来了！")
 	_anim_hold = maxf(0.0, _anim_hold - delta)
 	if _ap and _anim_hold <= 0.0:
 		if forward.y < -0.25:
@@ -256,7 +273,9 @@ func _breathe_fire() -> void:
 	if _sfx_d:
 		_sfx_d.play_at("explosion", mouth, -5.0, 0.92)
 	_anim_hold = 0.8
-	var target := player.global_position + Vector3(0, 0.8, 0)
+	# // FIX: OPT-C6c/R22 预判走位：按弹速飞行时间 50% 提前量瞄准（原打当前位置可匀速全躲）
+	var shot_speed := 22.0 if _enraged else 18.0
+	var target := player.global_position + Vector3(0, 0.8, 0) + player.velocity * (mouth.distance_to(player.global_position) / shot_speed) * 0.5
 	var count := 8 if _enraged else 5
 	for i in range(count):
 		var direction := (target - mouth).normalized()

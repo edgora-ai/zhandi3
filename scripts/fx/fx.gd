@@ -64,6 +64,62 @@ static func impact(pos: Vector3, color: Color = Color(0.85, 0.80, 0.65)) -> void
 	_puff(pos, color, 0.06, 3.0, 0.18)
 
 
+# ---------- 弹孔 decal ----------
+# // FIX: D5/FX8 弹孔池：64 个共享贴图四边形 LRU 复用，存续 20s；扫射弹着点可读
+
+const DECAL_MAX := 64
+static var _decals: Array[MeshInstance3D] = []
+static var _decal_idx := 0
+static var _decal_mat: StandardMaterial3D
+static var _decal_mesh: QuadMesh
+
+static func _ensure_decal_res() -> void:
+	if _decal_mesh != null:
+		return
+	_decal_mesh = QuadMesh.new()
+	_decal_mesh.size = Vector2(0.09, 0.09)
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.05, 0.05, 0.06, 0.85))
+	grad.set_color(1, Color(0.05, 0.05, 0.06, 0.0))
+	grad.add_point(0.35, Color(0.08, 0.08, 0.09, 0.6))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 32
+	tex.height = 32
+	_decal_mat = StandardMaterial3D.new()
+	_decal_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_decal_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_decal_mat.albedo_texture = tex
+	_decal_mat.albedo_color = Color(1, 1, 1, 0.9)
+
+static func decal(pos: Vector3, normal: Vector3) -> void:
+	_ensure_decal_res()
+	var mi: MeshInstance3D
+	if _decals.size() < DECAL_MAX:
+		mi = MeshInstance3D.new()
+		mi.mesh = _decal_mesh
+		mi.material_override = _decal_mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_scene().add_child(mi)
+		_decals.append(mi)
+	else:
+		mi = _decals[_decal_idx]
+	_decal_idx = (_decal_idx + 1) % DECAL_MAX
+	var n := normal.normalized() if normal.length_squared() > 0.01 else Vector3.UP
+	mi.visible = true
+	mi.global_position = pos + n * 0.012
+	# 四边形贴着表面：look_at 沿法线
+	if absf(n.dot(Vector3.UP)) < 0.98:
+		mi.look_at(mi.global_position + n, Vector3.UP)
+	else:
+		mi.look_at(mi.global_position + n, Vector3.FORWARD)
+	mi.rotation.z = randf() * TAU
+	mi.scale = Vector3.ONE * randf_range(0.8, 1.3)
+
+
 static func blood(pos: Vector3) -> void:
 	_puff(pos, Color(0.75, 0.12, 0.10), 0.09, 2.6, 0.22)
 

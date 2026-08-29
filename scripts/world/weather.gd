@@ -37,11 +37,12 @@ const FALL_SPEED := 22.0
 var _rain_player: AudioStreamPlayer
 var _snow_player: AudioStreamPlayer
 
-func setup(p_terrain: Terrain, p_player: Player, env: Environment) -> void:
+func setup(p_terrain: Terrain, p_player: Player, env: Environment, seed_value: int = -1) -> void:
 	terrain = p_terrain
 	player = p_player
 	_env = env
-	_rng.seed = 4477
+	# // FIX: OPT-G7/REG4 天气序列纳入 --seed（-1 保持固定 4477 兼容）
+	_rng.seed = 4477 if seed_value < 0 else hash(str(seed_value, "_weather"))
 	_state_t = _rng.randf_range(0.0, 40.0)
 	_build_rain()
 	# // FIX: OPT-E1/REG1/M9 雨声独立 rain_loop（原复用含鸟鸣的海滩 ambience.wav，且与全局环境音同源双开）

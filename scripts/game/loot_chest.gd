@@ -70,6 +70,10 @@ func _ready() -> void:
 
 
 func open(player: Player) -> void:
+	# // FIX: OPT-E3 宝箱开启音
+	var _sfx_c := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_c:
+		_sfx_c.play_at("chest_open", global_position, -6.0)
 	if opened:
 		return
 	opened = true

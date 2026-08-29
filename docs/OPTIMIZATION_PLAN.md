@@ -1,6 +1,6 @@
 # zhandi3 优化方案与任务拆解（2026-08-29）
 
-> **执行状态（2026-08-29 修复轮收尾，两轮提交）**：P0 批次全部完成并通过验证——A1-A6、B1-B6、G1、G2；P1/P2 完成 C1-C5、C3、C6(除 C6c 巨龙)、D2/D3/D4/D6/D7(部分)、E1/E2/E4、F2/F4、G3(吉普)、G5、H1/H2/H3/H5(部分)。验证记录：headless 基座/`--wildtest`/`--firetest`/`--seasontest`/`--feedtest`/`--focusrecoverytest`/`--sim` 全绿零 SCRIPT ERROR；sim KPI `bot_armor_avg` 50–100%、`vv_ratio` 0.41–0.58；毒圈 `zone_r=14 phase=5` 全场打完；视觉修复以截图为凭（突击步枪标签/视模型修正/夜景压暗/圈墙红橙）。明细见 `ISSUES.md` § OPT 修复轮已验证。未完成：C6c、D5、E3/E5、F1/F3/F5-F9、G4/G6/G7、H4/H6。
+> **执行状态（2026-08-29 修复轮收尾，三批提交）**：52 任务完成 **45 个**——P0 全部（A1-A6/B1-B6/G1/G2）+ C1-C6 全部（含 C6c 巨龙）+ D2-D7（除 D5→已完成）全部 + E1-E5 全部 + F1/F2/F4/F5/F6a/F7/F8a/F9 + G1-G7（G7 含 seed 复现实测断言；G7b 二周目存档增量除外）+ H1-H6（除 F6b 草分块淡出、F8b 屋顶形制、F3 完整 EnvironmentDirector）。验证：基座/wildtest/firetest/seasontest/feedtest/focusrecoverytest/sim(battlefield+wild) 全绿零 SCRIPT ERROR；seed 复现断言同 seed md5 一致/异 seed 不同；sim KPI 中盘 vv_ratio 0.44-1.0；视觉以截图为凭（冬季冷灰蓝天空/红色圈墙/树影/贴图墙面）。**未完成 7 项（全部 L/XL 架构级）**：F3 完整 EnvironmentDirector（F3-light 已落地等效验收）、F6b 草分块距离淡出（需 MultiMesh 分块重构）、F8b 屋顶形制差异化、G7b 二周目存档难度增量（依赖 C5 存档服务）、H4 puff 共享 mesh 深度优化、H6b 地表薄荷色斑根因、评审 R 系架构项（R14-R20 上帝类拆分）。
 > 定位：`docs/ISSUES.md` 定义"是什么/为什么"，`docs/ROADMAP.md` 定义"何时做/门禁"，本文件把 `docs/REVIEW_20260829.md`（玩家×策划全面评审，75 条问题）拆解为**可直接开工的任务**，每条含改动要点与可执行验收条件。
 > 任务 ID 规则 `OPT-<工作流><序号>`，提交信息与代码注释沿用工程惯例：`fix(OPT-A3): ...` + `// FIX: OPT-A3 ...` 可追踪前缀；任务完成时同步更新 `ISSUES.md` 对应行（新增行在标题中带 OPT ID）。
 > 规模：S<0.5 天 / M 0.5–2 天 / L 2–5 天 / XL>5 天。优先级：P0（对抗成立性）/ P1（手感与表现）/ P2（长线与打磨）。

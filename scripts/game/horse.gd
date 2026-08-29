@@ -381,6 +381,10 @@ func _find_safe_exit(fallback: Vector3) -> Vector3:
 	return fallback
 
 func enter(p: Player) -> void:
+	# // FIX: OPT-E3 马嘶
+	var _sfx_n := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_n:
+		_sfx_n.play_at("mount_neigh", global_position, -6.0)
 	if driver:
 		return
 	if not p.is_on_floor() or Vector2(p.velocity.x, p.velocity.z).length() > 3.5:

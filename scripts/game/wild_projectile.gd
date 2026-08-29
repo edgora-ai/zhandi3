@@ -75,17 +75,21 @@ func _build_visual() -> void:
 		glow.albedo_color = Color(1.0, 0.24, 0.035) if kind == "fire" else Color(0.05, 0.92, 1.0)
 		glow.emission_enabled = true
 		glow.emission = glow.albedo_color
-		glow.emission_energy_multiplier = 3.2
+		# // FIX: OPT-H4/FX12 去逐颗 OmniLight（同屏动态光预算），自发光 3.2→4.2 保持可见度
+		glow.emission_energy_multiplier = 4.2
 		mi.material_override = glow
-		var light := OmniLight3D.new()
-		light.light_color = glow.albedo_color
-		light.light_energy = 2.0
-		light.omni_range = 5.0
-		add_child(light)
 	add_child(mi)
 
 
+var _trail_t := 0.0
+
 func _physics_process(delta: float) -> void:
+	# // FIX: OPT-H4/FX12 火球/能量弹拖尾（无光小烟点，节奏 0.08s）
+	if kind == "fire" or kind == "energy":
+		_trail_t -= delta
+		if _trail_t <= 0.0:
+			_trail_t = 0.08
+			FX.impact(global_position, Color(1.0, 0.35, 0.08) if kind == "fire" else Color(0.10, 0.75, 1.0))
 	lifetime -= delta
 	if lifetime <= 0.0:
 		queue_free()
@@ -127,8 +131,9 @@ func _physics_process(delta: float) -> void:
 		if collider and collider != valid_source and collider.has_method("take_damage"):
 			# // FIX: OPT-B6 部位判定：按被击中形状求部位，箭爆头 ×1.5（可触发西诺克斯独眼）
 			var part := "body"
-			if collider.has_method("get_hit_part"):
-				part = collider.get_hit_part(collision.get_collider_shape())
+			var shape_idx: Variant = collision.get_collider_shape()
+			if collider.has_method("get_hit_part") and shape_idx is int:
+				part = collider.get_hit_part(shape_idx) # // FIX: OPT-B6 部位判定（带类型守卫）
 			var final_dmg := damage
 			if kind == "arrow" and part == "head":
 				final_dmg *= 1.5

@@ -32,6 +32,19 @@ const SOUNDS := {
 	"footstep_wood": "res://assets/sfx/footstep_wood.wav",
 	"footstep_water": "res://assets/sfx/footstep_water.wav",
 	"rain_loop": "res://assets/sfx/rain_loop.wav",
+	# // FIX: OPT-E3/FX14 交互缺口补齐
+	"ui_click": "res://assets/sfx/ui_click.wav",
+	"weapon_switch": "res://assets/sfx/weapon_switch.wav",
+	"dodge_whoosh": "res://assets/sfx/dodge_whoosh.wav",
+	"water_splash": "res://assets/sfx/water_splash.wav",
+	"smoke_pop": "res://assets/sfx/smoke_pop.wav",
+	"engine_loop": "res://assets/sfx/engine_loop.wav",
+	"korok_reward": "res://assets/sfx/korok_reward.wav",
+	"animal_pig": "res://assets/sfx/animal_pig.wav",
+	"animal_wolf": "res://assets/sfx/animal_wolf.wav",
+	"animal_bear": "res://assets/sfx/animal_bear.wav",
+	"mount_neigh": "res://assets/sfx/mount_neigh.wav",
+	"chest_open": "res://assets/sfx/chest_open.wav",
 }
 
 var _streams := {}

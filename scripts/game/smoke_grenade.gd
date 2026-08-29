@@ -40,6 +40,10 @@ func _process(delta: float) -> void:
 
 
 func _start_smoke() -> void:
+	# // FIX: OPT-E3 起烟气压声（原完全无声）
+	var _sfx_s := get_tree().get_first_node_in_group("sfx_bank")
+	if _sfx_s:
+		_sfx_s.play_at("smoke_pop", global_position, -8.0)
 	freeze = true
 	add_to_group("smoke")
 	for i in range(11):

@@ -27,6 +27,8 @@ var _sim_bot_deaths := 0 # // FIX: OPT-A1/A2 sim KPI 计数
 var _sim_vv_kills := 0
 var _sim_zone_deaths := 0
 var _match_t := 0.0 # // FIX: OPT-H3 结算存活时长
+var _airdrops := 0 # // FIX: OPT-G4 空投计数
+var _seed_value := -1 # // FIX: OPT-G7/REG4 --seed 值（-1 未指定）
 var total_combatants := BOT_COUNT + 1
 var _buff_acc := 0.0
 
@@ -133,6 +135,7 @@ func _ready() -> void:
 	var si := args.find("--seed")
 	if si >= 0 and si + 1 < args.size():
 		rng.seed = args[si + 1].to_int()
+		_seed_value = args[si + 1].to_int() # // FIX: OPT-G7 传给 zone/bot 子流
 	else:
 		rng.randomize()
 	_spawn_player(rng)
@@ -140,6 +143,8 @@ func _ready() -> void:
 	seasons.name = "SeasonSystem"
 	add_child(seasons)
 	seasons.season_changed.connect(func(_season_name: String, display_name: String) -> void:
+		if daynight:
+			daynight.season_palette = seasons.current_palette # // FIX: OPT-F3-light 切换时推送
 		hud.add_feed("季节切换：%s" % display_name)
 	)
 	var initial_season := "spring"
@@ -151,11 +156,12 @@ func _ready() -> void:
 	daynight.name = "DayNight"
 	add_child(daynight)
 	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
+	daynight.season_palette = seasons.current_palette # // FIX: OPT-F3-light 初始调色板（daynight 建好后回填）
 	daynight.blood_moon_started.connect(_on_blood_moon)
 	weather = Weather.new()
 	weather.name = "Weather"
 	add_child(weather)
-	weather.setup(terrain, player, _env)
+	weather.setup(terrain, player, _env, _seed_value) # // FIX: OPT-G7
 	if args.has("--rain"):
 		weather.force_rain(true)
 	if args.has("--thundertest") and weather:
@@ -179,10 +185,19 @@ func _ready() -> void:
 		wild_world.generate(terrain, player)
 		print("[boot_t] wild_world.generate +%dms" % (Time.get_ticks_msec() - boot_t0))
 		_spawn_wild_bots(rng)
+	# // FIX: OPT-G7/REG4 毒圈漂移与天气纳入 --seed（-1 时行为不变）
+	if _seed_value >= 0:
+		zone.rng.seed = hash(str(_seed_value, "_zone"))
 	if _map_id == "battlefield":
 		zone.start(10.0)
+		# // FIX: OPT-G4/PG9 决赛圈前空投（第 3/4/5 阶段收缩开始时各一次）
+		zone.shrinking_changed.connect(func(shrinking: bool) -> void:
+			if shrinking and zone.phase >= 2 and _airdrops < 3:
+				_airdrops += 1
+				_spawn_airdrop()
+		)
 	else:
-		hud.set_alive_text("阔野探索")
+		hud.set_alive_text("阔野探索 · 探索模式") # // FIX: OPT-G6/PG7 明示玩法定位
 		hud.set_kills(0)
 	if args.has("--ground"):
 		player.global_position.y = terrain.get_height(player.global_position.x, player.global_position.z) + 1.0
@@ -532,7 +547,7 @@ func _spawn_bots(rng: RandomNumberGenerator) -> void:
 		bot.name = "Bot_%s" % BOT_NAMES[i]
 		add_child(bot)
 		var land := find_land_point(rng, 0.8)
-		bot.setup(BOT_NAMES[i], zone, terrain, land)
+		bot.setup(BOT_NAMES[i], zone, terrain, land, _seed_value) # // FIX: OPT-G7
 		bot.global_position = land + Vector3(rng.randf_range(-20, 20), rng.randf_range(120.0, 170.0), rng.randf_range(-20, 20))
 		bot.rotation.y = rng.randf_range(0, TAU)
 		bot.died.connect(_on_combatant_died)
@@ -551,7 +566,12 @@ func _spawn_wild_bots(rng: RandomNumberGenerator) -> void:
 		add_child(bot)
 		var land: Vector3 = drops[i]
 		land.y = terrain.get_height(land.x, land.z)
-		bot.setup(BOT_NAMES[i], zone, terrain, land)
+		bot.setup(BOT_NAMES[i], zone, terrain, land, _seed_value) # // FIX: OPT-G7
+		# // FIX: OPT-G6/PG7 每 bot 落点半径保底一件武器（原 7 件/9 人多数空手）
+		var wl := land + Vector3(rng.randf_range(-6, 6), 0.15, rng.randf_range(-6, 6))
+		wl.y = terrain.get_height(wl.x, wl.z) + 0.15
+		Loot.spawn(self, wl, "weapon", ["smg", "rifle", "dmr"][i % 3], 0, 1 + (i % 2))
+		Loot.spawn(self, wl + Vector3(0.8, 0, 0), "ammo", "", 60, 1)
 		bot.global_position = land + Vector3(rng.randf_range(-12, 12), rng.randf_range(70.0, 120.0), rng.randf_range(-12, 12))
 		bot.rotation.y = rng.randf_range(0.0, TAU)
 		bot.died.connect(_on_combatant_died)
@@ -642,6 +662,24 @@ func _end_stats() -> Array:
 		["存活时长", "%d:%02d" % [int(_match_t) / 60, int(_match_t) % 60]],
 		["总伤害", "%d" % int(player.damage_dealt)],
 	]
+
+
+# // FIX: OPT-G4/PG9 空投：决赛圈前补给（DMR/r3甲/医疗/弹药），光柱醒目
+func _spawn_airdrop() -> void:
+	var c := zone.next_target()
+	var ang := randf() * TAU
+	var r := randf() * 0.7 * c.y
+	var pos := Vector3(c.x + cos(ang) * r, 0, c.z + sin(ang) * r)
+	pos.y = terrain.get_height(pos.x, pos.z)
+	if pos.y < Terrain.WATER_LEVEL + 0.5:
+		return
+	pos.y += 0.15
+	Loot.spawn(self, pos + Vector3(0.6, 0, 0.6), "weapon", "dmr", 0, 3)
+	Loot.spawn(self, pos + Vector3(-0.6, 0, 0.6), "armor", "", 75, 3)
+	Loot.spawn(self, pos + Vector3(0.6, 0, -0.6), "medkit", "", 60, 2)
+	Loot.spawn(self, pos + Vector3(-0.6, 0, -0.6), "ammo", "", 120, 2)
+	Loot.spawn(self, pos, "fuel", "", 1, 2)
+	hud.add_feed("补给空投已投放在圈内，注意光柱！")
 
 
 func _on_combatant_died(victim: Variant, killer: Variant) -> void:
@@ -735,6 +773,10 @@ func _on_capture_changed(point: CapturePoint, new_owner: Variant) -> void:
 
 func _on_blood_moon() -> void:
 	hud.add_feed("血月升起……怪物苏醒了")
+	# // FIX: OPT-E5/FX16 血月 stinger + 音乐压低（氛围高潮音频记忆点）
+	sfx.play("blood_stinger", -2.0)
+	if sfx.has_method("set_boss_music"):
+		sfx.set_boss_music(true)
 	sfx.play("zone_alarm", -2.0)
 	if wild_world:
 		var count := wild_world.respawn_monsters()
@@ -961,6 +1003,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _toggle_map_menu() -> void:
+	# // FIX: OPT-E3 UI 点击音
+	if sfx:
+		sfx.play("ui_click", -10.0)
 	if hud == null:
 		return
 	_map_menu_open = not _map_menu_open
@@ -2054,8 +2099,8 @@ func _setup_environment() -> void:
 	sun.light_color = Color(1.0, 0.957, 0.902)
 	sun.light_energy = 1.15
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 250.0
-	sun.shadow_bias = 0.03
+	sun.directional_shadow_max_distance = 320.0 # // FIX: OPT-F9/TA16 覆盖远山地标
+	sun.shadow_bias = 0.02 # // FIX: OPT-F9/TA16 降 bias 减接触影漂移
 	sun.rotation_degrees = Vector3(-48.0, -35.0, 0.0)
 	add_child(sun)
 
@@ -2097,8 +2142,11 @@ func _spawn_clouds() -> void:
 	mat.disable_fog = true
 	for i in range(22):
 		var cloud := Node3D.new()
-		cloud.position = Vector3(rng.randf_range(-460, 460), rng.randf_range(105, 160), rng.randf_range(-460, 460))
-		for j in range(rng.randi_range(3, 5)):
+		# // FIX: OPT-H6/VIS5 高度带抬升（不再贴山腰）+ 三种云形（团块/长条/双层）
+		cloud.position = Vector3(rng.randf_range(-460, 460), rng.randf_range(135, 190), rng.randf_range(-460, 460))
+		var shape := i % 3 # 0=团块 1=长条 2=双层
+		var puff_n := 3 if shape == 1 else (4 if shape == 2 else 5)
+		for j in range(puff_n):
 			var puff := MeshInstance3D.new()
 			var sm := SphereMesh.new()
 			sm.radius = rng.randf_range(10.0, 22.0)
@@ -2108,7 +2156,8 @@ func _spawn_clouds() -> void:
 			puff.mesh = sm
 			puff.material_override = mat
 			puff.position = Vector3(rng.randf_range(-22, 22), rng.randf_range(-2.5, 2.5), rng.randf_range(-9, 9))
-			puff.scale = Vector3(1.6, 0.38, 1.0)
+			puff.scale = Vector3(1.6, 0.38, 1.0) if shape == 0 else (Vector3(4.2, 0.30, 1.0) if shape == 1 else Vector3(1.4, 0.34, 1.0))
+			puff.position.y += (0.0 if shape != 2 else (0.0 if j % 2 == 0 else 6.0))
 			puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			cloud.add_child(puff)
 		add_child(cloud)

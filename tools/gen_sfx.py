@@ -167,10 +167,12 @@ CHORDS = [
     [174.61, 220.00, 261.63],   # F
 ]
 SEG = 6.0
+# // FIX: OPT-E5/FX16 循环扩写：4 和弦 ×3 遍（~72s+交叠≈96s），降低长局听觉疲劳
 music = chord(SEG, CHORDS[0])
-for ci in range(1, 4):
-    music = crossfade(music, chord(SEG, CHORDS[ci]), 2.0)
-music = crossfade(music, chord(SEG, CHORDS[0]), 2.0)   # 回到起始和弦，首尾无缝
+for rep in range(6):  # 6 遍 ≈102s 满足 ≥90s 验收
+    for ci in range(1, 4):
+        music = crossfade(music, chord(SEG, CHORDS[ci]), 2.0)
+    music = crossfade(music, chord(SEG, CHORDS[0]), 2.0)   # 每遍回到起始和弦，首尾无缝
 # 稀疏五声音阶铃音点缀
 PENTA = [523.25, 587.33, 659.25, 783.99, 880.00]
 for ni in range(7):
@@ -403,5 +405,59 @@ for j, x in enumerate(tone(0.09, 52.0, 0.040, 0.62)):
     if off + j < len(hb):
         hb[off + j] += x
 write_wav("heartbeat.wav", hb)
+
+# ---------- OPT-E3 音效覆盖缺口（12 类交互） ----------
+
+# UI 点击（地图/背包开合）
+write_wav("ui_click.wav", tone(0.035, 1250.0, 0.010, 0.32, "square"))
+# 切枪：金属拉栓 + 布料摩擦
+ws = mix(tone(0.05, 900.0, 0.014, 0.34), noise_burst(0.07, 0.025, 0.20, 0.5))
+write_wav("weapon_switch.wav", ws)
+# 闪避呼啸：快速下扫气声
+write_wav("dodge_whoosh.wav", mix(sweep(0.22, 1400.0, 260.0, 0.12, 0.30), noise_burst(0.18, 0.05, 0.16, 0.35)))
+# 入水水花：宽频爆裂 + 低频扑通
+splash = mix(noise_burst(0.30, 0.09, 0.55, 0.30), sweep(0.16, 220.0, 70.0, 0.10, 0.40))
+write_wav("water_splash.wav", splash)
+# 烟雾弹起烟：气压嘶声 + 咚
+smk = mix(noise_burst(0.7, 0.35, 0.30, 0.55), sweep(0.10, 140.0, 60.0, 0.07, 0.42))
+write_wav("smoke_pop.wav", smk)
+# 引擎循环：两缸点火脉冲（运行时 LOOP_FORWARD，音调随车速）
+eng = [0.0] * int(SR * 0.5)
+for k in range(4):
+    off = int(SR * 0.125 * k)
+    for j, x in enumerate(tone(0.06, 82.0, 0.030, 0.55)):
+        if off + j < len(eng):
+            eng[off + j] += x
+    for j, x in enumerate(noise_burst(0.03, 0.012, 0.16, 0.30)):
+        if off + j < len(eng):
+            eng[off + j] += x
+write_wav("engine_loop.wav", eng)
+# 探索精灵奖励：三连上行铃 + 咻
+kk = mix(sweep(0.12, 900.0, 1800.0, 0.08, 0.22), [0.0] * int(SR * 0.10) + tone(0.14, 1046.5, 0.10, 0.30))
+kk = mix(kk, [0.0] * int(SR * 0.22) + tone(0.18, 1318.5, 0.12, 0.30))
+kk = mix(kk, [0.0] * int(SR * 0.34) + tone(0.30, 1568.0, 0.20, 0.32))
+write_wav("korok_reward.wav", kk)
+# 动物叫声：猪哼 / 狼嚎 / 熊吼 / 鸟鸣
+pig = mix(sweep(0.18, 210.0, 90.0, 0.09, 0.50), noise_burst(0.10, 0.04, 0.20, 0.20))
+write_wav("animal_pig.wav", pig)
+howl = sweep(0.9, 330.0, 470.0, 0.8, 0.34)
+howl = mix(howl, sweep(0.4, 470.0, 300.0, 0.6, 0.20))
+write_wav("animal_wolf.wav", [0.0] * int(SR * 0.15) + howl)
+bear = mix(sweep(0.4, 120.0, 65.0, 0.22, 0.62), noise_burst(0.3, 0.10, 0.28, 0.12))
+write_wav("animal_bear.wav", bear)
+# 马嘶：颤音上扬
+nh = sweep(0.5, 500.0, 720.0, 0.45, 0.30)
+vib = []
+for i, x in enumerate(nh):
+    vib.append(x * (1.0 + 0.35 * math.sin(2 * math.pi * 13.0 * i / SR)))
+write_wav("mount_neigh.wav", vib)
+# 宝箱开启：木盖吱呀 + 金属扣
+ch = mix(sweep(0.35, 180.0, 420.0, 0.30, 0.24), [0.0] * int(SR * 0.25) + tone(0.08, 1500.0, 0.02, 0.30, "square"))
+write_wav("chest_open.wav", ch)
+
+# // FIX: OPT-E5/FX16 血月 stinger：小二度低音撞击 + 下滑 drone
+bs = mix(tone(0.9, 65.4, 0.5, 0.55), tone(0.9, 69.3, 0.5, 0.45))
+bs = mix(bs, sweep(1.4, 180.0, 48.0, 1.0, 0.35))
+write_wav("blood_stinger.wav", bs)
 
 print("done")

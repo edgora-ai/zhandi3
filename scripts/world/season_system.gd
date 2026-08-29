@@ -133,23 +133,10 @@ func set_season(season_name: String) -> void:
 	print("[season] %s (%s)" % [season_name, display_name])
 
 
+var current_palette := {} # // FIX: OPT-F3-light/R19/TA4 季节只发布调色板，天空/雾/太阳由 DayNight 单点合成（原两处互覆盖，冬季仍春天蓝天）
+
 func _apply_environment(palette: Dictionary) -> void:
-	if _sky_material:
-		_sky_material.sky_top_color = palette["sky_top"]
-		_sky_material.sky_horizon_color = palette["sky_horizon"]
-		_sky_material.ground_horizon_color = palette["ground_sky"]
-	if _environment:
-		_environment.fog_light_color = palette["fog"]
-		_environment.fog_density = float(palette["fog_density"]) * (0.68 if _terrain and _terrain.profile == "wild" else 1.0)
-		_environment.tonemap_exposure = float(palette["exposure"]) * (0.88 if _terrain and _terrain.profile == "wild" else 1.0)
-	if _sun:
-		_sun.light_color = palette["sun"]
-		_sun.light_energy = float(palette["sun_energy"]) * (0.88 if _terrain and _terrain.profile == "wild" else 1.0)
-	if _fill:
-		_fill.light_color = palette["fill"]
-		_fill.light_energy = float(palette["fill_energy"]) * (0.72 if _terrain and _terrain.profile == "wild" else 1.0)
-	if _rim:
-		_rim.light_color = palette["rim"]
+	current_palette = palette
 
 
 func _build_weather() -> void:
@@ -178,6 +165,18 @@ func _configure_weather(kind: String, color: Color) -> void:
 	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	material.no_depth_test = false
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# // FIX: OPT-H6/VIS6 花瓣/雪用径向渐变贴图（原纯色方块像素读作"坏点"）
+	var pgrad := Gradient.new()
+	pgrad.set_color(0, Color(1, 1, 1, 1))
+	pgrad.set_color(1, Color(1, 1, 1, 0.25))
+	var ptex := GradientTexture2D.new()
+	ptex.gradient = pgrad
+	ptex.fill = GradientTexture2D.FILL_RADIAL
+	ptex.fill_from = Vector2(0.5, 0.5)
+	ptex.fill_to = Vector2(0.5, 0.05)
+	ptex.width = 16
+	ptex.height = 16
+	material.albedo_texture = ptex
 	quad.material = material
 	var count := 120
 	if kind == "snow":

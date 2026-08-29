@@ -206,10 +206,16 @@ func _fire_ray() -> void:
 			col.take_damage(dmg, owner_body, part)
 			if owner_body.get("damage_dealt") != null:
 				owner_body.damage_dealt += dmg # // FIX: OPT-H3 结算伤害统计
+			# // FIX: D5/FX8 材质区分命中：木材屑/金属火花/泥土/生物血雾，静态物留弹孔
 			if col.has_method("is_plant"):
-				FX.impact(end_point)
-			else:
+				FX.impact(end_point, Color(0.55, 0.38, 0.18))
+			elif col is CharacterBody3D:
 				FX.blood(end_point)
+			elif col is Guardian or col.has_method("is_metal"):
+				FX.impact(end_point, Color(1.0, 0.85, 0.35))
+			else:
+				FX.impact(end_point, Color(0.62, 0.58, 0.48))
+				FX.decal(end_point, result.normal)
 			if is_player:
 				hit_landed.emit(part)
 		else:

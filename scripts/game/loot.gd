@@ -362,9 +362,13 @@ func apply_to(target: CharacterBody3D) -> void:
 			var cap := 100.0
 			if "max_hp" in target:
 				cap = float(target.get("max_hp"))
-			target.hp = minf(cap, target.hp + amount)
-			if target.has_signal("health_changed"):
-				target.health_changed.emit(target.hp, target.armor)
+			# // FIX: OPT-G4/PG11 玩家 medkit 改 3s 读条（受击打断不消耗，可被针对）；bot 保持即拾即用
+			if target is Player and target.get("hp") < cap - 1.0:
+				target.start_med_channel(float(amount))
+			else:
+				target.hp = minf(cap, target.hp + amount)
+				if target.has_signal("health_changed"):
+					target.health_changed.emit(target.hp, target.armor)
 		"ammo":
 			if target.has_method("give_ammo"):
 				target.give_ammo(amount)

@@ -94,6 +94,63 @@ static func _gen_grass_blades(seed: int) -> Image:
 
 
 ## 花朵贴图：5 瓣白花 + 黄色花心
+## // FIX: OPT-F8/TA11 建筑墙面程序化纹理：灰泥斑驳 / 木板条纹 / 砖缝（配 uv1_triplanar 上墙）
+static func wall_plaster() -> ImageTexture:
+	return _load_or_make("wall_plaster", _gen_wall_plaster)
+
+static func _gen_wall_plaster() -> Image:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	for y in range(64):
+		for x in range(64):
+			var n := rng.randf_range(-0.06, 0.06) + 0.04 * sin(float(x) * 0.4) + 0.03 * sin(float(y) * 0.23)
+			var c := 0.82 + n
+			img.set_pixel(x, y, Color(c, c * 0.965, c * 0.88, 1.0))
+	return img
+
+static func wall_plank() -> ImageTexture:
+	return _load_or_make("wall_plank", _gen_wall_plank)
+
+static func _gen_wall_plank() -> Image:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 12
+	for y in range(64):
+		var plank := y / 16
+		var seam := (y % 16) == 0
+		for x in range(64):
+			var n := rng.randf_range(-0.05, 0.05) + 0.03 * sin(float(x) * 0.9 + float(plank) * 2.1)
+			var c := 0.60 + n
+			if seam:
+				c *= 0.62
+			if x % 32 == 0:
+				c *= 0.85
+			img.set_pixel(x, y, Color(c, c * 0.72, c * 0.5, 1.0))
+	return img
+
+static func wall_brick() -> ImageTexture:
+	return _load_or_make("wall_brick", _gen_wall_brick)
+
+static func _gen_wall_brick() -> Image:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 13
+	for y in range(64):
+		var row := y / 8
+		var offset := (row % 2) * 8
+		for x in range(64):
+			var bx := (x + offset) % 16
+			var by := y % 8
+			var mortar := by == 0 or bx == 0
+			var n := rng.randf_range(-0.05, 0.05)
+			if mortar:
+				img.set_pixel(x, y, Color(0.62 + n, 0.58 + n, 0.52 + n, 1.0))
+			else:
+				var c := 0.72 + n
+				img.set_pixel(x, y, Color(c, c * 0.72, c * 0.58, 1.0))
+	return img
+
 static func flower(seed: int = 3) -> ImageTexture:
 	return _load_or_make("flower%d" % seed, func() -> Image: return _gen_flower(seed))
 

@@ -31,6 +31,7 @@ var _steer := 0.0
 var _camera_yaw := 0.0
 var _camera_pitch := -0.23
 var _camera_idle := 0.0
+var _engine: AudioStreamPlayer3D # // FIX: OPT-E3 引擎循环
 
 
 func _ready() -> void:
@@ -263,6 +264,20 @@ func enter(p: Player) -> void:
 	# // FIX: M2 燃料占位：吉普车当前无消耗，is_on_floor门限已落地，未来对接 stamina/fuel 管线
 	if not _is_exit_safe(p.global_position):
 		pass # // FIX: H17 占位：未来在此做进入前碰撞通过校验
+	# // FIX: OPT-E3 引擎循环启动（LOOP_FORWARD，随车速调音调由 _process 简化为固定）
+	if _engine == null:
+		var es := load("res://assets/sfx/engine_loop.wav") as AudioStreamWAV
+		if es:
+			es.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			es.loop_end = int(es.get_length() * es.mix_rate)
+		_engine = AudioStreamPlayer3D.new()
+		_engine.stream = es
+		_engine.bus = "SFX"
+		_engine.volume_db = -12.0
+		_engine.max_distance = 60.0
+		add_child(_engine)
+	if _engine:
+		_engine.play()
 	driver = p
 	driver.vehicle = self
 	driver.visible = false
@@ -284,6 +299,8 @@ func exit() -> void:
 	driver = null
 	speed = 0.0
 	velocity = Vector3.ZERO
+	if _engine:
+		_engine.stop() # // FIX: OPT-E3 下车停引擎
 	var fallback := global_position + global_transform.basis.x * 1.9 + Vector3(0, 0.55, 0)
 	p.global_position = _find_safe_exit(fallback) # // FIX: H17 固定偏移→安全落点 shape_test
 	p.visible = true

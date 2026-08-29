@@ -1108,7 +1108,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					hud.add_feed("这个传送位还没有激活的测绘点")
 			get_viewport().set_input_as_handled()
 			return
-		if event.physical_keycode == KEY_T and daynight:
+		# // FIX: R18 调试键门控（T 仅 debug 构建生效；原全量生效，发行版误触且与 InputMap 无冲突但直绑物理键）
+		if OS.is_debug_build() and event.physical_keycode == KEY_T and daynight:
 			daynight.advance(1.0)
 			hud.add_feed("时间流转：%s" % daynight.phase_name())
 			get_viewport().set_input_as_handled()

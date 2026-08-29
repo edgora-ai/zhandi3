@@ -99,7 +99,8 @@ func setup(p_terrain: Terrain, p_props: Props, p_buildings: Buildings, p_player:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_V:
+	# // FIX: R18 调试键门控（V 仅 debug 构建生效；原全量生效且直绑物理键绕过 InputMap）
+	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_V:
 		cycle_season()
 		get_viewport().set_input_as_handled()
 

@@ -197,6 +197,7 @@ static func attack_ring(parent: Node3D, radius: float, color: Color) -> MeshInst
 
 
 static var _puff_meshes: Dictionary = {} # // FIX: R4-14 puff 网格按半径共享（拖尾 100 次/s 不再每次 new SphereMesh）
+static var _puff_mats: Dictionary = {} # // FIX: H4b puff 材质色板缓存（Color 键，≤8，实例 transparency 淡出故可共享）
 
 static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: float) -> void:
 	var s: SphereMesh = _puff_meshes.get(radius)
@@ -207,18 +208,25 @@ static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: 
 		s.radial_segments = 6
 		s.rings = 3
 		_puff_meshes[radius] = s
+	# // FIX: H4b 材质按 Color 缓存（满 8 清池），淡出走实例 transparency 而非材质独占
+	var key := Color(color.r, color.g, color.b, 1.0)
+	var mat: Variant = _puff_mats.get(key)
+	if mat == null:
+		mat = _unshaded(Color(key.r, key.g, key.b, 0.85)) # // FIX: M6 0.85 alpha，已验证
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA # // FIX: M6 透明混合
+		if _puff_mats.size() >= 8:
+			_puff_mats.clear()
+		_puff_mats[key] = mat
 	var mi := MeshInstance3D.new()
 	mi.mesh = s
-	# M6: 已核验 fix — 半透明 puff 初始 alpha 0.85 且 scale/alpha 同步淡出（非实心球）
-	var mat := _unshaded(Color(color.r, color.g, color.b, 0.85)) # // FIX: M6 0.85 alpha，已验证
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA # // FIX: M6 透明混合
-	mi.material_override = mat
+	mi.material_override = mat as Material
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.transparency = 0.0
 	_scene().add_child(mi)
 	mi.global_position = pos
 	var tw := mi.create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(mi, "scale", Vector3.ONE * grow, life) # // FIX: M6 scale 淡出
 	tw.tween_property(mi, "position:y", pos.y + 0.25, life)
-	tw.tween_property(mat, "albedo_color:a", 0.0, life) # // FIX: M6 alpha 淡出至 0
+	tw.tween_property(mi, "transparency", 1.0, life) # // FIX: H4b 实例级淡出（共享材质不独占）
 	tw.chain().tween_callback(mi.queue_free)

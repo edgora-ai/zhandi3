@@ -1,6 +1,9 @@
 shader_type spatial;
 render_mode cull_disabled, unshaded, depth_draw_opaque;
 
+// FIX: OPT-F2/TA3 全局日光系数：unshaded 材质随昼夜明暗（夜晚草地 ≤ 白天 30%），修夜景"荧光地毯"
+global uniform float day_light;
+
 // 草丛卡片：交叉面片 + 多叶片贴图 + 行进风场 + 三段色带
 uniform sampler2D u_blade;
 uniform vec4 color_shadow : source_color = vec4(0.16, 0.34, 0.10, 1.0);
@@ -54,5 +57,5 @@ void fragment() {
 	float patch = vnoise(v_world * 0.045);
 	c *= 0.86 + patch * 0.28;
 	// 贴图灰度做叶间明暗
-	ALBEDO = c * (0.6 + tex.r * 0.55) * COLOR.rgb;
+	ALBEDO = c * (0.6 + tex.r * 0.55) * COLOR.rgb * day_light;
 }

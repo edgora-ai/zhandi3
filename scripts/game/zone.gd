@@ -4,12 +4,15 @@ extends Node3D
 
 signal shrinking_changed(shrinking: bool)
 
+# // FIX: OPT-G1/G5/R24 毒圈节奏重调：总时长 wait 143s + shrink 67s ≈ 210s（+grace 10 ≈ 220s）；
+# 第 3 阶段（index 2）起收缩速度 ≥8.6 m/s（105→55/5.5s=9.1、55→28/3.0s=9.0、28→14/1.6s=8.75），
+# 逼位移逼交火；决赛圈 9→14m 缓冲；圈外 DPS 每阶段翻倍 2→4→8→16→32，不理圈必死于前中期。
 const PHASES := [
-	{"wait": 20.0, "shrink": 30.0, "radius": 170.0, "dps": 2.0},
-	{"wait": 18.0, "shrink": 25.0, "radius": 110.0, "dps": 4.0},
-	{"wait": 15.0, "shrink": 20.0, "radius": 62.0, "dps": 8.0},
-	{"wait": 13.0, "shrink": 16.0, "radius": 28.0, "dps": 14.0},
-	{"wait": 11.0, "shrink": 14.0, "radius": 9.0, "dps": 20.0},
+	{"wait": 45.0, "shrink": 35.0, "radius": 170.0, "dps": 2.0},
+	{"wait": 36.0, "shrink": 22.0, "radius": 105.0, "dps": 4.0},
+	{"wait": 26.0, "shrink": 5.5, "radius": 55.0, "dps": 8.0},
+	{"wait": 20.0, "shrink": 3.0, "radius": 28.0, "dps": 16.0},
+	{"wait": 16.0, "shrink": 1.6, "radius": 14.0, "dps": 32.0},
 ]
 
 var center := Vector2.ZERO

@@ -1,6 +1,6 @@
 class_name DayNight
 extends Node
-## 昼夜循环：驱动太阳/天空/雾色变化。一天 6 分钟，t∈[0,1)：0.0 日出，0.3 正午，0.55 日落，0.8 午夜。
+## 昼夜循环：驱动太阳/天空/雾色变化。一天 6 分钟，t∈[0,1)：0.0 日出，0.25 正午（仰角峰值），0.5 日落，0.8 午夜。
 
 const DAY_LENGTH := 360.0
 
@@ -17,6 +17,7 @@ var _sky_mat: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
 var _fill: DirectionalLight3D
 var _rim: DirectionalLight3D
+var _daylight_gp_ready := false # // FIX: OPT-F2 全局 shader 参数只注册一次
 
 const SKY_TOP_DAY := Color(0.24, 0.56, 0.95)
 const SKY_TOP_DUSK := Color(0.42, 0.26, 0.48)
@@ -42,17 +43,18 @@ func setup(env: Environment, sky_mat: ProceduralSkyMaterial, sun: DirectionalLig
 
 
 func is_night() -> bool:
-	return t > 0.62 and t < 0.94
+	# // FIX: OPT-F4 日落 0.5（仰角曲线对齐），夜晚边界相应前移
+	return t > 0.53 and t < 0.97
 
 
 func phase_name() -> String:
-	if t < 0.12:
+	if t < 0.08:
 		return "清晨"
 	if t < 0.42:
 		return "正午"
-	if t < 0.62:
+	if t < 0.53:
 		return "黄昏"
-	if t < 0.94:
+	if t < 0.95:
 		return "夜晚"
 	return "黎明"
 
@@ -117,9 +119,25 @@ func _apply() -> void:
 	if blood_moon:
 		_env.fog_light_color = _env.fog_light_color.lerp(Color(0.55, 0.12, 0.10), 0.7)
 	_env.fog_density = lerpf(0.0016, 0.0009, day)
-	# 太阳角度随时间转过天空；夜间变成冷色月光。
-	var sun_angle := t * TAU - PI * 0.5
-	_sun.rotation_degrees = Vector3(rad_to_deg(-asin(clampf(sin(sun_angle), -1.0, 1.0))) - 20.0, -35.0, 0.0)
+	# // FIX: OPT-F2/TA3 unshaded 植被/水面随昼夜明暗（全局 shader 参数，夜晚 ≤ 白天 30%）
+	if not _daylight_gp_ready:
+		RenderingServer.global_shader_parameter_add("day_light", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)
+		_daylight_gp_ready = true
+	RenderingServer.global_shader_parameter_set("day_light", lerpf(0.22, 1.0, day))
+	# // FIX: OPT-F4/TA5 太阳轨迹方位角-仰角参数化：
+	# 白天 yaw -110°→110°（东升西落），夜晚月光 yaw 110°→250°（连续西移，黎明 250°≡-110° 无跳变）；
+	# 仰角单峰 sin 曲线（峰值 t=0.25 与 phase 正午对齐），修原 asin 镜像导致正午阴影翻转 180°
+	var elev_deg: float
+	var yaw_deg: float
+	if t < 0.5:
+		var day_u := t / 0.5
+		elev_deg = sin(PI * day_u) * 62.0
+		yaw_deg = lerpf(-110.0, 110.0, day_u)
+	else:
+		var night_u := (t - 0.5) / 0.5
+		elev_deg = sin(PI * night_u) * 40.0
+		yaw_deg = lerpf(110.0, 250.0, night_u)
+	_sun.rotation_degrees = Vector3(-(90.0 - elev_deg), yaw_deg, 0.0)
 	_sun.light_color = SUN_NIGHT.lerp(SUN_DAY, day).lerp(SUN_DUSK, dusk * 0.7)
 	if blood_moon:
 		_sun.light_color = Color(1.0, 0.22, 0.15)

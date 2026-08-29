@@ -11,7 +11,15 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "sfx")
 random.seed(7)
 
 
+def normalize(samples, peak=0.89):
+    """// FIX: OPT-E1/REG5 每轨归一化到 ≤0.89 true peak（原多轨直接叠加峰值 1.6~2.28 硬剪失真）"""
+    m = max(1e-6, max(abs(x) for x in samples))
+    k = min(1.0, peak / m)
+    return [x * k for x in samples]
+
+
 def write_wav(name, samples):
+    samples = normalize(samples)
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name)
     with wave.open(path, "wb") as w:
@@ -340,5 +348,60 @@ write_wav("heavy_impact.wav", heavy_impact)
 # 敌人攻击前摇：短促上扬双音，提醒玩家准备闪避或举盾。
 enemy_charge = mix(sweep(0.30, 170.0, 520.0, 0.20, 0.34), [0.0] * int(SR * 0.11) + tone(0.18, 720.0, 0.12, 0.20))
 write_wav("enemy_charge.wav", enemy_charge)
+
+# ---------- OPT-E1 音频回归修复新增采样（追加在既有种子序列之后，不改旧产物） ----------
+
+# REG1：雨声循环——宽带噪声雨幕 + 随机雨滴颗粒，无鸟鸣（原复用含鸟鸣的海滩环境音）。
+RAIN_DUR = 12.0
+n = int(SR * RAIN_DUR)
+rain = []
+rain_prev = 0.0
+for i in range(n):
+    x = random.uniform(-1, 1)
+    rain_prev += 0.18 * (x - rain_prev)
+    rain.append(rain_prev * 0.9)
+# 雨滴颗粒：高频短噼啪
+for _ in range(160):
+    off = int(SR * random.uniform(0.0, RAIN_DUR - 0.05))
+    drop = noise_burst(0.012, 0.004, random.uniform(0.10, 0.28))
+    for j, x in enumerate(drop):
+        if off + j < n:
+            rain[off + j] += x
+rain = loopify(rain, 1.5)
+write_wav("rain_loop.wav", rain)
+
+# REG2：四类脚步——草地（软沙沙）/沙石（颗粒擦）/木板（木质叩击）/水面（蹚水花）。
+foot_grass = noise_burst(0.09, 0.035, 0.30, 0.22)
+write_wav("footstep_grass.wav", foot_grass)
+foot_sand = mix(noise_burst(0.10, 0.045, 0.26, 0.35), tone(0.06, 95.0, 0.03, 0.16))
+write_wav("footstep_sand.wav", foot_sand)
+foot_wood = mix(tone(0.07, 185.0, 0.025, 0.42), noise_burst(0.05, 0.02, 0.18, 0.30))
+write_wav("footstep_wood.wav", foot_wood)
+foot_water = mix(noise_burst(0.16, 0.06, 0.30, 0.55), sweep(0.12, 900.0, 350.0, 0.05, 0.10))
+write_wav("footstep_water.wav", foot_water)
+
+# REG3：弓——蓄力吱呀（低频弦张力上滑）+ 释放弦震 twang（低频衰减 + 高频瞬态）。
+bow_draw_s = sweep(0.55, 90.0, 210.0, 0.80, 0.20)
+write_wav("bow_draw.wav", bow_draw_s)
+bow_rel = mix(tone(0.22, 118.0, 0.045, 0.62), noise_burst(0.05, 0.012, 0.35, 0.5))
+bow_rel = mix(bow_rel, tone(0.10, 340.0, 0.02, 0.22))
+write_wav("bow_release.wav", bow_rel)
+
+# FX1：换弹——拔匣双击（金属咔哒×2）+ 完成上膛单击。
+rl = mix(tone(0.03, 1500.0, 0.008, 0.40, "square"), noise_burst(0.025, 0.008, 0.30, 0.4))
+rl = mix(rl, [0.0] * int(SR * 0.11) + mix(tone(0.04, 1150.0, 0.010, 0.45, "square"), noise_burst(0.03, 0.010, 0.32, 0.4)))
+write_wav("reload_start.wav", rl)
+rl_end = mix(tone(0.045, 1750.0, 0.010, 0.42, "square"), noise_burst(0.03, 0.008, 0.28, 0.5))
+write_wav("reload_end.wav", rl_end)
+
+# OPT-D3：心跳循环——lub-dub 双低频搏动，约 1.05s 一循环（运行时 LOOP_FORWARD）。
+hb = [0.0] * int(SR * 1.05)
+for j, x in enumerate(tone(0.11, 58.0, 0.045, 0.85)):
+    hb[j] += x
+for j, x in enumerate(tone(0.09, 52.0, 0.040, 0.62)):
+    off = int(SR * 0.30)
+    if off + j < len(hb):
+        hb[off + j] += x
+write_wav("heartbeat.wav", hb)
 
 print("done")

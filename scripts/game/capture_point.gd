@@ -16,6 +16,7 @@ var owner_body: CharacterBody3D = null
 var progress := 0.0
 
 var _progress_by: CharacterBody3D = null
+var _contest_t := 0.0 # // FIX: OPT-G2 争夺冻结计时，超 10s 进度倒退破站桩
 var _flag: MeshInstance3D
 var _ring: MeshInstance3D
 var _beam: MeshInstance3D
@@ -100,12 +101,17 @@ func _process(delta: float) -> void:
 	_t += delta
 	_flag.rotation.y = sin(_t * 2.0) * 0.25
 
+	# // FIX: OPT-G2/PG4 owner 死亡即转中立：据点不再"属于死人"（原实现保留死人旗色与归属）
+	if owner_body != null and (not is_instance_valid(owner_body) or not owner_body.alive):
+		_clear_owner()
+
 	var occupants: Array = []
 	for c in get_tree().get_nodes_in_group("combatant"):
 		if c.alive and global_position.distance_to(c.global_position) < RADIUS:
 			occupants.append(c)
 
 	if occupants.size() == 1:
+		_contest_t = 0.0
 		var c: CharacterBody3D = occupants[0]
 		if c != owner_body:
 			if _progress_by != c:
@@ -115,20 +121,38 @@ func _process(delta: float) -> void:
 			if progress >= 1.0:
 				_set_owner(c)
 	elif occupants.is_empty():
+		_contest_t = 0.0
 		progress = maxf(0.0, progress - delta * 0.15)
-	# 多人争夺 → 进度冻结
+	else:
+		# // FIX: OPT-G2 多人争夺冻结超过 10s 触发进度倒退 0.2/s，进攻方有破局手段
+		_contest_t += delta
+		if _contest_t > 10.0:
+			progress = maxf(0.0, progress - delta * 0.2)
 
 
 func _set_owner(c: CharacterBody3D) -> void:
 	owner_body = c
 	progress = 0.0
 	_progress_by = null
-	var col := COLOR_PLAYER if c is Player else COLOR_BOT
+	_contest_t = 0.0
+	_apply_owner_color(Color(0.70, 0.70, 0.72) if c == null else (COLOR_PLAYER if c is Player else COLOR_BOT))
+	owner_changed.emit(self, c)
+
+
+# // FIX: OPT-G2 归属清除：旗/圈/光柱回中立色并广播
+func _clear_owner() -> void:
+	owner_body = null
+	progress = 0.0
+	_progress_by = null
+	_apply_owner_color(COLOR_NEUTRAL)
+	owner_changed.emit(self, null)
+
+
+func _apply_owner_color(col: Color) -> void:
 	_flag_mat.albedo_color = col
 	_ring_mat.albedo_color = Color(col.r, col.g, col.b, 0.30)
 	_beam_mat.albedo_color = Color(col.r, col.g, col.b, 0.24)
 	_beam_mat.emission = col
-	owner_changed.emit(self, c)
 
 
 func contains(c: CharacterBody3D) -> bool:

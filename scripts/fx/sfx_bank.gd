@@ -20,7 +20,18 @@ const SOUNDS := {
 	"explosion": "res://assets/sfx/explosion.wav",
 	"freeze": "res://assets/sfx/freeze.wav",
 	"stasis": "res://assets/sfx/stasis.wav",
-	"shot_bow": "res://assets/sfx/hit.wav",
+	# // FIX: OPT-E1/REG3 弓射击音独立（原复用 hit.wav 命中确认音，"发射=命中"混淆）
+	"shot_bow": "res://assets/sfx/bow_release.wav",
+	"bow_draw": "res://assets/sfx/bow_draw.wav",
+	# // FIX: FX1 换弹双段音 / OPT-D3 心跳 / REG2 四类脚步 / REG1 独立雨声
+	"reload_start": "res://assets/sfx/reload_start.wav",
+	"reload_end": "res://assets/sfx/reload_end.wav",
+	"heartbeat": "res://assets/sfx/heartbeat.wav",
+	"footstep_grass": "res://assets/sfx/footstep_grass.wav",
+	"footstep_sand": "res://assets/sfx/footstep_sand.wav",
+	"footstep_wood": "res://assets/sfx/footstep_wood.wav",
+	"footstep_water": "res://assets/sfx/footstep_water.wav",
+	"rain_loop": "res://assets/sfx/rain_loop.wav",
 }
 
 var _streams := {}
@@ -28,6 +39,7 @@ var _pool_2d: Array[AudioStreamPlayer] = []
 var _pool_3d: Array[AudioStreamPlayer3D] = []
 var _idx_2d := 0
 var _idx_3d := 0
+var _print_budget := 40 # // FIX: FX18/E2 日志限量：默认只打前 40 条，--verbose-sfx 恢复全量
 var _music_player: AudioStreamPlayer
 var _ambience_player: AudioStreamPlayer
 var _boss_player: AudioStreamPlayer
@@ -64,33 +76,63 @@ func _ready() -> void:
 		p.unit_size = 18.0
 		add_child(p)
 		_pool_3d.append(p)
+	# // FIX: OPT-E1/REG5 Master 挂 Limiter（ceiling -1dB）：多声叠加不再爆音削顶
+	var master := AudioServer.get_bus_index("Master")
+	if master >= 0 and AudioServer.get_bus_effect_count(master) == 0:
+		var limiter := AudioEffectLimiter.new()
+		limiter.ceiling_db = -1.0
+		AudioServer.add_bus_effect(master, limiter)
+
+
+# // FIX: FX13/E2 池分配优先空闲节点：SMG 连发不再吃掉 UI/命中确认音；全占用回退轮询
+func _pick_2d() -> AudioStreamPlayer:
+	for p in _pool_2d:
+		if not p.playing:
+			return p
+	var p := _pool_2d[_idx_2d]
+	_idx_2d = (_idx_2d + 1) % _pool_2d.size()
+	return p
+
+
+func _pick_3d() -> AudioStreamPlayer3D:
+	for p in _pool_3d:
+		if not p.playing:
+			return p
+	var p := _pool_3d[_idx_3d]
+	_idx_3d = (_idx_3d + 1) % _pool_3d.size()
+	return p
+
+
+func _log(msg: String) -> void:
+	if OS.get_cmdline_user_args().has("--verbose-sfx") or _print_budget > 0:
+		if not OS.get_cmdline_user_args().has("--verbose-sfx"):
+			_print_budget -= 1
+		print(msg)
 
 
 func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if not _streams.has(name):
 		return
-	var p := _pool_2d[_idx_2d]
-	_idx_2d = (_idx_2d + 1) % _pool_2d.size()
+	var p := _pick_2d()
 	p.bus = _bus_for(name)
 	p.stream = _streams[name]
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.96, 1.04)
 	p.play()
-	print("[sfx] play %s bus=%s vol=%.1f" % [name, p.bus, volume_db])
+	_log("[sfx] play %s bus=%s vol=%.1f" % [name, p.bus, volume_db])
 
 
 func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if not _streams.has(name):
 		return
-	var p := _pool_3d[_idx_3d]
-	_idx_3d = (_idx_3d + 1) % _pool_3d.size()
+	var p := _pick_3d()
 	p.bus = _bus_for(name)
 	p.global_position = pos
 	p.stream = _streams[name]
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.94, 1.06)
 	p.play()
-	print("[sfx] play_at %s bus=%s pos=%s" % [name, p.bus, str(pos)])
+	_log("[sfx] play_at %s bus=%s pos=%s" % [name, p.bus, str(pos)])
 
 
 ## 循环背景音乐 + 环境音（风/海浪/鸟鸣）

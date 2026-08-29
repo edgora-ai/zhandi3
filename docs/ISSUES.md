@@ -4,6 +4,44 @@
 > 已修复 29 项（见 § 已验证修复），剩余按 S→M 逐项 headless 验证推送。
 > 7 视角落盘：Game Design 5.1 / Visual 5.9 / Tech 5.3 / Audio 4.7 / Systems 4.6 / QA 4.5 / Commercial 3.4，加权 ~4.7–4.8。
 > Game@gpt-5.6-sol 11 项（2 critical）与 QA 已入本清单；2026-08-28 六路并行复审（战斗/世界/性能/UX/架构/健壮性）新增项已并入 § 本轮多角色增量 5。
+> **2026-08-29 OPT 修复轮**：据 `docs/REVIEW_20260829.md`（玩家×策划 75 条评审）与 `docs/OPTIMIZATION_PLAN.md`（52 任务）完成 P0 批次 + 部分 P1，见 § OPT 修复轮已验证。
+
+## OPT 修复轮已验证（2026-08-29，headless 全绿 + 零 SCRIPT ERROR）
+
+| OPT | 内容 | 证据 |
+|-----|------|------|
+| A1 | Bot 捡甲/捡药（45m 需求意图） | `--sim --seed 7` KPI：`bot_armor_avg` 50–100%（验收 ≥40%） |
+| A2 | Bot 拾取失败 12s 冷却（原注释占位、`_loot_failed_pos` 只写不读已删） | `bot.gd _find_nearest_loot/_loot_failed_at` |
+| A3 | Bot 公平四连：受击 0.5s 警觉不瞬锁、无 LoS 不锁定、背后感知 8→3m、丢视 >0.3s/烟雾即停火、交战查圈 | `--sim` 全场零 ERROR；KPI `vv_ratio` 0.41–0.58 |
+| A4 | 索敌高度自适应（趴姿不再隐形） | `bot.gd _target_sample_height()` |
+| A5 | Bot 命中飘字（爆头变红）+ 受击白闪 | `bot.gd take_damage` |
+| A6/REG6 | Bot 连发停顿 ÷skill（原 ×skill 难度倒挂） | `bot.gd _fight_fire` |
+| B1 | 时停 15s CD；Boss(≥150hp) 仅 1.5s；冻结期伤害减半 | `player.gd _toggle_stasis` + `weapon.gd` |
+| B2 | 弹反统一：投射物仅 0.18s 完美窗口反弹；普通举盾 0.25 倍+10 精力；弹反后可命中施法者 | `wild_projectile.gd` 碰撞段 |
+| B3 | 完美格挡仅抬盾边沿判定，收盾/落空 0.5s 冷却 | `player.gd` 输入边沿 + `_block_retry_ok` |
+| B4 | 疾疾内部 CD ≥3s，近战倍率 2.0→1.5 | `player.gd _start_flurry` |
+| B5 | 战场图精灵归零；复活后 1.5s 无敌帧 | `main.gd _spawn_player` + `player.gd` |
+| B6/R5 | 投射物阵营 mask 1\|2\|4（野怪火力可打 bot）+ 部位判定/箭爆头 ×1.5 | `wild_projectile.gd` |
+| C1 | hitscan 距离衰减（SMG 60→130m 至 0.40、rifle 120→220 至 0.75、DMR 250→350 至 0.85） | `weapon.gd WEAPONS falloff_*`；firetest 通过 |
+| C2 | 视角系圆锥扩散 + 连射 bloom（+0.15°/发，上限 1.2°） | `weapon.gd _fire_ray` |
+| C4 | 近战锁定 4.2→2.9m；近战/箭同乘 `damage_mult` | `player.gd _find_melee_target/_apply_melee_hit/_fire_arrow` |
+| C5 | 弓射速闸 0.35s + 最低蓄力 0.25；满抽 45 | `player.gd _fire_arrow` |
+| D2 | 枪口焰十字火舌面片（玩家+bot，共享静态资源） | `fx.gd muzzle_flash` |
+| D3 | 受击方向弧形指示 + 濒死红晕/心跳/SFX 低通 600Hz | `hud.gd show_damage_direction/set_low_hp` |
+| D6 | 曳光差异化（DMR 0.05 亮金） | `weapon.gd _fire_ray` |
+| D7 | VIS1 武器名事件驱动；VIS2 手臂缩移；VIS3 剑 ×0.72；TA8 ADS 反缩放；FX1 换弹动画+双段音 | 截图比对 /tmp/r_fp3.png、/tmp/r_sword2.png；`weapon_changed` 信号 |
+| E1a/REG1 | 雨声独立 `rain_loop`（原海滩鸟鸣） | `weather.gd` + `gen_sfx.py` |
+| E1b/REG2 | 玩家脚步 4 类材质映射；游泳改水声；bot 3D 脚步 | `player.gd _surface_footstep` + `bot.gd` |
+| E1c/REG3 | 弓射击/蓄力独立音（原=hit.wav） | `sfx_bank.gd SOUNDS` |
+| E1d/REG5 | 逐轨归一化 ≤0.89 + Master Limiter(-1dB) | `gen_sfx.py normalize` + `sfx_bank._ready` |
+| E2 | 音池优先空闲分配；日志限量（--verbose-sfx 全量） | `sfx_bank.gd _pick_*/_log` |
+| F2/TA3 | unshaded 草/树冠/水面接 `day_light`，夜晚 ≤ 白天 30% | 截图 /tmp/r_night.png（夜景明显压暗） |
+| F4/TA5 | 太阳方位角-仰角参数化，正午阴影不再翻转 180° | `day_night.gd _apply` |
+| G1/G5/R24 | 毒圈 ≈220s、第 3 阶段起 ≥8.6m/s、决赛圈 14m、DPS 2→4→8→16→32 | `--sim`：`zone_r=14 phase=5` 全场打完 |
+| G2/R23 | 据点 buff 仅圈内生效+多占递增；owner 死即中立播报；冻结 >10s 进度倒退 | `main.gd _recompute_buffs` + `capture_point.gd` |
+| — | sim KPI 探针 `bot_armor_avg/vv_ratio/zone_death_ratio`（回归断言依据） | `main.gd _process` |
+
+> 未完成（下一批）：C3/C6、D4/D5、E3–E5、F1/F3/F5–F9、G3–G7、H1–H6，见 `docs/OPTIMIZATION_PLAN.md` 总表。
 
 ## 验收总则（所有项通用门禁）
 

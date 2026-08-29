@@ -1,6 +1,10 @@
 class_name FX
 ## 轻量战斗特效：弹道曳光、命中烟尘、血液喷溅（全部为临时节点，自动回收）
 
+# // FIX: D2/FX11 共享静态资源：枪口焰/曳光网格与材质全局复用，运行时零 new Mesh/Material
+static var _flash_mesh: QuadMesh
+static var _flash_mat: StandardMaterial3D
+
 static func _scene() -> Node:
 	return (Engine.get_main_loop() as SceneTree).current_scene
 
@@ -12,12 +16,37 @@ static func _unshaded(color: Color) -> StandardMaterial3D:
 	return m
 
 
-static func tracer(from: Vector3, to: Vector3, color: Color = Color(1.0, 0.88, 0.45)) -> void:
+# 枪口焰：十字火舌面片（billboard）+ 随机滚转，0.05s 消失；玩家与 bot 共用。
+static func muzzle_flash(pos: Vector3, size: float = 0.22) -> void:
+	if _flash_mesh == null:
+		_flash_mesh = QuadMesh.new()
+		_flash_mesh.size = Vector2(1.0, 1.0)
+		_flash_mat = StandardMaterial3D.new()
+		_flash_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_flash_mat.albedo_color = Color(1.0, 0.82, 0.45, 0.95)
+		_flash_mat.emission_enabled = true
+		_flash_mat.emission = Color(1.0, 0.72, 0.30)
+		_flash_mat.emission_energy_multiplier = 2.0
+		_flash_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	var mi := MeshInstance3D.new()
+	mi.mesh = _flash_mesh
+	mi.material_override = _flash_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_scene().add_child(mi)
+	mi.global_position = pos
+	mi.scale = Vector3.ONE * size * randf_range(0.85, 1.2)
+	var tw := mi.create_tween()
+	tw.tween_property(mi, "scale", mi.scale * 0.3, 0.05)
+	tw.tween_callback(mi.queue_free)
+
+
+static func tracer(from: Vector3, to: Vector3, color: Color = Color(1.0, 0.88, 0.45), width: float = 0.025) -> void:
 	var dist := from.distance_to(to)
 	if dist < 1.0:
 		return
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.025, 0.025, dist)
+	mesh.size = Vector3(width, width, dist)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = _unshaded(color)

@@ -1,6 +1,9 @@
 shader_type spatial;
 render_mode cull_disabled, unshaded;
 
+// FIX: OPT-F2/TA3 全局日光系数：水面不再夜间发光
+global uniform float day_light;
+
 // 深度渐变水色 + 岸线泡沫环 + 波光 + 顶点波浪（参考 Elemental-Serenity 的水体思路）
 uniform sampler2D u_height_map;
 uniform float u_water_level = 2.0;
@@ -95,6 +98,6 @@ void fragment() {
 	col = mix(col, ice_col, ice_mask * 0.88);
 	alpha = max(alpha, ice_mask * 0.97);
 
-	ALBEDO = col;
+	ALBEDO = col * day_light;
 	ALPHA = alpha;
 }

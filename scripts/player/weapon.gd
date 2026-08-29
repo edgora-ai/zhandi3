@@ -6,22 +6,26 @@ signal ammo_changed(mag: int, reserve: int)
 signal fired
 signal reload_started
 signal hit_landed
+signal weapon_changed(id: String) # // FIX: VIS1 武器名事件驱动：--screenshot 等每帧早退场景也能同步标签
 
 const WEAPONS := {
 	"rifle": {
 		"label": "突击步枪", "damage": 12.0, "head_mult": 2.0, "rpm": 540.0,
 		"mag": 30, "start_reserve": 90, "spread": 1.3, "ads_spread": 0.45,
 		"reload": 1.8, "auto": true, "zoom": 1.3, "range": 220.0, "recoil": 0.35,
+		"falloff_start": 120.0, "falloff_end": 220.0, "falloff_min": 0.75, # // FIX: OPT-C1 距离衰减
 	},
 	"dmr": {
 		"label": "射手步枪", "damage": 34.0, "head_mult": 2.2, "rpm": 150.0,
 		"mag": 12, "start_reserve": 36, "spread": 0.8, "ads_spread": 0.12,
 		"reload": 2.1, "auto": false, "zoom": 2.4, "range": 350.0, "recoil": 1.2,
+		"falloff_start": 250.0, "falloff_end": 350.0, "falloff_min": 0.85, # // FIX: OPT-C1
 	},
 	"smg": {
 		"label": "冲锋枪", "damage": 9.0, "head_mult": 1.8, "rpm": 800.0,
 		"mag": 36, "start_reserve": 108, "spread": 2.0, "ads_spread": 1.0,
 		"reload": 1.5, "auto": true, "zoom": 1.15, "range": 130.0, "recoil": 0.2,
+		"falloff_start": 60.0, "falloff_end": 130.0, "falloff_min": 0.40, # // FIX: OPT-C1 近战段武器远距惩罚
 	},
 	"bow": {
 		"label": "猎弓", "damage": 0.0, "head_mult": 1.0, "rpm": 60.0,
@@ -51,6 +55,7 @@ var _cool := 0.0
 var _reload_left := 0.0
 var _kick := 0.0
 var _bob_t := 0.0
+var _bloom := 0.0 # // FIX: OPT-C2 连射 bloom（度），每发 +0.15 上限 1.2，停火回落
 
 
 func setup(p_owner: CharacterBody3D, p_is_player: bool) -> void:
@@ -80,6 +85,7 @@ func set_weapon(id: String, p_mag: int = -1, p_reserve: int = -1) -> void:
 	if is_player and id != "bow":
 		_build_viewmodel()
 	ammo_changed.emit(mag_left, reserve)
+	weapon_changed.emit(id)
 
 
 func label() -> String:
@@ -101,6 +107,11 @@ func start_reload() -> void:
 		return
 	reloading = true
 	_reload_left = data.reload
+	# // FIX: FX1 换弹开始音（拔匣），与 reload 时长对齐由 _process 完成音收尾
+	if is_player:
+		var sfx := owner_body.get_tree().get_first_node_in_group("sfx_bank")
+		if sfx:
+			sfx.play("reload_start", -6.0)
 	reload_started.emit()
 
 
@@ -130,9 +141,13 @@ func _try_fire() -> void:
 		return
 	_cool = 60.0 / data.rpm
 	mag_left -= 1
+	# // FIX: OPT-C2 bloom 累积（机瞄减半），停火在 _process 回落
+	_bloom = minf(_bloom + 0.15, 1.2)
 	_fire_ray()
 	last_shot_msec = Time.get_ticks_msec()
 	_kick = 0.06
+	# // FIX: D2/FX3 玩家与 bot 统一枪口焰火舌面片（共享资源，bot 中距可读）
+	FX.muzzle_flash(muzzle_world())
 	if is_player:
 		owner_body.add_recoil(data.recoil * (0.6 if is_ads else 1.0))
 		if _flash:
@@ -151,8 +166,12 @@ func _fire_ray() -> void:
 	else:
 		origin = owner_body.get_aim_origin()
 		dir = owner_body.get_aim_dir()
-	var s := deg_to_rad(current_spread())
-	dir = (dir + Vector3(randf_range(-s, s), randf_range(-s, s), randf_range(-s, s))).normalized()
+	# // FIX: OPT-C2 视角系圆锥采样（原世界轴加噪在俯射/沿轴瞄准时散布塌缩）
+	var s := deg_to_rad(current_spread() + _bloom * (0.5 if is_ads else 1.0))
+	var up_ref := Vector3.UP if absf(dir.dot(Vector3.UP)) < 0.95 else Vector3.FORWARD
+	var right := dir.cross(up_ref).normalized()
+	var upv := right.cross(dir).normalized()
+	dir = (dir + right * randf_range(-s, s) + upv * randf_range(-s, s)).normalized()
 
 	var mask := 1 | 4 if is_player else 1 | 2 | 4
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + dir * data.range, mask, [owner_body.get_rid()])
@@ -171,6 +190,16 @@ func _fire_ray() -> void:
 			var dmg: float = data.damage * owner_body.damage_mult
 			if part == "head":
 				dmg *= data.head_mult
+			# // FIX: OPT-C1 距离衰减（falloff_start→end 线性至 falloff_min）
+			var fs: float = data.get("falloff_start", 0.0)
+			var fe: float = data.get("falloff_end", 0.0)
+			if fs > 0.0 and fe > fs:
+				var hit_dist := origin.distance_to(end_point)
+				dmg *= lerpf(1.0, data.get("falloff_min", 1.0), clampf((hit_dist - fs) / (fe - fs), 0.0, 1.0))
+			# // FIX: OPT-B1 时停目标伤害减免 50%，防冻结期白打
+			var st: Variant = owner_body.get("_stasis_target")
+			if st != null and col == st:
+				dmg *= 0.5
 			col.take_damage(dmg, owner_body, part)
 			if col.has_method("is_plant"):
 				FX.impact(end_point)
@@ -180,7 +209,11 @@ func _fire_ray() -> void:
 				hit_landed.emit()
 		else:
 			FX.impact(end_point)
-	FX.tracer(muzzle_world(), end_point)
+	# // FIX: D6/FX9 曳光差异化：DMR 更宽更亮，其余默认
+	if weapon_id == "dmr":
+		FX.tracer(muzzle_world(), end_point, Color(1.0, 0.96, 0.62), 0.05)
+	else:
+		FX.tracer(muzzle_world(), end_point, Color(1.0, 0.88, 0.45), 0.025)
 
 
 func muzzle_world() -> Vector3:
@@ -191,6 +224,8 @@ func muzzle_world() -> Vector3:
 
 func _process(delta: float) -> void:
 	_cool = maxf(0.0, _cool - delta)
+	# // FIX: OPT-C2 bloom 停火回落（约 0.3s 归零）
+	_bloom = maxf(0.0, _bloom - delta * 4.0)
 	if reloading:
 		_reload_left -= delta
 		if _reload_left <= 0.0:
@@ -199,6 +234,11 @@ func _process(delta: float) -> void:
 			var take: int = mini(need, reserve)
 			mag_left += take
 			reserve -= take
+			# // FIX: FX1 换弹完成音（上膛 click）
+			if is_player:
+				var sfx := owner_body.get_tree().get_first_node_in_group("sfx_bank")
+				if sfx:
+					sfx.play("reload_end", -6.0)
 			ammo_changed.emit(mag_left, reserve)
 	if _flash and _flash.light_energy > 0.0:
 		_flash.light_energy = maxf(0.0, _flash.light_energy - delta * 24.0)
@@ -208,10 +248,18 @@ func _process(delta: float) -> void:
 	var cam: Camera3D = owner_body.camera
 	var target_fov: float = BASE_FOV / (data.get("zoom", 1.0) if is_ads else 1.0)
 	cam.fov = lerpf(cam.fov, target_fov, delta * 12.0)
+	# // FIX: TA8/D7 视模型 ADS 反缩放：cam.fov 除以 zoom 会让枪模同比放大，按 1/zoom 缩小补偿
+	var ads_comp: float = 1.0 / (data.get("zoom", 1.0) if is_ads else 1.0)
+	viewmodel.scale = viewmodel.scale.lerp(Vector3.ONE * ads_comp, delta * 12.0)
 	var target_pos := Vector3(0.0, -0.155, -0.35) if is_ads else Vector3(0.27, -0.23, -0.5)
 	# 后座回弹
 	_kick = maxf(0.0, _kick - delta * 0.5)
 	target_pos.z += _kick
+	# // FIX: FX1 换弹视模型动画：枪体下沉 15° 再回位
+	if reloading:
+		viewmodel.rotation.x = lerpf(viewmodel.rotation.x, -0.26, delta * 10.0)
+	else:
+		viewmodel.rotation.x = lerpf(viewmodel.rotation.x, 0.0, delta * 10.0)
 	# 移动摆动
 	var h_speed := Vector3(owner_body.velocity.x, 0, owner_body.velocity.z).length()
 	if owner_body.is_on_floor() and h_speed > 0.5 and not is_ads:
@@ -292,6 +340,7 @@ func _build_viewmodel() -> void:
 	muzzle.add_child(_flash)
 
 	# 程序化手部：右手握把、左手托护木，袖口按武器配色
+	# // FIX: VIS2/D7 手臂胶囊缩小下移：默认视角不再有巨大胶囊体伸入画面底部
 	var skin := Toon.make_material(Color(0.87, 0.70, 0.55), true, 0.003)
 	var sleeve := Toon.make_material(accent_color.darkened(0.15), true, 0.003)
 	var hand_r := MeshInstance3D.new()
@@ -307,13 +356,13 @@ func _build_viewmodel() -> void:
 	gun.add_child(hand_r)
 	var arm_r := MeshInstance3D.new()
 	var ar := CapsuleMesh.new()
-	ar.radius = 0.038
-	ar.height = 0.30
+	ar.radius = 0.030
+	ar.height = 0.24
 	ar.radial_segments = 6
 	arm_r.mesh = ar
 	arm_r.material_override = sleeve
 	arm_r.rotation_degrees = Vector3(-38.0, 0.0, -12.0)
-	arm_r.position = Vector3(0.06, -0.24, 0.26)
+	arm_r.position = Vector3(0.06, -0.28, 0.30)
 	gun.add_child(arm_r)
 	var hand_l := MeshInstance3D.new()
 	var hl := SphereMesh.new()
@@ -328,11 +377,11 @@ func _build_viewmodel() -> void:
 	gun.add_child(hand_l)
 	var arm_l := MeshInstance3D.new()
 	var al := CapsuleMesh.new()
-	al.radius = 0.038
-	al.height = 0.30
+	al.radius = 0.030
+	al.height = 0.24
 	al.radial_segments = 6
 	arm_l.mesh = al
 	arm_l.material_override = sleeve
 	arm_l.rotation_degrees = Vector3(-52.0, 22.0, 14.0)
-	arm_l.position = Vector3(-0.12, -0.21, -0.02)
+	arm_l.position = Vector3(-0.13, -0.25, 0.02)
 	gun.add_child(arm_l)

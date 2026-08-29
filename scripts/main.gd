@@ -23,6 +23,9 @@ var sfx: SfxBank
 var capture_points: Array[CapturePoint] = []
 
 var match_over := false
+var _sim_bot_deaths := 0 # // FIX: OPT-A1/A2 sim KPI 计数
+var _sim_vv_kills := 0
+var _sim_zone_deaths := 0
 var total_combatants := BOT_COUNT + 1
 var _buff_acc := 0.0
 
@@ -491,13 +494,19 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	add_child(hud)
 	player.hud = hud
 	player.health_changed.connect(hud.set_health)
+	player.health_changed.connect(func(hp_v: float, _armor: float) -> void: hud.set_low_hp(hp_v <= player.max_hp * 0.3)) # // FIX: OPT-D3 濒死反馈
 	player.damaged.connect(func(_a: float) -> void: hud.flash_damage())
 	player.weapon.ammo_changed.connect(hud.set_ammo)
 	player.weapon.fired.connect(func() -> void: sfx.play("shot_" + player.weapon.weapon_id, -2.0))
 	player.weapon.hit_landed.connect(func() -> void: sfx.play("hit", -8.0))
+	# // FIX: VIS1 武器名随武器切换事件驱动更新（截图模式 _process 早退时也正确）
+	player.weapon.weapon_changed.connect(func(_id: String) -> void: hud.set_weapon_name(player.weapon.label()))
 	player.grenade_thrown.connect(func(left: int) -> void: hud.add_feed("掷出烟雾弹（剩 %d）" % left))
 	hud.set_health(player.hp, player.armor)
-	hud.set_weapon_name("波克剑")
+	# // FIX: OPT-B5/PG6 战场图无精灵拾取点，归零隐藏复活币保持吃鸡"一次死亡=出局"；旷野保留
+	if _map_id != "wild":
+		player.fairies = 0
+	hud.set_weapon_name(player.weapon.label())
 	hud.set_ammo_text("--")
 	hud.set_alive(total_combatants)
 	hud.set_kills(0)
@@ -619,6 +628,13 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 	hud.add_feed("%s 淘汰了 %s" % [killer_name, victim_name])
 	hud.set_alive(_alive_count())
 	hud.set_kills(player.kills)
+	# // FIX: OPT-A1/A2 验收探针：bot 互杀占比 / 毒圈致死计数（--sim KPI 输出用）
+	if victim is Bot:
+		_sim_bot_deaths += 1
+		if killer is Bot:
+			_sim_vv_kills += 1
+		elif killer == null:
+			_sim_zone_deaths += 1
 
 	if victim == player:
 		if _map_id == "wild":
@@ -680,6 +696,10 @@ func _respawn_wild_player() -> void:
 
 
 func _on_capture_changed(point: CapturePoint, new_owner: Variant) -> void:
+	# // FIX: OPT-G2 归属转中立（new_owner==null）时播报"无人驻守"，不播占领音
+	if new_owner == null:
+		hud.add_feed("据点 %s 无人驻守，回归中立" % point.point_name)
+		return
 	var n: String = "你" if new_owner == player else new_owner.display_name
 	hud.add_feed("%s 占领了据点 %s" % [n, point.point_name])
 	if new_owner == player:
@@ -872,14 +892,14 @@ func _recompute_buffs() -> void:
 			var skewer_value: Variant = c.get("skewer_mult")
 			var charm_value: Variant = c.get("charm_mult")
 			var base := (float(skewer_value) if skewer_value != null else 1.0) * (float(charm_value) if charm_value != null else 1.0)
-			var has_point := false
+			# // FIX: OPT-G2/R23/PG4 据点 buff 改为"身处圈内才生效"，且多据点线性递增 1.1/1.2（非指数，
+			# 上限 2.0 钳制保持 H2 口径）；不再一次占领全图整局白嫖
+			var point_count := 0
 			for cp in capture_points:
-				if cp.owner_body == c and c.alive:
-					has_point = true
-					break
-			# // FIX: H2 回归断言—据点固定1.1倍非指数(每0.5s重算非累乘) 上限2.0 minf钳制 非*=累乘 回归验证:持续占有≠指数叠加
-			c.damage_mult = minf(2.0, base * (1.1 if has_point else 1.0)) # // FIX: H2 已为加法固定倍率+上限，非累乘
-			c.regen_rate = 3.0 if has_point else 0.0
+				if cp.owner_body == c and c.alive and cp.contains(c):
+					point_count += 1
+			c.damage_mult = minf(2.0, base * (1.0 + 0.1 * point_count))
+			c.regen_rate = 3.0 if point_count > 0 else 0.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1103,6 +1123,21 @@ func _process(delta: float) -> void:
 		if _sim_acc >= 10.0:
 			_sim_acc = 0.0
 			print("[sim] frame=%d map=%s alive=%d zone_r=%d phase=%d match_over=%s nodes=%d objs=%d res=%d mem=%dMB" % [Engine.get_process_frames(), _map_id, _alive_count(), int(zone.radius), zone.phase, str(match_over), Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
+			# // FIX: OPT-A1/A2 bot 资源行为 KPI：带甲率/互杀占比/毒圈致死（回归断言依据）
+			if _map_id == "battlefield":
+				var armored := 0
+				var bots_n := 0
+				for c in get_tree().get_nodes_in_group("combatant"):
+					if c is Bot and c.alive:
+						bots_n += 1
+						if c.armor > 0.0:
+							armored += 1
+				if bots_n > 0:
+					print("[sim][kpi] bot_armor_avg=%d%% vv_ratio=%.2f zone_death_ratio=%.2f bot_deaths=%d" % [
+						int(100.0 * float(armored) / float(bots_n)),
+						float(_sim_vv_kills) / maxf(1.0, float(_sim_bot_deaths)),
+						float(_sim_zone_deaths) / maxf(1.0, float(_sim_bot_deaths)),
+						_sim_bot_deaths])
 
 	if not player.alive:
 		return

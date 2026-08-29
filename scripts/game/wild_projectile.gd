@@ -20,7 +20,8 @@ func configure(p_kind: String, p_velocity: Vector3, p_damage: float, p_source: N
 func _ready() -> void:
 	add_to_group("wild_projectile")
 	collision_layer = 0
-	collision_mask = (1 | 4) if kind == "arrow" else (1 | 2)
+	# // FIX: OPT-B6/R5 阵营 mask：玩家箭命中 bot/怪物层；野怪投射物也命中 bot（PvE 不再只打玩家）
+	collision_mask = (1 | 2 | 4) if kind == "arrow" else (1 | 2 | 4)
 	var col := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
 	shape.radius = 0.22 if kind == "rock" else 0.30
@@ -93,29 +94,50 @@ func _physics_process(delta: float) -> void:
 	var collision := move_and_collide(velocity * delta)
 	if collision:
 		var collider: Object = collision.get_collider()
-		# 弹反：举盾且面向投射物时，石头被原路弹回（原创旷野卡通弹反）。
-		if collider is Player and collider.blocking:
+		# // FIX: OPT-B2/CB2 弹反规则统一：完美窗口（0.18s）内才原路弹回；
+		# 普通举盾按 0.25 倍扣血 + 10 精力，不再无限免费反弹
+		if collider is Player and (collider as Player).blocking:
 			var facing: Vector3 = -(collider as Player).global_transform.basis.z
 			if facing.dot(velocity.normalized()) < -0.3:
-				var back_dir := Vector3.ZERO
-				if source and is_instance_valid(source) and source is Node3D:
-					back_dir = ((source as Node3D).global_position + Vector3(0, 1.2, 0) - global_position).normalized()
-				else:
-					back_dir = -velocity.normalized()
-				velocity = back_dir * maxf(18.0, velocity.length() * 1.4)
-				lifetime = maxf(lifetime, 3.0)
-				collision_mask = 1 | 4
-				source = collider
-				lifetime = 3.0
-				collider.parry_count += 1
-				if collider.hud:
-					collider.hud.add_feed("弹反！")
+				var now_s := Time.get_ticks_msec() / 1000.0
+				if now_s - (collider as Player)._block_start < 0.18:
+					var back_dir := Vector3.ZERO
+					if source and is_instance_valid(source) and source is Node3D:
+						back_dir = ((source as Node3D).global_position + Vector3(0, 1.2, 0) - global_position).normalized()
+					else:
+						back_dir = -velocity.normalized()
+					velocity = back_dir * maxf(18.0, velocity.length() * 1.4)
+					lifetime = 3.0
+					# // FIX: OPT-B2/R30 弹反后可命中任意阵营（含施法者），source 换成玩家防自伤
+					collision_mask = 1 | 2 | 4
+					source = collider
+					collider.parry_count += 1
+					if collider.hud:
+						collider.hud.add_feed("弹反！")
+					return
+				# 普通格挡：减伤结算后投射物消耗
+				(collider as Player)._drain_stamina(10.0)
+				(collider as Player).take_damage(damage * 0.25, source if source and is_instance_valid(source) else null, "body")
+				FX.parry_flash(global_position)
+				queue_free()
 				return
 		if OS.get_cmdline_user_args().has("--wildtest"):
 			print("[wildtest] projectile collision kind=%s collider=%s pos=%s" % [kind, str(collider), str(global_position)])
 		var valid_source: Node = source if source and is_instance_valid(source) else null
 		if collider and collider != valid_source and collider.has_method("take_damage"):
-			collider.take_damage(damage, valid_source)
+			# // FIX: OPT-B6 部位判定：按被击中形状求部位，箭爆头 ×1.5（可触发西诺克斯独眼）
+			var part := "body"
+			if collider.has_method("get_hit_part"):
+				part = collider.get_hit_part(collision.get_collider_shape())
+			var final_dmg := damage
+			if kind == "arrow" and part == "head":
+				final_dmg *= 1.5
+			collider.take_damage(final_dmg, valid_source, part)
+			# // FIX: OPT-C5 弓命中反馈：接 hit_landed（播 hit 音）
+			if valid_source is Player:
+				var w: Variant = valid_source.get("weapon")
+				if w != null and w.has_signal("hit_landed"):
+					w.hit_landed.emit()
 		FX.impact(global_position, Color(1.0, 0.25, 0.05) if kind == "fire" else Color(0.25, 0.88, 1.0) if kind == "energy" else Color(0.62, 0.52, 0.38))
 		queue_free()
 	rotate_x(delta * 7.0)

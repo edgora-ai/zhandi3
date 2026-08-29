@@ -44,8 +44,8 @@ func setup(p_terrain: Terrain, p_player: Player, env: Environment) -> void:
 	_rng.seed = 4477
 	_state_t = _rng.randf_range(0.0, 40.0)
 	_build_rain()
-	# M9 雨雪环境声：复用 ambience/volcano 循环，随强度淡入
-	var rs: AudioStreamWAV = load("res://assets/sfx/ambience.wav")
+	# // FIX: OPT-E1/REG1/M9 雨声独立 rain_loop（原复用含鸟鸣的海滩 ambience.wav，且与全局环境音同源双开）
+	var rs: AudioStreamWAV = load("res://assets/sfx/rain_loop.wav")
 	rs.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	rs.loop_end = int(rs.get_length() * rs.mix_rate)
 	_rain_player = AudioStreamPlayer.new()

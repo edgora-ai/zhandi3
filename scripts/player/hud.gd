@@ -420,9 +420,10 @@ func _build_vignette() -> void:
 
 
 var _danger_on := false
+var _low_hp_on := false # // FIX: OPT-D3 濒死状态（hp≤30%）持续红晕+心跳+低通
 
 func flash_damage() -> void:
-	if _danger_on:
+	if _danger_on or _low_hp_on:
 		_vignette.modulate.a = 1.0
 		var tw2 := _vignette.create_tween()
 		tw2.tween_property(_vignette, "modulate:a", 0.25, 0.6)
@@ -434,12 +435,96 @@ func flash_damage() -> void:
 
 func set_danger(on: bool) -> void:
 	_danger_on = on
-	if on:
+	_update_danger_overlay()
+
+
+# // FIX: OPT-D3 濒死反馈开关：与毒圈红晕共用叠加层，双条件任一即红
+func set_low_hp(on: bool) -> void:
+	if _low_hp_on == on:
+		return
+	_low_hp_on = on
+	_update_danger_overlay()
+	_update_heartbeat(on)
+
+
+func _update_danger_overlay() -> void:
+	if _danger_on or _low_hp_on:
 		if _vignette.modulate.a < 0.25:
 			_vignette.modulate.a = 0.25
 	else:
 		var tw := _vignette.create_tween()
 		tw.tween_property(_vignette, "modulate:a", 0.0, 0.3)
+
+
+var _heartbeat: AudioStreamPlayer
+var _lowpass_idx := -1
+
+func _update_heartbeat(on: bool) -> void:
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	if on:
+		if _heartbeat == null:
+			_heartbeat = AudioStreamPlayer.new()
+			var stream := load("res://assets/sfx/heartbeat.wav") as AudioStreamWAV
+			if stream:
+				stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+				stream.loop_begin = 0
+				stream.loop_end = stream.data.size() / 2 # 16-bit 单声道帧数
+			_heartbeat.stream = stream
+			_heartbeat.bus = "SFX"
+			_heartbeat.volume_db = -8.0
+			add_child(_heartbeat)
+		if _heartbeat.stream:
+			_heartbeat.play()
+		# // FIX: OPT-D3 濒死低通 ≤600Hz 压低环境，压迫感
+		if sfx_bus >= 0 and _lowpass_idx == -1:
+			var fx := AudioEffectLowPassFilter.new()
+			fx.cutoff_hz = 600.0
+			_lowpass_idx = AudioServer.get_bus_effect_count(sfx_bus)
+			AudioServer.add_bus_effect(sfx_bus, fx)
+	else:
+		if _heartbeat:
+			_heartbeat.stop()
+		if sfx_bus >= 0 and _lowpass_idx >= 0:
+			AudioServer.remove_bus_effect(sfx_bus, _lowpass_idx)
+			_lowpass_idx = -1
+
+
+# ---------- 受击方向指示 ----------
+# // FIX: OPT-D3/FX6 受击方向弧形指示：屏幕上方=玩家前方，弧段指向攻击者方位 ≥0.6s
+
+var _dmg_arc: Control
+var _dmg_dir_angle := 0.0
+var _dmg_dir_t := 0.0
+
+func show_damage_direction(angle: float) -> void:
+	if _dmg_arc == null:
+		_dmg_arc = Control.new()
+		_dmg_arc.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_dmg_arc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_dmg_arc.draw.connect(_draw_dmg_arc)
+		_ui.add_child(_dmg_arc)
+	_dmg_dir_angle = angle
+	_dmg_dir_t = 0.8
+	_dmg_arc.queue_redraw()
+
+
+func _draw_dmg_arc() -> void:
+	if _dmg_arc == null or _dmg_dir_t <= 0.0:
+		return
+	var c := _dmg_arc.size * 0.5
+	var r := minf(_dmg_arc.size.x, _dmg_arc.size.y) * 0.30
+	var alpha := clampf(_dmg_dir_t / 0.8, 0.0, 1.0) * 0.9
+	_dmg_arc.draw_arc(c, r, _dmg_dir_angle - 0.9, _dmg_dir_angle + 0.9, 24, Color(1.0, 0.28, 0.22, alpha), 10.0)
+
+
+func _process(delta: float) -> void:
+	# // FIX: OPT-D3 方向弧倒计时与濒死红晕脉动
+	if _dmg_dir_t > 0.0:
+		_dmg_dir_t -= delta
+		if _dmg_arc:
+			_dmg_arc.queue_redraw()
+	if _low_hp_on and _vignette and not _danger_on:
+		_vignette.modulate.a = 0.25 + sin(Time.get_ticks_msec() * 0.006) * 0.10
 
 
 # ---------- 结算 ----------

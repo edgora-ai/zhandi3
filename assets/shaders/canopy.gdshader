@@ -1,6 +1,9 @@
 shader_type spatial;
 render_mode cull_disabled, unshaded, depth_draw_opaque;
 
+// FIX: OPT-F2/TA3 全局日光系数：树冠随昼夜明暗
+global uniform float day_light;
+
 // 树冠叶片卡片：广告牌化 + 叶簇贴图 + 三色 ramp（参考 Elemental-Serenity 的 Bush）
 uniform sampler2D u_leaf;
 uniform vec3 color_shadow : source_color = vec3(0.16, 0.33, 0.11);
@@ -38,5 +41,5 @@ void fragment() {
 			? mix(color_shadow, color_mid, t * 2.0)
 			: mix(color_mid, color_high, (t - 0.5) * 2.0);
 	// 贴图灰度做叶间明暗
-	ALBEDO = ramp * (0.55 + tex.r * 0.65);
+	ALBEDO = ramp * (0.55 + tex.r * 0.65) * day_light;
 }

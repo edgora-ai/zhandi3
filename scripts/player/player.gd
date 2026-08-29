@@ -31,6 +31,9 @@ var stamina := 100.0
 var max_stamina := 100.0
 var blocking := false
 var _block_start := -1.0
+var _block_retry_ok := 0.0    # // FIX: OPT-B3 完美格挡落空后的重举冷却（墙钟秒）
+var _revive_iframe_end := 0.0 # // FIX: OPT-B5 精灵复活无敌帧（墙钟秒）
+var _arrow_cd := 0.0          # // FIX: OPT-C5 弓射速闸（秒）
 var debug_block := false   # 自动化测试用：强制举盾
 var parry_count := 0
 var dodge_cd := 0.0
@@ -39,6 +42,7 @@ var _bow_draw := 0.0
 var _bow: Node3D
 var _dodge_iframe_end := -1.0
 var _flurry_end_ms := 0
+var _flurry_next_ok_ms := 0   # // FIX: OPT-B4 疾疾内部冷却 ≥3s（真实墙钟，防常驻慢动作）
 var _surf_notified := false
 var _surf_fx_t := 0.0
 var _shield: MeshInstance3D
@@ -118,6 +122,7 @@ var _bomb_hint_done := false
 var _pillars: Array[IcePillar] = []
 var _stasis_target: CharacterBody3D = null
 var _stasis_end_ms := 0
+var _stasis_next_ok_ms := 0   # // FIX: OPT-B1 时停公共冷却 ≥15s（真实墙钟）
 var _stasis_dmg := 0.0
 var _stasis_prev_mode := Node.PROCESS_MODE_INHERIT
 var _stasis_shell: MeshInstance3D
@@ -358,10 +363,15 @@ func _raise_ice() -> void:
 		sfx.play_at("freeze", spot, -6.0)
 
 
-# 时停：瞄准 20m 内敌人按 V 冻结 5 秒（金色时停壳），期间近战伤害累积，解除时一半转为冲击伤害并击飞。
+# 时停：瞄准 20m 内敌人按 V 冻结（金色时停壳），期间近战伤害累积，解除时一半转为冲击伤害并击飞。
+# // FIX: OPT-B1 加 15s 公共冷却；max_hp≥150 的 Boss 仅冻结 1.5s，防循环冻结跳过阶段机制。
 func _toggle_stasis() -> void:
 	if _stasis_target:
 		_release_stasis()
+		return
+	if Time.get_ticks_msec() < _stasis_next_ok_ms:
+		if hud:
+			hud.add_feed("时停冷却中（%.0fs）" % (float(_stasis_next_ok_ms - Time.get_ticks_msec()) / 1000.0))
 		return
 	var fwd := get_aim_dir()
 	var best: CharacterBody3D = null
@@ -384,7 +394,12 @@ func _toggle_stasis() -> void:
 		return
 	_stasis_target = best
 	_stasis_dmg = 0.0
-	_stasis_end_ms = Time.get_ticks_msec() + 5000
+	_stasis_next_ok_ms = Time.get_ticks_msec() + 15000
+	var is_boss: bool = "max_hp" in best and float(best.get("max_hp")) >= 150.0
+	var freeze_ms := 1500 if is_boss else 5000
+	_stasis_end_ms = Time.get_ticks_msec() + freeze_ms
+	if is_boss and hud:
+		hud.add_feed("强大的敌人只能被短暂凝滞")
 	_stasis_prev_mode = best.get_process_mode()
 	best.set_process_mode(Node.PROCESS_MODE_DISABLED)
 	_stasis_shell = MeshInstance3D.new()
@@ -582,6 +597,10 @@ func _dodge() -> void:
 
 
 func _start_flurry() -> void:
+	# // FIX: OPT-B4 疾疾内部冷却 ≥3s（真实墙钟）：闪避无敌帧保持无伤，但不再无限触发慢动作
+	if Time.get_ticks_msec() < _flurry_next_ok_ms:
+		return
+	_flurry_next_ok_ms = Time.get_ticks_msec() + 3000
 	flurry = true
 	Engine.time_scale = 0.22
 	_flurry_end_ms = Time.get_ticks_msec() + 1600
@@ -635,6 +654,18 @@ func _update_shake(delta: float) -> void: # // FIX: M11 镜头抖动更新（h/v
 			_shake_amp = 0.0
 
 
+# // FIX: OPT-E1/REG2 地面材质判定：近水→沙/水花，高处/雪线→沙石，其余草地（按高度/水线启发式）
+func _surface_footstep() -> String:
+	var y := global_position.y
+	if is_on_floor() and y < Terrain.WATER_LEVEL + 0.35:
+		return "footstep_water"
+	if y < Terrain.WATER_LEVEL + 1.4:
+		return "footstep_sand"
+	if terrain and y > Terrain.WATER_LEVEL + 26.0:
+		return "footstep_sand"
+	return "footstep_grass"
+
+
 func _physics_process(delta: float) -> void:
 	_check_timed_consumables()
 	_update_shake(delta)
@@ -672,8 +703,8 @@ func _physics_process(delta: float) -> void:
 			_footstep_cd = 0.38 if _spd > 6.0 else 0.52
 			var _sfx_f := get_tree().get_first_node_in_group("sfx_bank")
 			if _sfx_f:
-				_sfx_f.play_at("heavy_impact", global_position, -18.0, randf_range(0.95, 1.08))
-				print("[sfx] play_at heavy_impact footstep=%.1f" % _spd)
+				# // FIX: OPT-E1/REG2 脚步按地面材质映射（草地/沙石/木板/水面），不再复用近战重击音
+				_sfx_f.play_at(_surface_footstep(), global_position, -18.0, randf_range(0.95, 1.08))
 	elif is_climbing and _climb_sfx_cd <= 0.0:
 		var _cs := Vector2(velocity.x, velocity.y).length() + absf(velocity.z) * 0.5
 		if _cs > 0.5:
@@ -687,7 +718,8 @@ func _physics_process(delta: float) -> void:
 			_swim_sfx_cd = 0.65
 			var _sfx_s := get_tree().get_first_node_in_group("sfx_bank")
 			if _sfx_s:
-				_sfx_s.play_at("freeze", global_position, -14.0, 1.18)
+				# // FIX: OPT-E1/REG2 游泳改水声蹚水（原复用结冰风铃音）
+				_sfx_s.play_at("footstep_water", global_position, -14.0, 0.9)
 	var f := Input.get_axis("move_back", "move_forward")
 	if debug_move != 0.0:
 		f = debug_move
@@ -837,6 +869,11 @@ func _physics_process(delta: float) -> void:
 			if _magnet_prop:
 				_throw_magnet()
 			elif weapon.weapon_id == "bow":
+				# // FIX: OPT-E1 弓蓄力吱呀声（仅起势播一次）
+				if _bow_draw <= 0.0:
+					var _sfx_b := get_tree().get_first_node_in_group("sfx_bank")
+					if _sfx_b:
+						_sfx_b.play("bow_draw", -12.0)
 				_bow_draw = minf(1.0, _bow_draw + delta * 1.3)
 				weapon.set_ads(_bow_draw > 0.15)
 			elif weapon.weapon_id != "":
@@ -849,18 +886,24 @@ func _physics_process(delta: float) -> void:
 		if debug_block:
 			rmb = true
 		weapon.set_ads(rmb and weapon.weapon_id != "")
-		# 空手举盾：右键格挡，举盾瞬间为完美格挡窗口。
+		# 空手举盾：右键格挡，举盾边沿授予完美格挡窗口。
 		if weapon.weapon_id == "":
 			if rmb and not blocking:
 				blocking = true
-				_block_start = Time.get_ticks_msec() / 1000.0
+				# // FIX: OPT-B3 完美格挡仅在抬盾边沿判定一次；落空/收盾后 0.5s 内重举不刷新窗口
+				var now_s := Time.get_ticks_msec() / 1000.0
+				if now_s >= _block_retry_ok:
+					_block_start = now_s
 			elif not rmb and blocking:
 				blocking = false
+				# 收盾即进入重举冷却，连点/宏无法常驻完美窗口
+				_block_retry_ok = Time.get_ticks_msec() / 1000.0 + 0.5
 		elif blocking:
 			blocking = false
 		if _shield_root:
 			_shield_root.visible = blocking
 	_melee_cd = maxf(0.0, _melee_cd - delta)
+	_arrow_cd = maxf(0.0, _arrow_cd - delta) # // FIX: OPT-C5 弓射速闸
 	# 顿帧/时停/药剂/疾风已在帧头墙钟处理（不受 time_scale 与 early return 影响）
 	# 时停壳呼吸脉动，并随剩余时间收缩（壳体本身就是倒计时）。
 	if _stasis_shell and is_instance_valid(_stasis_shell):
@@ -1138,6 +1181,10 @@ func switch_slot(i: int) -> void:
 func take_damage(amount: float, from: Variant = null, _part: String = "body") -> void:
 	if not alive:
 		return
+	# // FIX: OPT-B5 精灵复活后 1.5s 无敌帧，防止复活当帧被同一 burst 烧掉精灵
+	if Time.get_ticks_msec() / 1000.0 < _revive_iframe_end:
+		damaged.emit(0.0)
+		return
 	var dmg := amount
 	dmg *= damage_taken_mult
 	# 完美闪避：闪身窗口内被击中触发专注时停——无伤且时间变慢。
@@ -1179,6 +1226,13 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		dmg -= absorbed
 	hp -= dmg
 	damaged.emit(dmg)
+	# // FIX: OPT-D3 受击方向指示：玩家系内计算攻击者方位角传 HUD（屏幕上方=前方）
+	if from is Node3D and (from as Node3D).is_inside_tree() and hud:
+		var to_a: Vector3 = (from as Node3D).global_position - global_position
+		to_a.y = 0.0
+		if to_a.length_squared() > 0.01:
+			var local := global_transform.basis.inverse() * to_a
+			hud.show_damage_direction(atan2(local.x, -local.z) - PI * 0.5)
 	# // FIX: M11 命中/受击镜头抖动分级（可开关，见 _shake_enabled 注释）— 已做 camera shake，命中/爆炸分级如下
 	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45) # // FIX: M11 受击分级：<15dmg 0.18s / >=15dmg 0.28s，Haptics 可在 _trigger_shake 内 Input.vibrate_handheld(80+amp*120) 接入（可开关）
 	_shake_t = 0.28 if dmg >= 15.0 else 0.18
@@ -1200,6 +1254,7 @@ func die(from: Variant = null) -> void:
 		fairies -= 1
 		hp = max_hp * 0.3
 		stamina = max_stamina
+		_revive_iframe_end = Time.get_ticks_msec() / 1000.0 + 1.5 # // FIX: OPT-B5 复活无敌帧
 		health_changed.emit(hp, armor)
 		DamageNumber.spawn_at(get_tree().current_scene, global_position + Vector3(0, 2.2, 0), "复活!", Color(1.0, 0.85, 0.40))
 		if hud:
@@ -1231,7 +1286,9 @@ var _sword_base_rot := Vector3.ZERO
 func _build_sword() -> void:
 	_sword = Node3D.new()
 	_sword.name = "Sword"
-	_sword.position = _sword_base_pos
+	# // FIX: VIS3/TA9 剑视模型整体 ×0.72 并右移下移：占屏宽从 ~1/3 降到 ≤1/4，不再穿出画面右缘
+	_sword.scale = Vector3.ONE * 0.72
+	_sword.position = _sword_base_pos + Vector3(0.05, -0.05, 0.0)
 	_sword_base_rot = Vector3(-0.15, 0.0, -0.35)
 	_sword.rotation = _sword_base_rot
 	camera.add_child(_sword)
@@ -1524,6 +1581,14 @@ func _build_bow() -> void:
 
 
 func _fire_arrow() -> void:
+	# // FIX: OPT-C5/R4 弓射速闸 0.35s + 最低蓄力 0.25（点抽刷伤害失效）；满抽伤害 38→45
+	if _arrow_cd > 0.0:
+		return
+	if _bow_draw < 0.25:
+		_bow_draw = 0.0
+		weapon.set_ads(false)
+		return
+	_arrow_cd = 0.35
 	if weapon.reserve <= 0:
 		if hud:
 			hud.add_feed("没箭了")
@@ -1532,9 +1597,10 @@ func _fire_arrow() -> void:
 	weapon.reserve -= 1
 	weapon.ammo_changed.emit(weapon.mag_left, weapon.reserve)
 	var dir := get_aim_dir()
+	var dmg := (18.0 + 27.0 * _bow_draw) * damage_mult # // FIX: OPT-C4 弓同乘全局增伤
 	var speed := 16.0 + 22.0 * _bow_draw
 	var arrow := WildProjectile.new()
-	arrow.configure("arrow", dir * speed + Vector3(0, 1.5 * _bow_draw, 0), 16.0 + 22.0 * _bow_draw, self)
+	arrow.configure("arrow", dir * speed + Vector3(0, 1.5 * _bow_draw, 0), dmg, self)
 	get_parent().add_child(arrow)
 	arrow.global_position = camera.global_position + dir * 0.7 - Vector3(0, 0.12, 0)
 	var sfx := get_tree().get_first_node_in_group("sfx_bank")
@@ -1562,7 +1628,8 @@ func _find_melee_target() -> CharacterBody3D:
 			var to_target := target.global_position - global_position
 			to_target.y = 0.0
 			var distance := to_target.length()
-			if distance < 0.15 or distance > 4.2:
+			# // FIX: OPT-C4 锁定半径 4.2→2.9：与 2.6m 弧形判定对齐（保留 lunge 覆盖差），消除锁定必落空
+			if distance < 0.15 or distance > 2.9:
 				continue
 			var facing := forward.dot(to_target / distance)
 			if facing < 0.18:
@@ -1610,7 +1677,8 @@ func _combo_poses() -> Array:
 
 # 挥击阶段生效的近战判定与命中反馈（顿帧 + 镜头微震 + 火花）。
 func _apply_melee_hit() -> void:
-	var mult := (1.35 if _combo_i == 2 else 1.0) * (2.0 if flurry else 1.0) * armor_melee_mult
+	# // FIX: OPT-C4/G8/R25 近战同乘 damage_mult（据点 buff/烤串/面具对近战生效）；疾疾倍率 2.0→1.5（OPT-B4）
+	var mult := (1.35 if _combo_i == 2 else 1.0) * (1.5 if flurry else 1.0) * armor_melee_mult * damage_mult
 	var hit_something := false
 	var hit_pos := camera.global_position + get_aim_dir() * 1.6
 	var forward := get_aim_dir()

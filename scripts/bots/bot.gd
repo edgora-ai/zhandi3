@@ -30,8 +30,12 @@ var move_target := Vector3.ZERO
 var aim_target: CharacterBody3D = null
 var target_loot: Loot = null
 var _loot_time := 0.0
-var _loot_failed_ids: Dictionary = {}
-var _loot_failed_pos := Vector3.ZERO
+# // FIX: OPT-A2 拾取失败带时间戳，12s 冷却后允许重试（原注释占位无实现）
+var _loot_failed_at: Dictionary = {}
+# // FIX: OPT-A3 受击警觉期：转向但不开火，无视线不锁定
+var _alert_t := 0.0
+var _alert_from_pos := Vector3.ZERO
+var _last_seen_pos := Vector3.ZERO # // FIX: OPT-A3 最后已知位置，丢视后向其搜索
 var capture_goal: CapturePoint = null
 
 var _think := 0.0
@@ -56,6 +60,7 @@ var _visual: Node3D
 var _head: Node3D
 var _look_phase := 0.0
 var _glance_yaw := 0.0
+var _step_cd := 0.0 # // FIX: OPT-E1/REG2 bot 脚步 3D 播放（听声辨位链路补全）
 
 
 var _glb: Node3D
@@ -342,6 +347,9 @@ func give_ammo(amount: int) -> void:
 func _think_tick() -> void:
 	if not alive:
 		return
+	# // FIX: OPT-A3 交战态也检查毒圈，圈内威胁加权撤退
+	var pos2 := Vector2(global_position.x, global_position.z)
+	var outside := zone.active and pos2.distance_to(zone.center) > zone.radius * 0.97
 	# 感知最近可见敌人
 	var enemy := _find_visible_enemy()
 	if enemy:
@@ -350,21 +358,37 @@ func _think_tick() -> void:
 		state = State.FIGHT
 		aim_target = enemy
 		_lose_sight = 0.0
+		_last_seen_pos = enemy.global_position
 		return
 	if state == State.FIGHT:
+		# // FIX: OPT-A3 丢视 >0.3s 停火（_fight_fire 内 _lose_sight 闸），
+		# 1.2s 后放弃目标转 ROTATE；期间朝最后已知位置警戒移动
 		_lose_sight += 0.3
-		if _lose_sight > 2.5:
+		if _lose_sight > 1.2:
 			state = State.ROTATE
 			aim_target = null
+			# 朝最后已知位置搜索逼近，行为更拟人
+			if _last_seen_pos != Vector3.ZERO:
+				move_target = _last_seen_pos + Vector3(randf_range(-3, 3), 0, randf_range(-3, 3))
 		return
-
-	# 非战斗决策：跑圈 > 找枪 > 占点 > 游荡
-	var pos2 := Vector2(global_position.x, global_position.z)
-	var outside := zone.active and pos2.distance_to(zone.center) > zone.radius * 0.97
+	# // FIX: OPT-A3 受击警觉期：转身面向伤害来源方向搜索，但不锁定不开火
+	if _alert_t > 0.0:
+		_alert_t -= 0.3
+		var to_alert := _alert_from_pos - global_position
+		to_alert.y = 0
+		if to_alert.length() > 1.0:
+			rotation.y = lerp_angle(rotation.y, atan2(to_alert.normalized().x, to_alert.normalized().z) + PI, 0.25)
+		if randf() < 0.4:
+			move_target = global_position + to_alert.normalized() * randf_range(4.0, 8.0)
+			state = State.ROTATE
+		return
+	# // FIX: OPT-A3 交战外同样跑圈优先：圈外必撤（原实现交战 early-return 永不检查毒圈）
 	if outside:
 		state = State.ROTATE
 		move_target = _random_point_in_zone()
 		return
+	# 非战斗决策：找枪 > 补甲/回血 > 找弹药 > 占点 > 游荡
+	# // FIX: OPT-A1 bot 资源行为：缺武器优先找枪；重伤找医疗、无甲找护甲（45m 需求半径）
 	if weapon.weapon_id == "":
 		var loot := _find_nearest_loot("weapon")
 		if loot:
@@ -372,6 +396,22 @@ func _think_tick() -> void:
 				_loot_time = 0.0
 			state = State.LOOT
 			target_loot = loot
+			return
+	if hp < MAX_HP * 0.6:
+		var med := _find_nearest_loot("medkit", 45.0)
+		if med:
+			if target_loot != med or state != State.LOOT:
+				_loot_time = 0.0
+			state = State.LOOT
+			target_loot = med
+			return
+	if armor <= 0.0:
+		var arm := _find_nearest_loot("armor", 45.0)
+		if arm:
+			if target_loot != arm or state != State.LOOT:
+				_loot_time = 0.0
+			state = State.LOOT
+			target_loot = arm
 			return
 	if weapon.reserve == 0 and weapon.mag_left == 0:
 		var ammo_loot := _find_nearest_loot("ammo")
@@ -420,11 +460,13 @@ func _find_visible_enemy() -> CharacterBody3D:
 		if d > best_d:
 			continue
 		var to_c: Vector3 = (c.global_position - global_position).normalized()
-		if d > 8.0 and fwd.dot(to_c) < 0.0:
+		# // FIX: OPT-A3 背后全向感知 8m→3m：更远的背身必须进入视野（fwd.dot ≥ 0）才被感知
+		if d > 3.0 and fwd.dot(to_c) < 0.0:
 			continue
 		if d > 40.0 and (idx % 2 == 0):
 			continue # // FIX: H7 远距LOD跳过一半射线
-		var target_eye: Vector3 = c.global_position + Vector3(0, 1.4, 0)
+	# // FIX: OPT-A4 索敌采样高度自适应：趴姿胶囊顶 ~0.9m，射线终点取目标碰撞半高而非硬编码 1.4m
+		var target_eye: Vector3 = c.global_position + Vector3(0, _target_sample_height(c), 0)
 		var query := PhysicsRayQueryParameters3D.create(eye, target_eye, 1 | 2 | 4, [get_rid()])
 		var result := get_world_3d().direct_space_state.intersect_ray(query)
 		if not result.is_empty() and result.collider == c and not _smoke_blocks(eye, target_eye):
@@ -432,6 +474,21 @@ func _find_visible_enemy() -> CharacterBody3D:
 			best_d = d
 	_cached_enemy = best
 	return best
+
+
+# // FIX: OPT-A4 目标胸口采样高度：按碰撞形状上限估算（站立 capsule ~1.4m、趴姿 capsule ~0.9m），远距趴姿减半感知
+func _target_sample_height(c: Node3D) -> float:
+	var h := 1.4
+	for child in c.get_children():
+		var col := child as CollisionShape3D
+		if col and col.shape is CapsuleShape3D:
+			var cap := col.shape as CapsuleShape3D
+			h = maxf(h, col.position.y + cap.height * 0.5)
+			break
+	var dist := global_position.distance_to(c.global_position)
+	if h < 1.1 and dist > 20.0:
+		h *= 0.9 # 趴姿远距感知略降（×0.9 高度 + 近距保底），不再完全隐形
+	return minf(h, 1.45)
 
 
 # 烟雾球遮挡视线：线段与烟球求交
@@ -445,27 +502,24 @@ func _smoke_blocks(a: Vector3, b: Vector3) -> bool:
 	return false
 
 
-func _find_nearest_loot(kind: String) -> Loot:
+func _find_nearest_loot(kind: String, max_dist: float = 90.0) -> Loot:
+	# // FIX: OPT-A2 失败物资 12s 冷却（原注释占位无实现导致 8s 死循环）；_loot_failed_pos 已删除
+	var now_ms := Time.get_ticks_msec()
+	# 清理过期失败记录
+	for fid in _loot_failed_at.keys():
+		if now_ms - int(_loot_failed_at[fid]) > 12000:
+			_loot_failed_at.erase(fid)
 	var best: Loot = null
-	var best_d := 90.0
+	var best_d := max_dist
 	for item in get_tree().get_nodes_in_group("loot"):
 		if item.consumed or item.kind != kind:
 			continue
-		if _loot_failed_ids.has(item.get_instance_id()):
+		if _loot_failed_at.has(item.get_instance_id()):
 			continue
 		var d := global_position.distance_to(item.global_position)
 		if d < best_d:
 			best = item
 			best_d = d
-	# Fallback: if all filtered, allow retry after 12s
-	if best == null:
-		for item in get_tree().get_nodes_in_group("loot"):
-			if item.consumed or item.kind != kind:
-				continue
-			var d2 := global_position.distance_to(item.global_position)
-			if d2 < best_d:
-				best = item
-				best_d = d2
 	return best
 
 
@@ -529,8 +583,8 @@ func _physics_process(delta: float) -> void:
 			if target_loot and is_instance_valid(target_loot) and not target_loot.consumed:
 				_loot_time += delta
 				if _loot_time > 8.0:
-					_loot_failed_ids[target_loot.get_instance_id()] = true
-					_loot_failed_pos = target_loot.global_position
+					# // FIX: OPT-A2/P3 失败记录带时刻，12s 冷却后可重试（原 8s 死循环）
+					_loot_failed_at[target_loot.get_instance_id()] = Time.get_ticks_msec()
 					target_loot = null
 					_loot_time = 0.0
 					state = State.ROTATE
@@ -540,6 +594,8 @@ func _physics_process(delta: float) -> void:
 					if global_position.distance_to(target_loot.global_position) < 1.8:
 						target_loot.apply_to(self)
 						_loot_time = 0.0
+						target_loot = null
+						state = State.ROTATE
 			else:
 				state = State.ROTATE
 		State.ROTATE, State.CAPTURE:
@@ -555,6 +611,15 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - GRAVITY * delta, -30.0)
 	move_and_slide()
+
+	# // FIX: OPT-E1/REG2 bot 移动脚步声（3D，随速度节流），20+ bot 不再无声移动
+	_step_cd = maxf(0.0, _step_cd - delta)
+	var bot_spd := Vector2(velocity.x, velocity.z).length()
+	if is_on_floor() and bot_spd > 1.5 and _step_cd <= 0.0:
+		_step_cd = 0.40 if bot_spd > 5.0 else 0.55
+		var _sfx_step := get_tree().get_first_node_in_group("sfx_bank")
+		if _sfx_step:
+			_sfx_step.play_at("footstep_grass", global_position, -14.0, randf_range(0.9, 1.1))
 
 	# 朝向
 	var face := move_dir
@@ -644,15 +709,25 @@ func _fight_fire(delta: float) -> void:
 	if weapon.mag_left <= 0:
 		weapon.start_reload()
 		return
+	# // FIX: OPT-A3 烟雾遮断视线即停火：目标被烟遮挡时不开火（压制弹只打最后已知位置）
 	var dist := global_position.distance_to(aim_target.global_position)
 	if dist > weapon.data.range * 0.85:
+		return
+	# // FIX: OPT-A3/CB6 丢失视线 >0.3s 即停火（穿墙/入烟不再倾泻曳光），仅允许朝最后已知位置警戒
+	if _lose_sight > 0.3:
+		return
+	if _smoke_blocks(get_aim_origin(), aim_target.global_position + Vector3(0, 1.1, 0)):
 		return
 	if _burst_pause > 0.0:
 		_burst_pause -= delta
 		return
 	if _burst_left <= 0:
+		# // FIX: OPT-A6/REG6 连发停顿 ÷ skill（原 ×skill 使越准的 bot 打得越慢，难度被抵消）
 		_burst_left = randi_range(3, 6)
-		_burst_pause = randf_range(0.35, 0.9) * skill
+		_burst_pause = randf_range(0.35, 0.9) / skill
+		return
+	# // FIX: OPT-A3 受击警觉期未结束不开火（反应时间 ≥0.5s，含转向）
+	if _alert_t > 0.0:
 		return
 	# 只有大致朝向目标时才开火
 	var fwd := -global_transform.basis.z
@@ -682,7 +757,7 @@ func _blocked(from: Vector3, dir: Vector3) -> bool:
 
 # ---------- 伤害与死亡 ----------
 
-func take_damage(amount: float, from: Variant = null, _part: String = "body") -> void:
+func take_damage(amount: float, from: Variant = null, part: String = "body") -> void:
 	if not alive:
 		return
 	var dmg := amount
@@ -691,13 +766,29 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		armor -= absorbed
 		dmg -= absorbed
 	hp -= dmg
-	# 被打会反击：立即察觉攻击者
-	if from is CharacterBody3D and from.alive and state != State.FIGHT:
-		state = State.FIGHT
-		aim_target = from
-		_lose_sight = 0.0
+	# // FIX: OPT-A5 命中反馈：飘字（爆头变红）+ 受击压扁闪动，与野怪同款标准
+	var col := Color(1.0, 0.35, 0.30) if part == "head" else Color(1.0, 0.85, 0.25)
+	DamageNumber.spawn_at(get_parent(), global_position + Vector3(0, 2.05, 0), "%d%s" % [int(round(dmg)), "爆头" if part == "head" else ""], col)
+	_flash_hit()
+	# // FIX: OPT-A3/CB5 受击不再瞬锁：非交战态进入 0.5s 警觉期（转身面向来源、不锁定不开火）；
+	# 无视线不会隔墙锁定 aim_target；交战态保持当前目标不被打扰
+	if from is Node3D and from.is_inside_tree():
+		if state != State.FIGHT:
+			_alert_t = 0.5
+			_alert_from_pos = from.global_position
+			state = State.ROTATE
 	if hp <= 0.0:
 		die(from)
+
+
+func _flash_hit() -> void:
+	# // FIX: OPT-A5 受击白闪：glb 与程序化模型统一短促压扁回弹
+	var root := _visual if _visual != null else _glb
+	if root == null:
+		return
+	root.scale = Vector3(1.06, 0.94, 1.06)
+	var tw := create_tween()
+	tw.tween_property(root, "scale", Vector3.ONE, 0.12)
 
 
 func die(from: Variant = null) -> void:

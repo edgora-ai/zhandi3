@@ -1076,11 +1076,11 @@ func _recompute_buffs() -> void:
 			var skewer_value: Variant = c.get("skewer_mult")
 			var charm_value: Variant = c.get("charm_mult")
 			var base := (float(skewer_value) if skewer_value != null else 1.0) * (float(charm_value) if charm_value != null else 1.0)
-			# // FIX: OPT-G2/R23/PG4 据点 buff 改为"身处圈内才生效"，且多据点线性递增 1.1/1.2（非指数，
-			# 上限 2.0 钳制保持 H2 口径）；不再一次占领全图整局白嫖
+			# // FIX: OPT-G2/R23/PG4 据点 buff 改为"身处据点圈内才生效"，且多据点线性递增 1.1/1.2（非指数，
+			# 上限 2.0 钳制保持 H2 口径）；不再一次占领全图整局白嫖。毒圈外不计 buff，跑圈收益 > 圈外硬扛
 			var point_count := 0
 			for cp in capture_points:
-				if cp.owner_body == c and c.alive and cp.contains(c):
+				if cp.owner_body == c and c.alive and cp.contains(c) and not zone.is_outside(c.global_position):
 					point_count += 1
 			c.damage_mult = minf(2.0, base * (1.0 + 0.1 * point_count))
 			c.regen_rate = 3.0 if point_count > 0 else 0.0

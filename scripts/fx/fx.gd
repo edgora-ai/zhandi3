@@ -144,10 +144,25 @@ static func parry_flash(pos: Vector3) -> void:
 	_puff(pos, Color(1.0, 1.0, 0.9), 0.12, 3.0, 0.14)
 
 
+static var _melee_mesh_l: BoxMesh # // FIX: H4b melee 短芒单位网格（scale.z 提长，零 new Mesh）
+static var _melee_mesh_h: BoxMesh
+static var _melee_mats: Dictionary = {} # // FIX: H4b melee 材质色板缓存（tint 键）
+
 # 剑刃命中：中心闪光加放射状短芒，比通用枪击烟尘更清楚地表达斩击方向。
 static func melee_hit(pos: Vector3, attack_dir: Vector3, heavy: bool = false) -> void:
 	var tint := Color(1.0, 0.66, 0.22) if heavy else Color(0.62, 0.88, 1.0)
 	_puff(pos, tint, 0.11 if heavy else 0.08, 3.8, 0.16)
+	if _melee_mesh_l == null:
+		_melee_mesh_l = BoxMesh.new()
+		_melee_mesh_l.size = Vector3(0.025, 0.025, 1.0)
+		_melee_mesh_h = BoxMesh.new()
+		_melee_mesh_h.size = Vector3(0.025, 0.025, 1.0)
+	var mat: Variant = _melee_mats.get(tint)
+	if mat == null:
+		mat = _unshaded(tint)
+		if _melee_mats.size() >= 8:
+			_melee_mats.clear()
+		_melee_mats[tint] = mat
 	var forward := attack_dir.normalized()
 	var right := forward.cross(Vector3.UP).normalized()
 	if right.length_squared() < 0.01:
@@ -156,10 +171,9 @@ static func melee_hit(pos: Vector3, attack_dir: Vector3, heavy: bool = false) ->
 		var angle := TAU * float(i) / float(7 if heavy else 5)
 		var outward := (right * cos(angle) + Vector3.UP * sin(angle)).normalized()
 		var streak := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.025, 0.025, 0.34 if heavy else 0.24)
-		streak.mesh = mesh
-		streak.material_override = _unshaded(tint)
+		streak.mesh = _melee_mesh_h if heavy else _melee_mesh_l
+		streak.material_override = mat as Material
+		streak.scale = Vector3(1, 1, 0.34 if heavy else 0.24)
 		streak.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_scene().add_child(streak)
 		streak.global_position = pos + outward * 0.10
@@ -171,24 +185,35 @@ static func melee_hit(pos: Vector3, attack_dir: Vector3, heavy: bool = false) ->
 		tw.chain().tween_callback(streak.queue_free)
 
 
+static var _ring_meshes: Dictionary = {} # // FIX: H4b 预警环按半径缓存 TorusMesh（零 new Mesh）
+static var _ring_mats: Dictionary = {} # // FIX: H4b 预警环按 Color 缓存材质（≤8）
+
 # 敌人脚下的攻击预警环。调用者保留节点并在前摇阶段控制 visible/scale。
 static func attack_ring(parent: Node3D, radius: float, color: Color) -> MeshInstance3D:
+	var mesh: Variant = _ring_meshes.get(radius)
+	if mesh == null:
+		mesh = TorusMesh.new()
+		mesh.inner_radius = radius * 0.88
+		mesh.outer_radius = radius
+		mesh.rings = 24
+		mesh.ring_segments = 5
+		_ring_meshes[radius] = mesh
+	var mat: Variant = _ring_mats.get(color)
+	if mat == null:
+		mat = StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = color
+		mat.emission_enabled = true
+		mat.emission = Color(color.r, color.g, color.b)
+		mat.emission_energy_multiplier = 2.0
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		if _ring_mats.size() >= 8:
+			_ring_mats.clear()
+		_ring_mats[color] = mat
 	var ring := MeshInstance3D.new()
-	var mesh := TorusMesh.new()
-	mesh.inner_radius = radius * 0.88
-	mesh.outer_radius = radius
-	mesh.rings = 24
-	mesh.ring_segments = 5
-	ring.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = color
-	mat.emission_enabled = true
-	mat.emission = Color(color.r, color.g, color.b)
-	mat.emission_energy_multiplier = 2.0
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	ring.material_override = mat
+	ring.mesh = mesh as Mesh
+	ring.material_override = mat as Material
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ring.position.y = 0.08
 	ring.visible = false

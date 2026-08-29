@@ -728,6 +728,32 @@ func _record_run(rank: int) -> void:
 	_write_save()
 
 
+var _finish_locked := false # // FIX: S-01 胜负终态幂等（同 tick 多死不改判，终局后再进不覆盖）
+
+func _finish_match(victory: bool, rank: int = 1) -> void:
+	if match_over and _finish_locked:
+		return
+	_finish_locked = true
+	match_over = true
+	if zone:
+		zone.active = false # // FIX: S-01 终局停区（吃鸡后不被毒圈改判失败）
+	player.input_locked = true
+	for c in get_tree().get_nodes_in_group("combatant"):
+		if c is Bot and c != player:
+			c.alive = false # // FIX: S-01 终局冻 AI（同 tick 结算不被 bot 补刀扰动）
+	if victory:
+		sfx.play("victory", -2.0)
+		_record_run(1)
+		hud.show_end(true, 1, player.kills, total_combatants, _end_stats())
+	else:
+		sfx.play("defeat", -2.0)
+		sfx.play("heavy_impact", -4.0, 0.65)
+		_record_run(rank)
+		get_tree().create_timer(1.5).timeout.connect(func() -> void:
+			if hud and hud.has_method("show_end"):
+				hud.show_end(false, rank, player.kills, total_combatants, _end_stats())
+		)
+
 func _end_stats() -> Array:
 	return [
 		["存活时长", "%d:%02d" % [int(_match_t) / 60, int(_match_t) % 60]],
@@ -806,21 +832,10 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 			hud.show_death_screen()
 			get_tree().create_timer(2.2).timeout.connect(_respawn_wild_player)
 			return
-		match_over = true
-		sfx.play("defeat", -2.0)
-		sfx.play("heavy_impact", -4.0, 0.65)
-		var rank := _alive_count() + 1
-		_record_run(rank) # // FIX: R4-G7b 结算写档
-		get_tree().create_timer(1.5).timeout.connect(func() -> void:
-			hud.show_end(false, rank, player.kills, total_combatants, _end_stats())
-		)
+		_finish_match(false, _alive_count() + 1)
 		return
 	if _map_id != "wild" and not match_over and _alive_count() == 1 and player.alive:
-		match_over = true
-		player.input_locked = true
-		sfx.play("victory", -2.0)
-		_record_run(1) # // FIX: R4-G7b
-		hud.show_end(true, 1, player.kills, total_combatants, _end_stats())
+		_finish_match(true)
 
 
 # 旷野模式重生：回到最近的神庙入口，满血满精力，世界状态照旧。
@@ -975,9 +990,8 @@ func _on_moblin_killed(from: Variant) -> void:
 func _on_dragon_killed(from: Variant) -> void:
 	if from != player or match_over:
 		return
-	match_over = true
-	player.input_locked = true
-	sfx.play("victory", -2.0)
+	# // FIX: S-01 讨伐胜利同样走幂等终局（停区/冻 AI 不被毒圈改判）
+	_finish_match(true)
 	# L2 Stinger: 胜利动机额外打击强化记忆点（窗口通过 [stinger] 日志验证，复用已有音轨无外部资产）
 	sfx.play("heavy_impact", -6.0, 0.72)
 	if sfx.has_method("play_boss_victory_stinger"):

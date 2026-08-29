@@ -181,7 +181,24 @@ func hud_status(pos: Vector3) -> Array:
 		return ["站上发光的圆盘", 0.0]
 	if _active:
 		return ["神庙试炼 %d/%d（剩 %ds）" % [_hit_count, RUNE_COUNT, int(_window)], float(_hit_count) / RUNE_COUNT]
-	return ["接近神庙开启试炼", 0.0]
+	if global_position.distance_to(pos) < START_DIST:
+		return ["[E] 开启神庙试炼", 0.0]
+	return ["", -1.0]
+
+
+func try_start_from_interact() -> bool:
+	# // FIX: S-03 22m 内仅 HUD 提示，显式 E 才开启（原靠近即自动开，误触且 HUD 提示语义不清）
+	if completed or _active or player == null:
+		return false
+	if global_position.distance_to(player.global_position) >= START_DIST:
+		return false
+	_active = true
+	_window = _trial_time
+	_hit_count = 0
+	var scene := get_tree().current_scene
+	if scene and scene.get("hud") != null:
+		scene.hud.add_feed("神庙试炼开启：%d 秒内射中 %d 个符文" % [int(_trial_time), RUNE_COUNT])
+	return true
 
 
 func _process(delta: float) -> void:
@@ -214,15 +231,7 @@ func _process(delta: float) -> void:
 			if scene and scene.get("hud") != null:
 				scene.hud.add_feed("石球归位！石门开启")
 		return
-	var dist := global_position.distance_to(player.global_position)
-	if not _active and dist < START_DIST:
-		_active = true
-		_window = _trial_time
-		_hit_count = 0
-		var scene := get_tree().current_scene
-		if scene and scene.get("hud") != null:
-			scene.hud.add_feed("神庙试炼开启：%d 秒内射中 %d 个符文" % [int(_trial_time), RUNE_COUNT])
-	elif _active:
+	if _active:
 		_window -= delta
 		if _window <= 0.0:
 			# 超时重置，可反复挑战。

@@ -135,11 +135,11 @@ func _ring(pos: Vector3, mat: Material) -> void:
 
 func _on_exit_pad_enter(body: Node) -> void:
 	if body is Player:
-		body.nearby_shrine_exit = self
+		body.nearby_shrine_exit = _exit_area
 
 
 func _on_exit_pad_exit(body: Node) -> void:
-	if body is Player and body.nearby_shrine_exit == self:
+	if body is Player and body.nearby_shrine_exit == _exit_area:
 		body.nearby_shrine_exit = null
 
 

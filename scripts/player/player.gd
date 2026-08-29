@@ -1042,7 +1042,10 @@ func _scan_loot() -> void:
 func _try_pickup() -> void:
 	if nearby_loot and not nearby_loot.consumed:
 		nearby_loot.apply_to(self)
-	elif nearby_npc:
+		return
+	if _try_shrine_trial_interact():
+		return
+	if nearby_npc:
 		nearby_npc.talk()
 	elif nearby_fish:
 		nearby_fish.catch(self)
@@ -1058,6 +1061,20 @@ func _try_pickup() -> void:
 			si.leave(self)
 	elif nearby_beacon:
 		nearby_beacon.activate(self)
+
+
+func _try_shrine_trial_interact() -> bool:
+	# // FIX: S-03 22m 内按 E 显式开启试炼（原靠近即自动开）；优先级高于门/宝箱等后续交互
+	var scene := get_tree().current_scene
+	if scene == null or scene.get("wild_world") == null:
+		return false
+	var ww: Variant = scene.wild_world
+	if ww == null or ww.get("trials") == null:
+		return false
+	for t in ww.trials:
+		if t != null and t.has_method("try_start_from_interact") and t.try_start_from_interact():
+			return true
+	return false
 
 
 func give_weapon(id: String) -> void:

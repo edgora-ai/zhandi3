@@ -15,6 +15,7 @@ var _state_t := 0.0
 var _attack_cd := 0.0
 var _throw_cd := 0.0
 var _strike_t := -1.0  # >=0 表示跺地/投石已在途中，计时到点结算
+var _attack_cue: MeshInstance3D # // FIX: OPT-C6/CB15 西诺克斯攻击预警环（原来全场最短前摇且无提示）
 var _strike_kind := ""
 var _anim := 0.0
 var _glb: Node3D
@@ -175,7 +176,12 @@ func _physics_process(delta: float) -> void:
 	# 出手结算：跺地/投石到点执行。
 	if _strike_t >= 0.0:
 		_strike_t -= delta
+		# // FIX: OPT-C6/CB15 预警环随前摇放大，出手即隐藏
+		if _attack_cue and _attack_cue.visible:
+			_attack_cue.scale = Vector3.ONE * clampf(1.0 - maxf(0.05, _strike_t) / 0.72, 0.15, 1.0)
 		if _strike_t < 0.0:
+			if _attack_cue:
+				_attack_cue.visible = false
 			if _strike_kind == "stomp":
 				FX.impact(global_position + Vector3(0, 0.2, -2.2))
 				var _sfx_h := get_tree().get_first_node_in_group("sfx_bank")
@@ -252,9 +258,17 @@ func _physics_process(delta: float) -> void:
 		if _attack_cd <= 0.0:
 			_attack_cd = 2.6
 			_strike_kind = "stomp"
-			_strike_t = 0.42
+			# // FIX: OPT-C6/CB15 跺地前摇 0.42→0.72s + 脚下 4.2m 攻击环（可读可闪）
+			_strike_t = 0.72
 			_play(&"stomp")
 			_anim_hold = 0.6
+			if _attack_cue == null:
+				_attack_cue = FX.attack_ring(self, 4.2, Color(1.0, 0.30, 0.10, 0.65))
+			_attack_cue.visible = true
+			_attack_cue.scale = Vector3.ONE * 0.2
+			var _sfx_w := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_w:
+				_sfx_w.play_at("enemy_charge", global_position + Vector3(0, 1.6, 0), -8.0, 0.7)
 	velocity.y = -6.0
 	move_and_slide()
 	global_position.y = terrain.get_height(global_position.x, global_position.z)

@@ -5,7 +5,7 @@ extends Node3D
 signal ammo_changed(mag: int, reserve: int)
 signal fired
 signal reload_started
-signal hit_landed
+signal hit_landed(part: String) # // FIX: D4/CB17 命中带部位，供爆头 hitmarker
 signal weapon_changed(id: String) # // FIX: VIS1 武器名事件驱动：--screenshot 等每帧早退场景也能同步标签
 
 const WEAPONS := {
@@ -193,20 +193,25 @@ func _fire_ray() -> void:
 			# // FIX: OPT-C1 距离衰减（falloff_start→end 线性至 falloff_min）
 			var fs: float = data.get("falloff_start", 0.0)
 			var fe: float = data.get("falloff_end", 0.0)
+			var hit_dist := origin.distance_to(end_point)
 			if fs > 0.0 and fe > fs:
-				var hit_dist := origin.distance_to(end_point)
 				dmg *= lerpf(1.0, data.get("falloff_min", 1.0), clampf((hit_dist - fs) / (fe - fs), 0.0, 1.0))
+			# // FIX: OPT-C3/CB19 SMG 近战段补偿：12m 内 ×1.3（近距生态位）
+			if weapon_id == "smg" and hit_dist < 12.0:
+				dmg *= 1.3
 			# // FIX: OPT-B1 时停目标伤害减免 50%，防冻结期白打
 			var st: Variant = owner_body.get("_stasis_target")
 			if st != null and col == st:
 				dmg *= 0.5
 			col.take_damage(dmg, owner_body, part)
+			if owner_body.get("damage_dealt") != null:
+				owner_body.damage_dealt += dmg # // FIX: OPT-H3 结算伤害统计
 			if col.has_method("is_plant"):
 				FX.impact(end_point)
 			else:
 				FX.blood(end_point)
 			if is_player:
-				hit_landed.emit()
+				hit_landed.emit(part)
 		else:
 			FX.impact(end_point)
 	# // FIX: D6/FX9 曳光差异化：DMR 更宽更亮，其余默认

@@ -133,11 +133,11 @@ func _physics_process(delta: float) -> void:
 			if kind == "arrow" and part == "head":
 				final_dmg *= 1.5
 			collider.take_damage(final_dmg, valid_source, part)
-			# // FIX: OPT-C5 弓命中反馈：接 hit_landed（播 hit 音）
+			# // FIX: OPT-C5 弓命中反馈：接 hit_landed（播 hit 音 + hitmarker）
 			if valid_source is Player:
 				var w: Variant = valid_source.get("weapon")
 				if w != null and w.has_signal("hit_landed"):
-					w.hit_landed.emit()
+					w.hit_landed.emit(part)
 		FX.impact(global_position, Color(1.0, 0.25, 0.05) if kind == "fire" else Color(0.25, 0.88, 1.0) if kind == "energy" else Color(0.62, 0.52, 0.38))
 		queue_free()
 	rotate_x(delta * 7.0)

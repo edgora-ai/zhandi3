@@ -68,6 +68,11 @@ func is_outside(pos: Vector3) -> bool:
 	return Vector2(pos.x, pos.z).distance_to(center) > radius
 
 
+# // FIX: OPT-H1/FX10 下一目标圈数据 (center_x, radius, center_z)：小地图虚线预览与 HUD 同源
+func next_target() -> Vector3:
+	return Vector3(_target_center.x, _target_radius, _target_center.y)
+
+
 func status_text() -> String:
 	if not active:
 		return ""
@@ -132,3 +137,8 @@ func _damage_tick(delta: float) -> void:
 			continue
 		if is_outside(c.global_position):
 			c.take_damage(dps * 0.5, null)
+			# // FIX: OPT-H1/FX10 圈外掉血 tick 音（≥2 次/s 低鸣），不再静默掉血
+			if c is Player:
+				var sfx := get_tree().get_first_node_in_group("sfx_bank")
+				if sfx:
+					sfx.play("hit", -14.0, 0.55)

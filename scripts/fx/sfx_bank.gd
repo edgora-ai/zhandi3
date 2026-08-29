@@ -131,6 +131,13 @@ func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 
 	p.stream = _streams[name]
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.94, 1.06)
+	# // FIX: OPT-E4/FX15 分类衰减：枪声/爆炸 350m（原 90m 截断远距枪声）、脚步 60m、其余 90m
+	if name.begins_with("shot_") or name == "explosion" or name == "thunder":
+		p.max_distance = 350.0
+	elif name.begins_with("footstep"):
+		p.max_distance = 60.0
+	else:
+		p.max_distance = 90.0
 	p.play()
 	_log("[sfx] play_at %s bus=%s pos=%s" % [name, p.bus, str(pos)])
 

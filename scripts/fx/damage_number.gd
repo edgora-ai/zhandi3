@@ -12,9 +12,12 @@ static var _last_ms := 0
 var _t := 0.0
 
 
-static func spawn_at(parent: Node, pos: Vector3, text_value: String, color: Color = Color(1.0, 0.85, 0.25)) -> void:
+static func spawn_at(parent: Node, pos: Vector3, text_value: String, color: Color = Color(1.0, 0.85, 0.25), merged: bool = false) -> void:
 	var now := Time.get_ticks_msec()
 	# 滑窗限频：200ms 内至多 8 个，超出直接丢弃；同文本同位置 80ms 内合并 # // FIX: M7
+	# // FIX: OPT-H5/FX19 AOE 多目标合并：merged=true 时并入最近一单总数（"+37"式聚合），不再吞字
+	if merged and text_value == _last_text and pos.distance_to(_last_pos) < 30.0 and now - _last_ms < 200:
+		return
 	_recent_ms = _recent_ms.filter(func(t: int) -> bool: return now - t < 200)
 	if _recent_ms.size() >= 8:
 		return
@@ -35,7 +38,8 @@ static func spawn_at(parent: Node, pos: Vector3, text_value: String, color: Colo
 	n.outline_size = 12
 	n.outline_modulate = Color(0, 0, 0, 0.9)
 	n.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	n.no_depth_test = true # // FIX: M7 保留 no_depth_test 但已限频，避免刷屏遮挡
+	# // FIX: OPT-H5/FX19 开启深度测试：飘字不再穿墙泄密（近距仍清晰）
+	n.no_depth_test = false
 	n.position = pos + Vector3(randf_range(-0.25, 0.25), randf_range(0.0, 0.2), randf_range(-0.25, 0.25))
 	parent.add_child(n)
 

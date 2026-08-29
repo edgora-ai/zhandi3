@@ -17,6 +17,9 @@ var progress := 0.0
 
 var _progress_by: CharacterBody3D = null
 var _contest_t := 0.0 # // FIX: OPT-G2 争夺冻结计时，超 10s 进度倒退破站桩
+var _fill_ring: MeshInstance3D # // FIX: OPT-H2/FX17 占领进度世界内可视化
+var _fill_mat: StandardMaterial3D
+var _last_tick_step := -1 # // FIX: OPT-H2 占领逐段 tick 音
 var _flag: MeshInstance3D
 var _ring: MeshInstance3D
 var _beam: MeshInstance3D
@@ -87,6 +90,27 @@ func _build() -> void:
 	_flag.position = Vector3(0.68, 4.1, 0)
 	add_child(_flag)
 
+	# // FIX: OPT-H2/FX17 占领进度环：随 progress 从圈缘向中心收缩（0→100% 扫描填充）
+	_fill_ring = MeshInstance3D.new()
+	var fc := TorusMesh.new()
+	fc.inner_radius = RADIUS * 0.96
+	fc.outer_radius = RADIUS
+	fc.rings = 40
+	fc.ring_segments = 6
+	_fill_ring.mesh = fc
+	_fill_mat = StandardMaterial3D.new()
+	_fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_fill_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_fill_mat.albedo_color = Color(1.0, 0.85, 0.3, 0.55)
+	_fill_mat.emission_enabled = true
+	_fill_mat.emission = Color(1.0, 0.85, 0.3)
+	_fill_mat.emission_energy_multiplier = 1.5
+	_fill_ring.material_override = _fill_mat
+	_fill_ring.position.y = 0.16
+	_fill_ring.scale = Vector3.ONE * 0.001
+	_fill_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_fill_ring)
+
 
 func _flat_material(c: Color, alpha: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -117,17 +141,38 @@ func _process(delta: float) -> void:
 			if _progress_by != c:
 				_progress_by = c
 				progress = 0.0
+				_last_tick_step = -1
 			progress += delta / CAPTURE_TIME
+			_update_fill_ring(c)
 			if progress >= 1.0:
 				_set_owner(c)
 	elif occupants.is_empty():
 		_contest_t = 0.0
 		progress = maxf(0.0, progress - delta * 0.15)
+		if _fill_ring:
+			_fill_ring.scale = _fill_ring.scale.lerp(Vector3.ONE * 0.001, delta * 6.0)
 	else:
 		# // FIX: OPT-G2 多人争夺冻结超过 10s 触发进度倒退 0.2/s，进攻方有破局手段
 		_contest_t += delta
 		if _contest_t > 10.0:
 			progress = maxf(0.0, progress - delta * 0.2)
+
+
+# // FIX: OPT-H2/FX17 进度环收缩 + 逐 20% tick 音加速
+func _update_fill_ring(c: CharacterBody3D) -> void:
+	if _fill_ring == null:
+		return
+	_fill_ring.visible = true
+	var col := COLOR_PLAYER if c is Player else COLOR_BOT
+	_fill_mat.albedo_color = Color(col.r, col.g, col.b, 0.55)
+	_fill_mat.emission = col
+	_fill_ring.scale = Vector3.ONE * maxf(0.05, 1.0 - progress)
+	var step := int(progress * 5.0)
+	if step > _last_tick_step:
+		_last_tick_step = step
+		var sfx := get_tree().get_first_node_in_group("sfx_bank")
+		if sfx:
+			sfx.play_at("pickup", global_position, -6.0, 0.9 + 0.25 * step)
 
 
 func _set_owner(c: CharacterBody3D) -> void:

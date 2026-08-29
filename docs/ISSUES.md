@@ -4,9 +4,9 @@
 > 已修复 29 项（见 § 已验证修复），剩余按 S→M 逐项 headless 验证推送。
 > 7 视角落盘：Game Design 5.1 / Visual 5.9 / Tech 5.3 / Audio 4.7 / Systems 4.6 / QA 4.5 / Commercial 3.4，加权 ~4.7–4.8。
 > Game@gpt-5.6-sol 11 项（2 critical）与 QA 已入本清单；2026-08-28 六路并行复审（战斗/世界/性能/UX/架构/健壮性）新增项已并入 § 本轮多角色增量 5。
-> **2026-08-29 OPT 修复轮**：据 `docs/REVIEW_20260829.md`（玩家×策划 75 条评审）与 `docs/OPTIMIZATION_PLAN.md`（52 任务）完成 P0 批次 + 部分 P1，见 § OPT 修复轮已验证。
+> **2026-08-29 OPT 修复轮**：据 `docs/REVIEW_20260829.md`（玩家×策划 75 条评审）与 `docs/OPTIMIZATION_PLAN.md`（52 任务）完成 P0 批次全部 + 大部分 P1/P2 小中项，见 § OPT 修复轮已验证。
 
-## OPT 修复轮已验证（2026-08-29，headless 全绿 + 零 SCRIPT ERROR）
+## OPT 修复轮已验证（2026-08-29，两轮，headless 全绿 + 零 SCRIPT ERROR）
 
 | OPT | 内容 | 证据 |
 |-----|------|------|
@@ -40,6 +40,20 @@
 | G1/G5/R24 | 毒圈 ≈220s、第 3 阶段起 ≥8.6m/s、决赛圈 14m、DPS 2→4→8→16→32 | `--sim`：`zone_r=14 phase=5` 全场打完 |
 | G2/R23 | 据点 buff 仅圈内生效+多占递增；owner 死即中立播报；冻结 >10s 进度倒退 | `main.gd _recompute_buffs` + `capture_point.gd` |
 | — | sim KPI 探针 `bot_armor_avg/vv_ratio/zone_death_ratio`（回归断言依据） | `main.gd _process` |
+| C3 | DMR 武器权重 20%→8%；护甲 25/50/75 三档；SMG 12m 内 ×1.3；步枪穿甲（吸收 0.6→0.45 双方一致） | `main.gd 掉落表` + `weapon.gd` + 双方 `take_damage` |
+| C6a | 投石 0.55s 前摇：攻击环放大 + 蓄力音 + 锁定预判点 | `wild_monster.gd _throw_windup/_throw_at_player_locked` |
+| C6b | 西诺克斯跺地前摇 0.42→0.72s + 脚下 4.2m 预警环 | `hinox.gd _attack_cue` |
+| D4 | hitmarker（爆头红）+ 击杀扩散圈；`hit_landed(part)` 带部位 | `weapon.gd` + `hud.gd` + `main.gd` |
+| E4 | 3D 衰减分类：枪声/爆炸 350m、脚步 60m、其余 90m | `sfx_bank.gd play_at` |
+| G3 | 吉普 hp 400 可击毁爆炸（驾驶员/近距 40 伤）；驾驶员受伤 ×0.5 不再无敌；燃料 100 行驶消耗+油尽限速；油桶 loot 自动补给 | `vehicle.gd` + `loot.gd "fuel"` + `player.gd` |
+| G5 | 精力回复 26→15/s、延迟 0.45→1.5s | `player.gd _drain_stamina` |
+| H1 | 圈墙红橙危险配色；小地图下一目标圈描边预览（同源坐标）；圈外掉血 tick 音 | `zone.gdshader` + `hud.gd` + `zone.gd` |
+| H2 | 占领进度环向心收缩可视化 + 逐 20% tick 音 | `capture_point.gd _fill_ring` |
+| H3 | 结算新增存活时长/总伤害统计（卡片自适应）；击杀确认 | `hud.gd show_end` + `main.gd _end_stats` |
+| H5a | 飘字开深度测试不穿墙；AOE 同帧合并不吞字 | `damage_number.gd` |
+| H5b | 落地扬尘（速度分级）/近水面水花 | `player.gd` 落地段 |
+
+> 未完成（下一批，多为 L/XL 或需分块/资产再生成）：C6c 巨龙阶段、D5 弹孔、E3 音效缺口 12 类、E5 音乐扩写、F1 glb 卡通化、F3 EnvironmentDirector、F5 森林阴影、F6 草分块淡出（单 MultiMesh 的 visibility_range 为节点级，须分块）、F7 描边规范、F8 建筑细节、F9 渲染杂项、G4 空投/medkit 读条、G6 旷野定位、G7 seed 真复现、H4 特效性能包、H6 天空元素——见 `docs/OPTIMIZATION_PLAN.md` 总表。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。
 
 > 未完成（下一批）：C3/C6、D4/D5、E3–E5、F1/F3/F5–F9、G3–G7、H1–H6，见 `docs/OPTIMIZATION_PLAN.md` 总表。
 

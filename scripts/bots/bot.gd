@@ -761,8 +761,14 @@ func take_damage(amount: float, from: Variant = null, part: String = "body") -> 
 	if not alive:
 		return
 	var dmg := amount
+	# // FIX: OPT-C3 步枪穿甲：来源为步枪时吸收 0.6→0.45，与玩家侧同规则
+	var absorb_ratio := 0.6
+	if from is CharacterBody3D:
+		var fw: Variant = from.get("weapon")
+		if fw != null and fw.get("weapon_id") == "rifle":
+			absorb_ratio = 0.45
 	if armor > 0.0:
-		var absorbed := minf(armor, dmg * 0.6)
+		var absorbed := minf(armor, dmg * absorb_ratio)
 		armor -= absorbed
 		dmg -= absorbed
 	hp -= dmg

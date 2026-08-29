@@ -168,6 +168,15 @@ func _build_minimap() -> void:
 	_minimap_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap_zone.color = Color(0.25, 0.75, 1.0, 0.18)
 	_minimap_wrap.add_child(_minimap_zone)
+	# // FIX: OPT-H1/FX10 下一目标圈白色虚线预览（StyleBoxFlat 圆形描边，与 zone 同源坐标）
+	_minimap_zone_next = Panel.new()
+	_minimap_zone_next.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.draw_center = false
+	sb.border_color = Color(1.0, 1.0, 1.0, 0.75)
+	sb.set_border_width_all(1)
+	_minimap_zone_next.add_theme_stylebox_override("panel", sb)
+	_minimap_wrap.add_child(_minimap_zone_next)
 	_minimap_player = ColorRect.new()
 	_minimap_player.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap_player.size = Vector2(8, 8)
@@ -176,6 +185,7 @@ func _build_minimap() -> void:
 
 
 var _minimap_zone: ColorRect
+var _minimap_zone_next: Panel # // FIX: OPT-H1 下一目标圈预览
 var _minimap_capture_dots: Array[ColorRect] = []
 
 func update_minimap(player: Player, zone: Zone = null) -> void:
@@ -190,6 +200,19 @@ func update_minimap(player: Player, zone: Zone = null) -> void:
 		var center_px := _world_to_map(Vector3(zone.center.x, 0, zone.center.y))
 		_minimap_zone.position = center_px - Vector2(radius_px, radius_px)
 		_minimap_zone.size = Vector2(radius_px * 2, radius_px * 2)
+		# // FIX: OPT-H1/FX10 缩圈中/待缩时叠加下一目标圈虚线（同源坐标，误差 ≤2px）
+		if _minimap_zone_next:
+			var show_next: bool = zone.active and zone.phase < 5 and (zone.shrinking or zone.timer < 15.0)
+			_minimap_zone_next.visible = show_next
+			if show_next:
+				var tc: Vector3 = zone.next_target() # (center_x, radius, center_z)
+				var nr: float = tc.y / 500.0 * 164.0
+				var nc := _world_to_map(Vector3(tc.x, 0, tc.z))
+				_minimap_zone_next.position = nc - Vector2(nr, nr)
+				_minimap_zone_next.size = Vector2(nr * 2, nr * 2)
+				var sb := _minimap_zone_next.get_theme_stylebox("panel") as StyleBoxFlat
+				if sb:
+					sb.set_corner_radius_all(int(nr))
 
 
 
@@ -495,41 +518,75 @@ func _update_heartbeat(on: bool) -> void:
 var _dmg_arc: Control
 var _dmg_dir_angle := 0.0
 var _dmg_dir_t := 0.0
+var _hit_t := 0.0 # // FIX: D4/CB17 hitmarker
+var _hit_head := false
+var _kill_t := 0.0 # // FIX: D4 击杀扩散圈
 
-func show_damage_direction(angle: float) -> void:
+func show_hitmarker(headshot: bool) -> void:
+	_ensure_feedback_arc()
+	_hit_head = headshot
+	_hit_t = 0.18
+
+# // FIX: D4 击杀确认：准星扩散圈
+func show_kill_confirm() -> void:
+	_ensure_feedback_arc()
+	_kill_t = 0.35
+
+func _ensure_feedback_arc() -> void:
 	if _dmg_arc == null:
 		_dmg_arc = Control.new()
 		_dmg_arc.set_anchors_preset(Control.PRESET_FULL_RECT)
 		_dmg_arc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_dmg_arc.draw.connect(_draw_dmg_arc)
 		_ui.add_child(_dmg_arc)
+
+func show_damage_direction(angle: float) -> void:
+	_ensure_feedback_arc()
 	_dmg_dir_angle = angle
 	_dmg_dir_t = 0.8
 	_dmg_arc.queue_redraw()
 
 
 func _draw_dmg_arc() -> void:
-	if _dmg_arc == null or _dmg_dir_t <= 0.0:
-		return
 	var c := _dmg_arc.size * 0.5
-	var r := minf(_dmg_arc.size.x, _dmg_arc.size.y) * 0.30
-	var alpha := clampf(_dmg_dir_t / 0.8, 0.0, 1.0) * 0.9
-	_dmg_arc.draw_arc(c, r, _dmg_dir_angle - 0.9, _dmg_dir_angle + 0.9, 24, Color(1.0, 0.28, 0.22, alpha), 10.0)
+	# // FIX: OPT-D3 受击方向弧
+	if _dmg_dir_t > 0.0:
+		var r := minf(_dmg_arc.size.x, _dmg_arc.size.y) * 0.30
+		var alpha := clampf(_dmg_dir_t / 0.8, 0.0, 1.0) * 0.9
+		_dmg_arc.draw_arc(c, r, _dmg_dir_angle - 0.9, _dmg_dir_angle + 0.9, 24, Color(1.0, 0.28, 0.22, alpha), 10.0)
+	# // FIX: D4/CB17 hitmarker 四角斜刻（爆头红色）
+	if _hit_t > 0.0:
+		var a := clampf(_hit_t / 0.18, 0.0, 1.0)
+		var col := Color(1.0, 0.25, 0.20, a) if _hit_head else Color(1.0, 1.0, 1.0, a * 0.9)
+		var g := 7.0
+		var d := 11.0
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				_dmg_arc.draw_line(c + Vector2(sx * g, sy * g), c + Vector2(sx * d, sy * d), col, 2.5)
+	# // FIX: D4 击杀扩散圈
+	if _kill_t > 0.0:
+		var k := 1.0 - _kill_t / 0.35
+		var kcol := Color(1.0, 0.85, 0.35, (1.0 - k) * 0.9)
+		_dmg_arc.draw_arc(c, 14.0 + k * 22.0, 0, TAU, 32, kcol, 3.0)
 
 
 func _process(delta: float) -> void:
 	# // FIX: OPT-D3 方向弧倒计时与濒死红晕脉动
 	if _dmg_dir_t > 0.0:
 		_dmg_dir_t -= delta
-		if _dmg_arc:
-			_dmg_arc.queue_redraw()
+	if _hit_t > 0.0:
+		_hit_t -= delta
+	if _kill_t > 0.0:
+		_kill_t -= delta
+	if _dmg_arc and (_dmg_dir_t > 0.0 or _hit_t > 0.0 or _kill_t > 0.0):
+		_dmg_arc.queue_redraw()
 	if _low_hp_on and _vignette and not _danger_on:
 		_vignette.modulate.a = 0.25 + sin(Time.get_ticks_msec() * 0.006) * 0.10
 
 
 # ---------- 结算 ----------
 
-func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
+func show_end(victory: bool, rank: int, kills: int, total: int, extra_stats: Array = []) -> void:
 	if _end_panel:
 		return
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -537,15 +594,23 @@ func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
 	_end_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_ui.add_child(_end_panel)
 	_mk_rect(_end_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.62))
-	# 结算卡片：主题顶条 + 大字排名 + 分隔线 + 数据行，胜金败红。
+	# 结算卡片：主题顶条 + 大字排名 + 分隔线 + 数据行，胜金败红。高度随统计行数自适应。
 	var accent := Color(1.0, 0.85, 0.3) if victory else Color(0.95, 0.42, 0.32)
+	var stats := [
+		["击  杀", "%d" % kills, Color(0.95, 0.55, 0.45)],
+		["评  价", _rank_comment(victory, rank, total), Color(0.55, 0.85, 0.95)],
+	]
+	# // FIX: OPT-H3/PG14 结算统计扩展：存活时长/总伤害等（色块+文字冗余保持 M5 口径）
+	for extra in extra_stats:
+		stats.append([str(extra[0]), str(extra[1]), Color(0.85, 0.80, 0.60)])
+	var card_h := 320.0 + stats.size() * 42.0
 	var card := Control.new()
 	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.position = Vector2(-260, -190)
-	card.size = Vector2(520, 380)
+	card.position = Vector2(-260, -card_h * 0.5)
+	card.size = Vector2(520, card_h)
 	_end_panel.add_child(card)
-	_mk_rect(card, Vector2.ZERO, Vector2(520, 380), Color(0.05, 0.06, 0.08, 0.92))
-	_mk_rect(card, Vector2(6, 6), Vector2(508, 368), Color(0.10, 0.13, 0.16, 0.85))
+	_mk_rect(card, Vector2.ZERO, Vector2(520, card_h), Color(0.05, 0.06, 0.08, 0.92))
+	_mk_rect(card, Vector2(6, 6), Vector2(508, card_h - 12.0), Color(0.10, 0.13, 0.16, 0.85))
 	_mk_rect(card, Vector2(6, 6), Vector2(508, 6), accent)
 	var title := _mk_label(card, "大吉大利，今晚吃鸡！" if victory else "阵  亡", 38, accent)
 	title.position = Vector2(0, 28)
@@ -560,10 +625,6 @@ func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
 	total_label.size.x = 520
 	total_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_mk_rect(card, Vector2(60, 206), Vector2(400, 2), Color(0.35, 0.38, 0.42, 0.8))
-	var stats := [
-		["击  杀", "%d" % kills, Color(0.95, 0.55, 0.45)],
-		["评  价", _rank_comment(victory, rank, total), Color(0.55, 0.85, 0.95)],
-	]
 	for i in range(stats.size()):
 		var row: Array = stats[i]
 		_mk_rect(card, Vector2(122, 236 + i * 42), Vector2(14, 14), row[2])
@@ -572,7 +633,7 @@ func show_end(victory: bool, rank: int, kills: int, total: int) -> void:
 		var val_l := _mk_label(card, str(row[1]), 22, Color(0.97, 0.93, 0.80))
 		val_l.position = Vector2(252, 228 + i * 42)
 	var hint := _mk_label(card, "按 R 重新开始", 19, Color(0.75, 0.88, 1.0))
-	hint.position = Vector2(0, 330)
+	hint.position = Vector2(0, 246 + stats.size() * 42)
 	hint.size.x = 520
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ignore_mouse(_end_panel)

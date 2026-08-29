@@ -1,6 +1,6 @@
 # zhandi3 优化方案与任务拆解（2026-08-29）
 
-> **执行状态（2026-08-29 修复轮收尾）**：P0 批次全部完成并通过验证——A1-A6、B1-B5、B6、G1、G2 + P1 中的 C1/C2/C4/C5、D2/D3/D6/D7(部分)、E1、E2、F2、F4。验证记录：headless 基座/`--wildtest`/`--firetest`/`--sim` 全绿零 SCRIPT ERROR；sim KPI `bot_armor_avg` 50–100%、`vv_ratio` 0.41–0.58；毒圈 `zone_r=14 phase=5` 全场打完；视觉修复以 `/tmp/r_fp3.png`（突击步枪+视模型）、`/tmp/r_night.png`（夜景压暗）截图为凭。明细见 `ISSUES.md` § OPT 修复轮已验证。未完成：C3/C6、D4/D5、E3–E5、F1/F3/F5–F9、G3–G7、H1–H6。
+> **执行状态（2026-08-29 修复轮收尾，两轮提交）**：P0 批次全部完成并通过验证——A1-A6、B1-B6、G1、G2；P1/P2 完成 C1-C5、C3、C6(除 C6c 巨龙)、D2/D3/D4/D6/D7(部分)、E1/E2/E4、F2/F4、G3(吉普)、G5、H1/H2/H3/H5(部分)。验证记录：headless 基座/`--wildtest`/`--firetest`/`--seasontest`/`--feedtest`/`--focusrecoverytest`/`--sim` 全绿零 SCRIPT ERROR；sim KPI `bot_armor_avg` 50–100%、`vv_ratio` 0.41–0.58；毒圈 `zone_r=14 phase=5` 全场打完；视觉修复以截图为凭（突击步枪标签/视模型修正/夜景压暗/圈墙红橙）。明细见 `ISSUES.md` § OPT 修复轮已验证。未完成：C6c、D5、E3/E5、F1/F3/F5-F9、G4/G6/G7、H4/H6。
 > 定位：`docs/ISSUES.md` 定义"是什么/为什么"，`docs/ROADMAP.md` 定义"何时做/门禁"，本文件把 `docs/REVIEW_20260829.md`（玩家×策划全面评审，75 条问题）拆解为**可直接开工的任务**，每条含改动要点与可执行验收条件。
 > 任务 ID 规则 `OPT-<工作流><序号>`，提交信息与代码注释沿用工程惯例：`fix(OPT-A3): ...` + `// FIX: OPT-A3 ...` 可追踪前缀；任务完成时同步更新 `ISSUES.md` 对应行（新增行在标题中带 OPT ID）。
 > 规模：S<0.5 天 / M 0.5–2 天 / L 2–5 天 / XL>5 天。优先级：P0（对抗成立性）/ P1（手感与表现）/ P2（长线与打磨）。

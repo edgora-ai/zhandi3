@@ -14,6 +14,8 @@ var _home := Vector3.ZERO
 var _wander_target := Vector3.ZERO
 var _think := 0.0
 var _throw_cooldown := 1.0
+var _throw_windup := -1.0 # // FIX: OPT-C6 投石前摇计时
+var _locked_throw_target := Vector3.ZERO # // FIX: OPT-C6 前摇开始时锁定预判点
 var _hit_cooldown := 0.0
 var _anim_time := 0.0
 var _arm_left: Node3D
@@ -220,10 +222,27 @@ func _physics_process(delta: float) -> void:
 			if sfx_charge:
 				sfx_charge.play_at("enemy_charge", global_position + Vector3(0, 1.0, 0), -10.0, 1.28)
 	elif distance < 46.0:
-		move_dir = to_player.normalized() * 0.25
-		if _throw_cooldown <= 0.0:
-			_throw_at_player()
-			_throw_cooldown = randf_range(1.8, 2.7)
+		# // FIX: OPT-C6/CB13 投石 0.55s 前摇：脚下攻击环放大提示 + 蓄力音，锁定发射瞬间预判点（可闪避）
+		if _throw_windup >= 0.0:
+			_throw_windup -= delta
+			move_dir = Vector3.ZERO
+			if _attack_cue:
+				_attack_cue.visible = true
+				_attack_cue.scale = Vector3.ONE * (1.4 + (0.55 - _throw_windup) * 2.2)
+			if _throw_windup <= 0.0:
+				_throw_windup = -1.0
+				if _attack_cue:
+					_attack_cue.visible = false
+				_throw_at_player_locked()
+				_throw_cooldown = randf_range(1.8, 2.7)
+		else:
+			move_dir = to_player.normalized() * 0.25
+			if _throw_cooldown <= 0.0:
+				_throw_windup = 0.55
+				_locked_throw_target = player.global_position + Vector3(0, 1.0, 0) + player.velocity * 0.25
+				var sfx_windup := get_tree().get_first_node_in_group("sfx_bank")
+				if sfx_windup:
+					sfx_windup.play_at("enemy_charge", global_position + Vector3(0, 1.0, 0), -10.0, 0.9)
 	else:
 		_think -= delta
 		if _think <= 0.0:
@@ -257,9 +276,12 @@ func _physics_process(delta: float) -> void:
 		_arm_right.rotation.x = lerpf(_arm_right.rotation.x, -1.25 if distance > 12.0 and distance < 46.0 else sin(_anim_time * 9.0) * stride, delta * 6.0)
 
 
-func _throw_at_player() -> void:
+func _throw_at_player_locked() -> void:
+	# // FIX: OPT-C6 使用前摇开始时锁定的预判点（预警期玩家位移可躲）；直调（测试钩子）时回退实时预判
 	var origin := global_position + Vector3(0, 1.55, 0)
-	var target := player.global_position + Vector3(0, 1.0, 0) + player.velocity * 0.25
+	var target := _locked_throw_target
+	if target == Vector3.ZERO and player:
+		target = player.global_position + Vector3(0, 1.0, 0) + player.velocity * 0.25
 	var delta := target - origin
 	var horizontal := Vector3(delta.x, 0, delta.z)
 	var flight_time := clampf(horizontal.length() / 13.0, 0.35, 1.5)

@@ -51,6 +51,8 @@ var _stamina_wait := 0.0
 var _stamina_used := false
 var alive := true
 var damage_mult := 1.0
+var damage_dealt := 0.0 # // FIX: OPT-H3/PG14 结算统计：玩家总输出
+var fuel_cans := 0 # // FIX: OPT-G3/M2 载具油桶携带数
 var regen_rate := 0.0
 var display_name := "玩家"
 var kills := 0
@@ -139,6 +141,7 @@ var _trail_inner: Array[Vector3] = []
 var _melee_target: CharacterBody3D = null
 var melee_damage := MELEE_DAMAGE
 var _footstep_cd := 0.0
+var _last_frame_vy := 0.0 # // FIX: OPT-H5 落地冲击速度（扬尘强度）
 var _climb_sfx_cd := 0.0
 var _swim_sfx_cd := 0.0
 var _landed_last_frame := true
@@ -667,6 +670,7 @@ func _surface_footstep() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	_last_frame_vy = velocity.y # // FIX: OPT-H5 记录落地前垂直速度
 	_check_timed_consumables()
 	_update_shake(delta)
 	if not alive:
@@ -778,6 +782,14 @@ func _physics_process(delta: float) -> void:
 			var _sfx_l := get_tree().get_first_node_in_group("sfx_bank")
 			if _sfx_l:
 				_sfx_l.play_at("heavy_impact", global_position, -10.0, 1.12)
+			# // FIX: OPT-H5/FX20 落地扬尘：按下落速度生成尘土 puff（近水面为水花）
+			var impact_spd := absf(_last_frame_vy)
+			if impact_spd > 6.0:
+				if global_position.y < Terrain.WATER_LEVEL + 0.4:
+					FX.impact(global_position + Vector3(0, 0.3, 0), Color(0.80, 0.92, 1.0))
+				else:
+					for _i in range(3 if impact_spd < 12.0 else 6):
+						FX.impact(global_position + Vector3(randf_range(-0.4, 0.4), 0.15, randf_range(-0.4, 0.4)), Color(0.62, 0.55, 0.42))
 		_landed_last_frame = true
 		if is_dropping:
 			is_dropping = false
@@ -857,10 +869,11 @@ func _physics_process(delta: float) -> void:
 	if regen_rate > 0.0 and hp < max_hp:
 		hp = minf(max_hp, hp + regen_rate * delta)
 		health_changed.emit(hp, armor)
-	# 精力回复：本帧无消耗且过了短暂延迟后快速回满。
+	# 精力回复：停手 1.5s 后以 15/s 回复（原 0.45s/26s 近乎免费，滑翔撤离无机会成本）
 	_stamina_wait = maxf(0.0, _stamina_wait - delta)
 	if not _stamina_used and _stamina_wait <= 0.0:
-		stamina = minf(max_stamina, stamina + 26.0 * delta)
+		# // FIX: OPT-G5/PG12 精力回复 26→15/s、延迟 0.45→1.5s：滑翔/疾跑恢复资源压力
+		stamina = minf(max_stamina, stamina + 15.0 * delta)
 	_stamina_used = false
 
 	# 武器输入（持续按住）
@@ -1187,6 +1200,15 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		return
 	var dmg := amount
 	dmg *= damage_taken_mult
+	# // FIX: OPT-G3/PG5 驾驶员受击伤害 ×0.5（恢复受击层后不再无敌，但载具提供掩蔽减伤）
+	if vehicle != null:
+		dmg *= 0.5
+	# // FIX: OPT-C3 步枪穿甲定位：来源为步枪时护甲吸收 0.6→0.45（20-50m 生态位）
+	var absorb_ratio := 0.6
+	if from is CharacterBody3D:
+		var fw: Variant = from.get("weapon")
+		if fw != null and fw.get("weapon_id") == "rifle":
+			absorb_ratio = 0.45
 	# 完美闪避：闪身窗口内被击中触发专注时停——无伤且时间变慢。
 	if Time.get_ticks_msec() / 1000.0 < _dodge_iframe_end:
 		_start_flurry()
@@ -1221,7 +1243,7 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 				if hud and dmg >= 8.0:
 					hud.add_feed("格挡住了攻击")
 	if armor > 0.0:
-		var absorbed := minf(armor, dmg * 0.6)
+		var absorbed := minf(armor, dmg * absorb_ratio)
 		armor -= absorbed
 		dmg -= absorbed
 	hp -= dmg
@@ -1679,6 +1701,7 @@ func _combo_poses() -> Array:
 func _apply_melee_hit() -> void:
 	# // FIX: OPT-C4/G8/R25 近战同乘 damage_mult（据点 buff/烤串/面具对近战生效）；疾疾倍率 2.0→1.5（OPT-B4）
 	var mult := (1.35 if _combo_i == 2 else 1.0) * (1.5 if flurry else 1.0) * armor_melee_mult * damage_mult
+	var hit_dmg := melee_damage * mult
 	var hit_something := false
 	var hit_pos := camera.global_position + get_aim_dir() * 1.6
 	var forward := get_aim_dir()
@@ -1690,7 +1713,8 @@ func _apply_melee_hit() -> void:
 	if not result.is_empty():
 		var col: Object = result.collider
 		if col.has_method("take_damage"):
-			col.take_damage(melee_damage * mult, self, "body")
+			col.take_damage(hit_dmg, self, "body")
+			damage_dealt += hit_dmg # // FIX: OPT-H3
 			hit_something = true
 			hit_pos = result.position
 			if col is CharacterBody3D:
@@ -1712,7 +1736,8 @@ func _apply_melee_hit() -> void:
 			if to_t.length() > 2.6 or to_t.normalized().dot(forward) < 0.5:
 				continue
 			if target.has_method("take_damage"):
-				target.take_damage(melee_damage * mult, self, "body")
+				target.take_damage(hit_dmg, self, "body")
+				damage_dealt += hit_dmg # // FIX: OPT-H3
 				hit_ids[target.get_instance_id()] = true
 				if target.has_method("apply_melee_impulse"):
 					target.apply_melee_impulse(forward, 7.0, _combo_i == 2)
@@ -1936,7 +1961,7 @@ func _set_gliding(enabled: bool) -> void:
 func _drain_stamina(amount: float) -> void:
 	stamina = maxf(0.0, stamina - amount)
 	_stamina_used = true
-	_stamina_wait = 0.45
+	_stamina_wait = 1.5 # // FIX: OPT-G5/PG12 回复延迟 0.45→1.5s
 
 
 func _set_player_capsule(mode: String) -> void:

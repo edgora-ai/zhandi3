@@ -26,6 +26,7 @@ var match_over := false
 var _sim_bot_deaths := 0 # // FIX: OPT-A1/A2 sim KPI 计数
 var _sim_vv_kills := 0
 var _sim_zone_deaths := 0
+var _match_t := 0.0 # // FIX: OPT-H3 结算存活时长
 var total_combatants := BOT_COUNT + 1
 var _buff_acc := 0.0
 
@@ -498,7 +499,10 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	player.damaged.connect(func(_a: float) -> void: hud.flash_damage())
 	player.weapon.ammo_changed.connect(hud.set_ammo)
 	player.weapon.fired.connect(func() -> void: sfx.play("shot_" + player.weapon.weapon_id, -2.0))
-	player.weapon.hit_landed.connect(func() -> void: sfx.play("hit", -8.0))
+	player.weapon.hit_landed.connect(func(part: String) -> void:
+		sfx.play("hit", -8.0)
+		hud.show_hitmarker(part == "head") # // FIX: D4/CB17 爆头红色 hitmarker
+	)
 	# // FIX: VIS1 武器名随武器切换事件驱动更新（截图模式 _process 早退时也正确）
 	player.weapon.weapon_changed.connect(func(_id: String) -> void: hud.set_weapon_name(player.weapon.label()))
 	player.grenade_thrown.connect(func(left: int) -> void: hud.add_feed("掷出烟雾弹（剩 %d）" % left))
@@ -603,22 +607,42 @@ func _drop_loot_at(rng: RandomNumberGenerator, pos: Vector3) -> void:
 	var roll := rng.randf()
 	if roll < 0.45:
 		var w := rng.randf()
-		if w < 0.40:
+		# // FIX: OPT-C3/PG10 DMR 武器权重 20%→8%（原最强枪垄断掉落），SMG/步枪 46%/46%
+		if w < 0.46:
 			Loot.spawn(self, pos, "weapon", "smg", 0, 1)
-		elif w < 0.80:
+		elif w < 0.92:
 			Loot.spawn(self, pos, "weapon", "rifle", 0, 2)
 		else:
 			Loot.spawn(self, pos, "weapon", "dmr", 0, 3)
 	elif roll < 0.63:
-		var amt := 50 if rng.randf() < 0.4 else 25
-		Loot.spawn(self, pos, "armor", "", amt, 2 if amt == 50 else 1)
-	elif roll < 0.81:
+		# // FIX: OPT-C3 补 r3 重甲 75（低概率），护甲 25/50/75 三档拉开 TTK 差
+		var ar := rng.randf()
+		var amt := 25
+		var rar := 1
+		if ar < 0.15:
+			amt = 75
+			rar = 3
+		elif ar < 0.55:
+			amt = 50
+			rar = 2
+		Loot.spawn(self, pos, "armor", "", amt, rar)
+	elif roll < 0.79:
 		Loot.spawn(self, pos, "medkit", "", 60 if rng.randf() < 0.5 else 40, 1)
+	elif roll < 0.81:
+		Loot.spawn(self, pos, "fuel", "", 1, 2) # // FIX: OPT-G3 油桶补给
 	else:
 		Loot.spawn(self, pos, "ammo", "", 90 if rng.randf() < 0.4 else 45, 1)
 
 
 # ---------- 比赛事件 ----------
+
+# // FIX: OPT-H3 结算附加统计：存活时长 / 总输出伤害
+func _end_stats() -> Array:
+	return [
+		["存活时长", "%d:%02d" % [int(_match_t) / 60, int(_match_t) % 60]],
+		["总伤害", "%d" % int(player.damage_dealt)],
+	]
+
 
 func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 	var killer_name := "毒圈"
@@ -635,6 +659,9 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 			_sim_vv_kills += 1
 		elif killer == null:
 			_sim_zone_deaths += 1
+	# // FIX: D4 击杀确认扩散圈
+	if killer == player and victim != player:
+		hud.show_kill_confirm()
 
 	if victim == player:
 		if _map_id == "wild":
@@ -649,14 +676,14 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 		sfx.play("heavy_impact", -4.0, 0.65)
 		var rank := _alive_count() + 1
 		get_tree().create_timer(1.5).timeout.connect(func() -> void:
-			hud.show_end(false, rank, player.kills, total_combatants)
+			hud.show_end(false, rank, player.kills, total_combatants, _end_stats())
 		)
 		return
 	if _map_id != "wild" and not match_over and _alive_count() == 1 and player.alive:
 		match_over = true
 		player.input_locked = true
 		sfx.play("victory", -2.0)
-		hud.show_end(true, 1, player.kills, total_combatants)
+		hud.show_end(true, 1, player.kills, total_combatants, _end_stats())
 
 
 # 旷野模式重生：回到最近的神庙入口，满血满精力，世界状态照旧。
@@ -1037,6 +1064,9 @@ func _poll_focus_recovery() -> void:
 
 
 func _process(delta: float) -> void:
+	# // FIX: OPT-H3 对局时长统计（结算用）
+	if not match_over:
+		_match_t += delta
 	# 昼夜音乐：每秒检查一次昼夜状态，入夜/天明交叉切换配乐。
 	_music_check_t -= delta
 	if _music_check_t <= 0.0:
@@ -1273,7 +1303,7 @@ func _update_wild_test() -> void:
 				var enemy_pos := player.global_position + Vector3(0, 0, -9)
 				enemy_pos.y = terrain.get_height(enemy_pos.x, enemy_pos.z) + 0.05
 				enemy.global_position = enemy_pos
-				enemy._throw_at_player()
+				enemy._throw_at_player_locked() # // FIX: OPT-C6 改名后同步测试钩子
 		300:
 			var projectiles := get_tree().get_nodes_in_group("wild_projectile")
 			var projectile_pos := Vector3.ZERO

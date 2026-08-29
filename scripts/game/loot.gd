@@ -67,6 +67,9 @@ func _build_visual() -> void:
 			_build_box(Vector3(0.1, 0.08, 0.26), Color(0.85, 0.15, 0.12), Vector3(0, 0.12, 0))
 		"ammo":
 			_build_box(Vector3(0.34, 0.2, 0.24), Color(0.45, 0.38, 0.2))
+		# // FIX: OPT-G3 蓝色油桶
+		"fuel":
+			_build_box(Vector3(0.34, 0.44, 0.34), Color(0.25, 0.50, 0.85))
 		"mushroom":
 			_build_mushroom()
 		"meat":
@@ -323,6 +326,8 @@ func describe() -> String:
 			return "医疗包 +%d" % amount
 		"ammo":
 			return "弹药 +%d" % amount
+		"fuel":
+			return "燃油桶（载具燃料）"
 		"mushroom":
 			return "旷野蘑菇 ×%d（收入背包）" % amount
 		"meat":
@@ -363,6 +368,12 @@ func apply_to(target: CharacterBody3D) -> void:
 		"ammo":
 			if target.has_method("give_ammo"):
 				target.give_ammo(amount)
+		# // FIX: OPT-G3/M2 油桶：+1 携带，载具油量低时自动消耗
+		"fuel":
+			if target.get("fuel_cans") != null:
+				target.fuel_cans += 1
+				if target.get("hud"):
+					target.hud.add_feed("拾取燃油桶（携带 %d）" % int(target.fuel_cans))
 		"mushroom", "meat", "dragon_scale", "wood", "monster_part":
 			if target.has_method("give_item"):
 				target.give_item(kind, amount)

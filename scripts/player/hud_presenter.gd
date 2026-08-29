@@ -26,6 +26,14 @@ static func refresh(m: Node) -> void: # 动态访问 main（无 class_name，鸭
 			m.hud.set_interact("按 E 进入神庙")
 		elif m.player.nearby_shrine_exit:
 			m.hud.set_interact("按 E 离开神庙")
+		elif m.player.nearby_chest:
+			m.hud.set_interact("按 E 打开宝箱")
+		elif m.player.nearby_beacon:
+			m.hud.set_interact("按 E 传送")
+		elif m.player.nearby_bed:
+			m.hud.set_interact("按 E 睡到天亮")
+		elif m.player.nearby_fish:
+			m.hud.set_interact("按 E 抓鱼")
 		else:
 			m.hud.set_interact("")
 		m.hud.set_weapon_name(m.player.weapon.label())

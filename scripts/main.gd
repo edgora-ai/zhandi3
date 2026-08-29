@@ -27,6 +27,8 @@ var _sim_bot_deaths := 0 # // FIX: OPT-A1/A2 sim KPI 计数
 var _sim_vv_kills := 0
 var _sim_zone_deaths := 0
 var _match_t := 0.0 # // FIX: OPT-H3 结算存活时长
+var _tutorial_step := -1 # // FIX: R11-lite 首局教学（-1 关闭）
+var _tutorial_t := 0.0
 var _airdrops := 0 # // FIX: OPT-G4 空投计数
 # // FIX: R4-G7b 二周目存档最小闭环（C5-lite）：结算写入 user://save_v1.json（原子写），
 # 新局读取出击次数推 bot skill 下限（0.7→0.9→1.1 封顶），重载可读、损坏回退默认
@@ -187,6 +189,10 @@ func _ready() -> void:
 	_load_save() # // FIX: R4-G7b
 	if int(save_data.get("runs", 0)) > 0:
 		print("[save] runs=%d best=%d ng_floor=%.1f" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor()])
+	elif _map_id == "battlefield":
+		# // FIX: R11-lite 首局三步教学（老玩家局自动跳过）
+		_tutorial_step = 0
+		_tutorial_t = 3.0
 	daynight.season_palette = seasons.current_palette # // FIX: OPT-F3-light 初始调色板（daynight 建好后回填）
 	daynight.blood_moon_started.connect(_on_blood_moon)
 	daynight.blood_moon_ended.connect(func() -> void:
@@ -1181,6 +1187,26 @@ func _process(delta: float) -> void:
 	# // FIX: OPT-H3 对局时长统计（结算用）
 	if not match_over:
 		_match_t += delta
+	# // FIX: R11-lite 首局三步教学推进
+	if _tutorial_step >= 0:
+		_tutorial_t -= delta
+		if _tutorial_t <= 0.0:
+			match _tutorial_step:
+				0:
+					hud.add_feed("教学 1/3：移动 WASD，鼠标视角；空格跳跃")
+					_tutorial_step = 1
+					_tutorial_t = 10.0
+				1:
+					hud.add_feed("教学 2/3：靠近光柱按 E 拾取武器和护甲")
+					_tutorial_step = 2
+					_tutorial_t = 10.0
+				2:
+					hud.add_feed("教学 3/3：跟着白圈跑进安全区，圈外会持续掉血")
+					_tutorial_step = 3
+					_tutorial_t = 8.0
+				3:
+					hud.add_feed("活到最后，大吉大利！")
+					_tutorial_step = -1
 	# 昼夜音乐：每秒检查一次昼夜状态，入夜/天明交叉切换配乐。
 	_music_check_t -= delta
 	if _music_check_t <= 0.0:

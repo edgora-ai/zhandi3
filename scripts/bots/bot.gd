@@ -342,6 +342,22 @@ func get_hit_part(shape_idx: int) -> String:
 
 func give_weapon(id: String) -> void:
 	if weapon.weapon_id != "":
+		# // FIX: R4-2 换枪升级：更稀有的枪在 12m 内允许替换（丢旧枪落地），原首把枪锁死不升级
+		var new_rarity: int = {"smg": 1, "rifle": 2, "dmr": 3}.get(id, 1)
+		var cur_rarity: int = {"smg": 1, "rifle": 2, "dmr": 3}.get(weapon.weapon_id, 1)
+		var pl_dist := 999.0
+		for c in get_tree().get_nodes_in_group("combatant"):
+			if c is Player:
+				pl_dist = global_position.distance_to(c.global_position)
+				break
+		if new_rarity <= cur_rarity or pl_dist > 12.0:
+			return
+		var old_id := weapon.weapon_id
+		weapon.set_weapon(id, Weapon.WEAPONS[id].mag, Weapon.WEAPONS[id].start_reserve)
+		var pos := global_position
+		if terrain:
+			pos.y = terrain.get_height(pos.x, pos.z) + 0.1
+		Loot.spawn(get_parent(), pos + Vector3(0.6, 0, 0), "weapon", old_id, 0, cur_rarity)
 		return
 	weapon.set_weapon(id, Weapon.WEAPONS[id].mag, Weapon.WEAPONS[id].start_reserve)
 

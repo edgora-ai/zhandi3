@@ -103,6 +103,7 @@
 | G7b | **二周目存档最小闭环（C5-lite）**：user://save_v1.json 版本化原子写（tmp→rename）；结算写入 runs/best_rank/total_kills；启动读取并播报；bot skill 下限 0.7→0.8→0.9→1.0 随局数递增。**实测**：一局死亡后落盘 `{"runs":1,"best_rank":23}`，重载打印 `[save] runs=1 best=23 ng_floor=0.8`，损坏回退默认 | main.gd _load_save/_record_run/_write_save/_ng_skill_floor |
 | R3-TA6b | day_light 重复注册守卫（project.godot 声明后运行时 add 报错） | day_night.gd |
 
+> R5b 追加：bot 换枪升级（更稀有且玩家 12m 内，旧枪落地）；R11-lite 首局三步教学（WASD/E/跑圈，仅 save runs==0 触发，老玩家自动跳过）。
 > 未完成（维持原状）：R14-R20 架构重构（Phase 2/3 既定范围，本轮评估后不做——上帝类拆分风险大于收益）。
 
 > 未完成（全部为 XL 级或依赖外部前置）：

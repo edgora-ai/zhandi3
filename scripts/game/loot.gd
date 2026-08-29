@@ -364,20 +364,18 @@ func apply_to(target: CharacterBody3D) -> void:
 			if target.has_signal("health_changed"):
 				target.health_changed.emit(target.hp, target.armor)
 		"medkit":
-			var cap := 100.0
+			# // FIX: R9 即拾即用（原 3s 读条在实战节奏下是灾难：按左键开火即断、被蹭一枪即断，
+			# 血包消耗了却没回血；G4/PG11 的"读条决策"设计在本作节奏里不成立，回归直回）
+			var cap2 := 100.0
 			if "max_hp" in target:
-				cap = float(target.get("max_hp"))
-			# // FIX: OPT-G4/PG11 玩家 medkit 改 3s 读条（受击打断不消耗，可被针对）；bot 保持即拾即用
-			if target is Player and target.get("hp") < cap - 1.0:
-				target.start_med_channel(float(amount))
-			elif target is Player and target.get("hp") >= cap - 1.0:
-				if target.hud:
+				cap2 = float(target.get("max_hp"))
+			if target.get("hp") >= cap2 - 1.0:
+				if target is Player and target.hud:
 					target.hud.add_feed("生命已满")
 				return
-			else:
-				target.hp = minf(cap, target.hp + amount)
-				if target.has_signal("health_changed"):
-					target.health_changed.emit(target.hp, target.armor)
+			target.hp = minf(cap2, target.hp + amount)
+			if target.has_signal("health_changed"):
+				target.health_changed.emit(target.hp, target.armor)
 		"ammo":
 			if target.has_method("give_ammo"):
 				target.give_ammo(amount)

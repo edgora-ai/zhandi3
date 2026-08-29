@@ -896,7 +896,6 @@ func _physics_process(delta: float) -> void:
 	if regen_rate > 0.0 and hp < max_hp:
 		hp = minf(max_hp, hp + regen_rate * delta)
 		health_changed.emit(hp, armor)
-	_update_med_channel(delta) # // FIX: OPT-G4 医疗读条推进
 	# 精力回复：停手 1.5s 后以 15/s 回复（原 0.45s/26s 近乎免费，滑翔撤离无机会成本）
 	_stamina_wait = maxf(0.0, _stamina_wait - delta)
 	if not _stamina_used and _stamina_wait <= 0.0:
@@ -906,12 +905,6 @@ func _physics_process(delta: float) -> void:
 
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		# // FIX: R3-P1-4 读条期间开火自动打断治疗（原可边打边吸，读条脆弱窗设计失效）
-		if _med_channel_t > 0.0 and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			_med_channel_t = -1.0
-			_med_amount = 0.0
-			if hud:
-				hud.add_feed("开火打断了治疗")
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			if _magnet_prop:
 				_throw_magnet()
@@ -1097,35 +1090,6 @@ func give_ammo(amount: int) -> void:
 		var total: int = reserves[weapon_slots[slot_index]]
 		if total >= 240 and hud:
 			hud.add_feed("备弹已满（240）")
-
-
-# ---------- 医疗包读条（G4/PG11） ----------
-
-var _med_channel_t := -1.0
-var _med_amount := 0.0
-
-func start_med_channel(amount: float) -> void:
-	# // FIX: OPT-G4/PG11 medkit 3s 读条：受伤 >2 取消且不消耗
-	if _med_channel_t > 0.0:
-		hp = minf(max_hp, hp + _med_amount * 0.5) # 连拾叠加按半额立即结算上一份
-	_med_channel_t = 3.0
-	_med_amount = amount
-	if hud:
-		hud.add_feed("使用医疗包...（3 秒，受击会打断）")
-
-func _update_med_channel(delta: float) -> void:
-	if _med_channel_t <= 0.0:
-		return
-	_med_channel_t -= delta
-	if hud:
-		hud.set_med_progress(1.0 - _med_channel_t / 3.0)
-	if _med_channel_t <= 0.0:
-		hp = minf(max_hp, hp + _med_amount)
-		health_changed.emit(hp, armor)
-		if hud:
-			hud.set_med_progress(-1.0)
-			hud.add_feed("治疗完成 +%d" % int(_med_amount))
-		_med_amount = 0.0
 
 
 # 卢比：敌人掉落，行商处消费。
@@ -1318,13 +1282,6 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		var absorbed := minf(armor, dmg * absorb_ratio)
 		armor -= absorbed
 		dmg -= absorbed
-	# // FIX: OPT-G4 医疗读条被打断（不消耗）
-	if _med_channel_t > 0.0 and dmg > 2.0:
-		_med_channel_t = -1.0
-		_med_amount = 0.0
-		if hud:
-			hud.set_med_progress(-1.0)
-			hud.add_feed("治疗被打断！")
 	hp -= dmg
 	damaged.emit(dmg)
 	# // FIX: OPT-D3 受击方向指示：玩家系内计算攻击者方位角传 HUD（屏幕上方=前方）

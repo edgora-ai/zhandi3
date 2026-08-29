@@ -479,6 +479,95 @@ func set_med_progress(p: float) -> void:
 		_med_bar.size.x = 176.0 * clampf(p, 0.0, 1.0)
 
 
+# ---------- 设置面板（R4-U1 Esc 唤出，暂停态） ----------
+var settings_panel: Control
+var settings_open := false
+
+func toggle_settings(m: Node) -> void:
+	settings_open = not settings_open
+	if settings_panel == null:
+		_build_settings(m)
+	settings_panel.visible = settings_open
+	# // FIX: R9 不再 get_tree().paused（会冻结全场景且面板无 PROCESS_MODE_ALWAYS 自身也被冻结）；
+	# 打开=释放鼠标，关闭=重新捕获（游戏继续跑，滑杆即时生效）
+	if settings_open:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _build_settings(m: Node) -> void:
+	settings_panel = Control.new()
+	settings_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	settings_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	_ui.add_child(settings_panel)
+	_mk_rect(settings_panel, Vector2.ZERO, Vector2(4000, 4000), Color(0, 0, 0, 0.55))
+	var card := Control.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.position = Vector2(-240, -170)
+	card.size = Vector2(480, 340)
+	settings_panel.add_child(card)
+	_mk_rect(card, Vector2.ZERO, Vector2(480, 340), Color(0.05, 0.06, 0.08, 0.94))
+	_mk_rect(card, Vector2(6, 6), Vector2(468, 6), Color(1.0, 0.85, 0.3))
+	var title := _mk_label(card, "设  置", 30, Color(1.0, 0.9, 0.6))
+	title.position = Vector2(0, 18)
+	title.size.x = 480
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var rows := [
+		["鼠标灵敏度", 0.4, 2.0, float(m.save_data.get("settings", {}).get("sens", 1.0)), func(v: float) -> void:
+			m.player.MOUSE_SENS = 0.0022 * v
+			_store_setting(m, "sens", v)],
+		["视野 FOV", 60.0, 100.0, float(m.save_data.get("settings", {}).get("fov", 75.0)), func(v: float) -> void:
+			m.player.weapon.BASE_FOV = v
+			_store_setting(m, "fov", v)],
+		["主音量", 0.0, 1.0, float(m.save_data.get("settings", {}).get("vol_master", 1.0)), func(v: float) -> void:
+			_set_bus_volume("Master", v)
+			_store_setting(m, "vol_master", v)],
+		["音效", 0.0, 1.0, float(m.save_data.get("settings", {}).get("vol_sfx", 1.0)), func(v: float) -> void:
+			_set_bus_volume("SFX", v)
+			_store_setting(m, "vol_sfx", v)],
+		["音乐", 0.0, 1.0, float(m.save_data.get("settings", {}).get("vol_music", 1.0)), func(v: float) -> void:
+			_set_bus_volume("Music", v)
+			_store_setting(m, "vol_music", v)],
+	]
+	for i in range(rows.size()):
+		var row: Array = rows[i]
+		var y := 64 + i * 48
+		var lab := _mk_label(card, str(row[0]), 19, Color(0.85, 0.88, 0.92))
+		lab.position = Vector2(36, y)
+		var slider := HSlider.new()
+		slider.min_value = row[1]
+		slider.max_value = row[2]
+		slider.step = (row[2] - row[1]) / 40.0
+		slider.value = row[3]
+		slider.position = Vector2(190, y + 4)
+		slider.size = Vector2(220, 20)
+		slider.process_mode = Node.PROCESS_MODE_ALWAYS
+		var cb: Callable = row[4]
+		cb.call(slider.value)
+		slider.value_changed.connect(cb)
+		card.add_child(slider)
+	var hint := _mk_label(card, "Esc 继续（设置即时生效并自动保存）", 16, Color(0.6, 0.8, 0.95))
+	hint.position = Vector2(0, 306)
+	hint.size.x = 480
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ignore_mouse(card)
+
+
+func _set_bus_volume(bus_name: String, linear: float) -> void:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx >= 0:
+		AudioServer.set_bus_volume_db(idx, linear_to_db(clampf(linear, 0.0001, 1.0)))
+
+
+func _store_setting(m: Node, key: String, value: float) -> void:
+	var cfg: Dictionary = m.save_data.get("settings", {})
+	cfg[key] = value
+	m.save_data["settings"] = cfg
+	if m.has_method("_write_save"):
+		m._write_save()
+
+
 func set_danger(on: bool) -> void:
 	_danger_on = on
 	_update_danger_overlay()

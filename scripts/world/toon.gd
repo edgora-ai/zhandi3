@@ -33,19 +33,31 @@ static func apply_to_glb(root: Node, outline_width: float = 0.014) -> int:
 			continue
 		for si in range(mesh_inst.mesh.get_surface_count()):
 			var mat := mesh_inst.get_active_material(si)
-			var col := Color(0.72, 0.66, 0.58)
-			var new_mat := make_material(col, true, outline_width)
-			if mat is StandardMaterial3D:
-				var sm := mat as StandardMaterial3D
-				col = sm.albedo_color
-				# // FIX: R3-TA1 透传 emission（守护者核心/龙/骷髅眼的夜间发光特征，原被覆盖抹平）
+			# // FIX: R9 模型重染透传修复：
+			# 1) 带 albedo_texture 的表面保留原贴图+原色（原只透传颜色，Blender 贴图细节全丢）
+			# 2) emission 表面透传发光（守护者核心/龙脊/眼睛）
+			# 3) 仅纯色表面换卡通材质+描边
+			var sm := mat as StandardMaterial3D
+			if sm == null:
+				count += 1
+				continue
+			if sm.albedo_texture != null:
+				# 有贴图的表面：贴卡通光照模式但不换色（描边照加）
+				var tex_mat := make_material(sm.albedo_color, true, outline_width)
+				tex_mat.albedo_texture = sm.albedo_texture
+				mesh_inst.set_surface_override_material(si, tex_mat)
 				if sm.emission_enabled:
-					new_mat.emission_enabled = true
-					new_mat.emission = sm.emission
-					new_mat.emission_energy_multiplier = sm.emission_energy_multiplier
-			elif mat is BaseMaterial3D:
-				col = (mat as BaseMaterial3D).albedo_color
-			new_mat.albedo_color = col
-			mesh_inst.set_surface_override_material(si, new_mat)
+					tex_mat.emission_enabled = true
+					tex_mat.emission = sm.emission
+					tex_mat.emission_energy_multiplier = sm.emission_energy_multiplier
+			elif sm.emission_enabled:
+				# 纯自发光表面（眼/核心）：保留原材质，仅补描边 next_pass
+				if sm.next_pass == null:
+					var emis_outline := sm.duplicate() as StandardMaterial3D
+					emis_outline.next_pass = make_outline(outline_width)
+					mesh_inst.set_surface_override_material(si, emis_outline)
+			else:
+				var new_mat := make_material(sm.albedo_color, true, outline_width)
+				mesh_inst.set_surface_override_material(si, new_mat)
 			count += 1
 	return count

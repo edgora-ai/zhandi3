@@ -134,11 +134,8 @@ func _apply() -> void:
 	var season_fog_d: float = float(season_palette.get("fog_density", 0.0009)) if season_palette.has("fog_density") else 0.0009
 	_env.fog_density = lerpf(0.0016, season_fog_d, day)
 	# // FIX: OPT-F2/TA3 unshaded 植被/水面随昼夜明暗（全局 shader 参数，夜晚 ≤ 白天 30%）
-	if not _daylight_gp_ready:
-		# // FIX: R4 project.godot 已声明 [shader_globals] day_light 时运行时重复 add 会报错
-		if not RenderingServer.global_shader_parameter_get_list().has("day_light"):
-			RenderingServer.global_shader_parameter_add("day_light", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)
-		_daylight_gp_ready = true
+	# // FIX: R9 删除运行时注册分支（global_shader_parameter_get_list 是编辑器专用 API，
+	# 运行时调用每帧刷性能警告；project.godot [shader_globals] 已声明 day_light，直接 set 即可）
 	RenderingServer.global_shader_parameter_set("day_light", lerpf(0.22, 1.0, day))
 	# // FIX: OPT-F4/TA5 太阳轨迹方位角-仰角参数化：
 	# 白天 yaw -110°→110°（东升西落），夜晚月光 yaw 110°→250°（连续西移，黎明 250°≡-110° 无跳变）；

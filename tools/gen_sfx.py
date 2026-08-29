@@ -482,4 +482,13 @@ for j, x in enumerate(bed):
     bd[j] += x
 write_wav("blood_drone.wav", bd)
 
+# // FIX: R4-W 霰弹枪（宽爆裂+低频推背）/ 轻机枪（短促机械连点）
+sg = mix(noise_burst(0.30, 0.07, 0.95, 0.12), tone(0.22, 62.0, 0.09, 0.85))
+write_wav("shot_shotgun.wav", sg)
+lg = mix(noise_burst(0.09, 0.022, 0.70, 0.30), tone(0.07, 130.0, 0.030, 0.55))
+write_wav("shot_lmg.wav", lg)
+# 远距变体
+shot("shot_shotgun_far.wav", 0.38, 0.10, 48.0, 0.04)
+shot("shot_lmg_far.wav", 0.18, 0.05, 65.0, 0.06)
+
 print("done")

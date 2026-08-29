@@ -37,6 +37,8 @@ var _loot_fail_counts: Dictionary = {} # // FIX: OPT-A2 强化：指数退避防
 var _alert_t := 0.0
 var _alert_from_pos := Vector3.ZERO
 var _alert_source_id := 0 # // FIX: R2-B3 受击源追踪
+var squad_id := -1 # // FIX: R4-S 小队编号（8 队×3）
+var squad_name := ""
 var _suppress_left := 0 # // FIX: R4-11 压制弹余量（进交战时补满 3 发）
 var _last_seen_pos := Vector3.ZERO # // FIX: OPT-A3 最后已知位置，丢视后向其搜索
 var capture_goal: CapturePoint = null
@@ -71,7 +73,9 @@ var _ap: AnimationPlayer
 var _cur_anim := ""
 
 
-func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3, seed_value: int = -1) -> void:
+func setup(p_name: String, p_zone: Zone, p_terrain: Terrain, drop_to: Vector3, seed_value: int = -1, p_squad_id: int = -1, p_squad_name: String = "") -> void:
+	squad_id = p_squad_id
+	squad_name = p_squad_name
 	display_name = p_name
 	zone = p_zone
 	terrain = p_terrain
@@ -343,8 +347,8 @@ func get_hit_part(shape_idx: int) -> String:
 func give_weapon(id: String) -> void:
 	if weapon.weapon_id != "":
 		# // FIX: R4-2 换枪升级：更稀有的枪在 12m 内允许替换（丢旧枪落地），原首把枪锁死不升级
-		var new_rarity: int = {"smg": 1, "rifle": 2, "dmr": 3}.get(id, 1)
-		var cur_rarity: int = {"smg": 1, "rifle": 2, "dmr": 3}.get(weapon.weapon_id, 1)
+		var new_rarity: int = {"smg": 1, "rifle": 2, "dmr": 3, "shotgun": 1, "lmg": 2}.get(id, 1)
+		var cur_rarity: int = {"smg": 1, "rifle": 2, "dmr": 3, "shotgun": 1, "lmg": 2}.get(weapon.weapon_id, 1)
 		var pl_dist := 999.0
 		for c in get_tree().get_nodes_in_group("combatant"):
 			if c is Player:
@@ -860,6 +864,17 @@ func die(from: Variant = null) -> void:
 	set_deferred("collision_mask", 0)
 	_drop_loot()
 	died.emit(self, from)
+
+
+# // FIX: R4-S 队友阵亡通知：同队幸存者前往事发点调查（对局像真比赛的队伍感）
+func notify_squad_death(pos: Vector3) -> void:
+	if not alive or squad_id < 0:
+		return
+	if global_position.distance_to(pos) < 140.0:
+		state = State.ROTATE
+		move_target = pos + Vector3(randf_range(-6, 6), 0, randf_range(-6, 6))
+		_alert_t = 0.5
+		_alert_from_pos = pos
 
 
 func _drop_loot() -> void:

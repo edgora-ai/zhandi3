@@ -15,7 +15,7 @@ const ACCEL := 30.0
 const AIR_ACCEL := 14.0
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
-const MOUSE_SENS := 0.0022
+var MOUSE_SENS := 0.0022 # // FIX: R4-U1 设置面板可调灵敏度（原 const）
 @export var MAX_HP := 100.0 # // FIX: M13
 const INTERACT_DIST := 3.4
 @export var SWIM_SPEED := 4.8 # // FIX: M13
@@ -186,7 +186,7 @@ func _ready() -> void:
 
 	camera = Camera3D.new()
 	camera.position.y = 1.58
-	camera.fov = Weapon.BASE_FOV
+	camera.fov = 75.0 # // FIX: R4-U1 BASE_FOV 改实例变量，此处用初始值（weapon 建立后每帧接管）
 	camera.far = 1500.0
 	camera.current = true
 	add_child(camera)
@@ -280,7 +280,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if vehicle and not event.is_action_pressed("vehicle"):
 			return  # 驾驶中只响应下车
 		if event.is_action_pressed("ui_cancel"):
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
+			# // FIX: R9-回滚 R4-U1 的 Esc→设置面板接线（引用不存在的 main 组；且 get_tree().paused
+			# 会暂停整个场景而 HUD 面板若无 ALWAYS 处理则自身也被冻结——暂停设计不完整导致输入链异常）。
+			# 恢复原"释放/捕获鼠标"行为；设置面板改由 F10 显式唤出且不暂停场景。
+			if hud and hud.settings_open:
+				hud.toggle_settings(self) # 面板开着：Esc 关闭面板
+			else:
+				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
 		elif event.is_action_pressed("reload"):
 			weapon.start_reload()
 		elif event.is_action_pressed("interact"):
@@ -305,6 +311,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_stasis()
 		elif event.is_action_pressed("magnet"):
 			_toggle_magnet()
+		elif event.physical_keycode == KEY_F10:
+			# // FIX: R9 F10 设置面板（不占 Esc 原行为）
+			if hud:
+				hud.toggle_settings(self)
 		elif event.is_action_pressed("weapon_slot_1"):
 			switch_slot(0)
 		elif event.is_action_pressed("weapon_slot_2"):

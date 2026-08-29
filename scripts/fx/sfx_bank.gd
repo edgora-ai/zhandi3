@@ -5,6 +5,10 @@ extends Node
 const SOUNDS := {
 	"shot_rifle": "res://assets/sfx/shot_rifle.wav",
 	"shot_dmr": "res://assets/sfx/shot_dmr.wav",
+	"shot_shotgun": "res://assets/sfx/shot_shotgun.wav", # // FIX: R4-W
+	"shot_lmg": "res://assets/sfx/shot_lmg.wav",
+	"shot_shotgun_far": "res://assets/sfx/shot_shotgun_far.wav",
+	"shot_lmg_far": "res://assets/sfx/shot_lmg_far.wav",
 	"shot_smg": "res://assets/sfx/shot_smg.wav",
 	"hit": "res://assets/sfx/hit.wav",
 	"sword_whoosh": "res://assets/sfx/sword_whoosh.wav",

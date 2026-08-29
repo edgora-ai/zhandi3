@@ -589,12 +589,20 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 
 
 func _spawn_bots(rng: RandomNumberGenerator) -> void:
+	# // FIX: R4-S 小队编成：8 队×3 人，同队聚拢跳伞（对局像真比赛）
+	var squad_names := ["苍蓝", "赤焰", "黄沙", "翠木", "玄石", "银翼", "紫电", "霜狼"]
+	var squad_count := int(ceil(BOT_COUNT / 3.0)) # // FIX: R4-S 非整除鲁棒（原 BOT_COUNT/3 向下取整越界）
+	var squad_lands: Array[Vector3] = []
+	for sq in range(squad_count):
+		squad_lands.append(find_land_point(rng, 0.8))
 	for i in range(BOT_COUNT):
 		var bot := Bot.new()
+		var sq := i / 3
 		bot.name = "Bot_%s" % BOT_NAMES[i]
 		add_child(bot)
-		var land := find_land_point(rng, 0.8)
-		bot.setup(BOT_NAMES[i], zone, terrain, land, _seed_value) # // FIX: OPT-G7
+		var land: Vector3 = squad_lands[sq] + Vector3(rng.randf_range(-22, 22), 0, rng.randf_range(-22, 22))
+		land.y = terrain.get_height(land.x, land.z)
+		bot.setup(BOT_NAMES[i], zone, terrain, land, _seed_value, sq, squad_names[sq]) # // FIX: OPT-G7
 		if _ng_skill_floor() > 0.7:
 			bot.skill = maxf(bot.skill, _ng_skill_floor()) # // FIX: R4-G7b 二周目难度增量
 		bot.global_position = land + Vector3(rng.randf_range(-20, 20), rng.randf_range(120.0, 170.0), rng.randf_range(-20, 20))
@@ -619,7 +627,7 @@ func _spawn_wild_bots(rng: RandomNumberGenerator) -> void:
 		# // FIX: OPT-G6/PG7 每 bot 落点半径保底一件武器（原 7 件/9 人多数空手）
 		var wl := land + Vector3(rng.randf_range(-6, 6), 0.15, rng.randf_range(-6, 6))
 		wl.y = terrain.get_height(wl.x, wl.z) + 0.15
-		Loot.spawn(self, wl, "weapon", ["smg", "rifle", "smg", "rifle", "dmr"][i % 5], 0, 1 + (i % 2)) # // FIX: R2-C2c DMR 25%→20%
+		Loot.spawn(self, wl, "weapon", ["smg", "rifle", "shotgun", "rifle", "dmr"][i % 5], 0, 1 + (i % 2)) # // FIX: R4-W 旷野保底纳入霰弹
 		Loot.spawn(self, wl + Vector3(0.8, 0, 0), "ammo", "", 60, 1)
 		bot.global_position = land + Vector3(rng.randf_range(-12, 12), rng.randf_range(70.0, 120.0), rng.randf_range(-12, 12))
 		bot.rotation.y = rng.randf_range(0.0, TAU)
@@ -676,13 +684,19 @@ func _drop_loot_at(rng: RandomNumberGenerator, pos: Vector3) -> void:
 	var roll := rng.randf()
 	if roll < 0.45:
 		var w := rng.randf()
-		# // FIX: OPT-C3/PG10 DMR 武器权重 20%→8%（原最强枪垄断掉落），SMG/步枪 46%/46%
-		if w < 0.46:
+		# // FIX: R4-W 五枪掉落生态：霰弹/轻机枪入池（近战霸主+压制位），DMR 维持 ~8%
+		if w < 0.28:
 			Loot.spawn(self, pos, "weapon", "smg", 0, 1)
-		elif w < 0.92:
+		elif w < 0.55:
 			Loot.spawn(self, pos, "weapon", "rifle", 0, 2)
-		else:
+		elif w < 0.70:
+			Loot.spawn(self, pos, "weapon", "shotgun", 0, 1)
+		elif w < 0.84:
+			Loot.spawn(self, pos, "weapon", "lmg", 0, 2)
+		elif w < 0.92:
 			Loot.spawn(self, pos, "weapon", "dmr", 0, 3)
+		else:
+			Loot.spawn(self, pos, "weapon", "smg", 0, 1)
 	elif roll < 0.63:
 		# // FIX: OPT-C3 补 r3 重甲 75（低概率），护甲 25/50/75 三档拉开 TTK 差
 		var ar := rng.randf()
@@ -735,7 +749,7 @@ func _spawn_airdrop() -> void:
 		if pos.y < Terrain.WATER_LEVEL + 0.5:
 			continue
 		pos.y += 0.15
-		Loot.spawn(self, pos + Vector3(0.6, 0, 0.6), "weapon", "dmr", 0, 3)
+		Loot.spawn(self, pos + Vector3(0.6, 0, 0.6), "weapon", ["dmr", "lmg"][_airdrops % 2], 0, 3) # // FIX: R4-W 空投轮换重武器
 		Loot.spawn(self, pos + Vector3(-0.6, 0, 0.6), "armor", "", 75, 3)
 		Loot.spawn(self, pos + Vector3(0.6, 0, -0.6), "medkit", "", 60, 2)
 		Loot.spawn(self, pos + Vector3(-0.6, 0, -0.6), "ammo", "", 120, 2)
@@ -750,7 +764,17 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 	if killer != null:
 		killer_name = "你" if killer == player else killer.display_name
 	var victim_name: String = "你" if victim == player else victim.display_name
-	hud.add_feed("%s 淘汰了 %s" % [killer_name, victim_name])
+	if victim is Bot and victim.squad_name != "":
+		victim_name = "%s小队·%s" % [victim.squad_name, victim.display_name]
+	var killer_tag: String = killer_name
+	if killer is Bot and killer.squad_name != "":
+		killer_tag = "%s小队·%s" % [killer.squad_name, killer.display_name]
+	hud.add_feed("%s 淘汰了 %s" % [killer_tag, victim_name])
+	# // FIX: R4-S 队友阵亡广播
+	if victim is Bot and victim.squad_id >= 0:
+		for c in get_tree().get_nodes_in_group("combatant"):
+			if c is Bot and c.alive and c.squad_id == victim.squad_id:
+				c.notify_squad_death(victim.global_position)
 	# // FIX: R4-G6b 旷野探索模式不刷"存活 N"（原无条件覆盖探索模式文案）
 	if _map_id != "wild":
 		hud.set_alive(_alive_count())

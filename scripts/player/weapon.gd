@@ -28,6 +28,20 @@ const WEAPONS := {
 		"reload": 1.5, "auto": true, "zoom": 1.15, "range": 130.0, "recoil": 0.2,
 		"falloff_start": 60.0, "falloff_end": 130.0, "falloff_min": 0.40, # // FIX: OPT-C1 近战段武器远距惩罚
 	},
+	"shotgun": {
+		# // FIX: R4-W1 武器库扩容：霰弹枪（12m 内一枪位，25m 后急剧衰减）——补近战霸主生态位
+		"label": "霰弹枪", "damage": 8.0, "head_mult": 1.5, "rpm": 75.0,
+		"mag": 6, "start_reserve": 24, "spread": 4.5, "ads_spread": 3.0,
+		"reload": 2.4, "auto": false, "zoom": 1.1, "range": 40.0, "recoil": 1.6,
+		"pellets": 7, "falloff_start": 10.0, "falloff_end": 25.0, "falloff_min": 0.25,
+	},
+	"lmg": {
+		# // FIX: R4-W2 轻机枪（60 弹压制位，换弹惩罚重）
+		"label": "轻机枪", "damage": 11.0, "head_mult": 1.6, "rpm": 480.0,
+		"mag": 60, "start_reserve": 120, "spread": 2.2, "ads_spread": 0.9,
+		"reload": 3.6, "auto": true, "zoom": 1.2, "range": 200.0, "recoil": 0.5,
+		"falloff_start": 110.0, "falloff_end": 200.0, "falloff_min": 0.7,
+	},
 	"bow": {
 		"label": "猎弓", "damage": 0.0, "head_mult": 1.0, "rpm": 60.0,
 		"mag": 1, "start_reserve": 24, "spread": 0.0, "ads_spread": 0.0,
@@ -37,7 +51,7 @@ const WEAPONS := {
 
 @export var base_fov := 75.0 # // FIX: M13 @export 可调—FOV可在编辑器实时调参；WEAPONS平衡表集中可调详见下
 const GUNMETAL := Color(0.15, 0.16, 0.18) # // FIX: M13 武器数值WEAPONS集中表为关卡平衡可调源，策划可不改代码调参（reserve/mag/damage/spread等）
-const BASE_FOV := 75.0
+var BASE_FOV := 75.0 # // FIX: R4-U1 设置面板可调 FOV（原 const）
 
 var owner_body: CharacterBody3D
 var is_player := false
@@ -165,7 +179,9 @@ func _try_fire() -> void:
 	mag_left -= 1
 	# // FIX: OPT-C2 bloom 累积（机瞄减半），停火在 _process 回落
 	_bloom = minf(_bloom + 0.15, 1.2)
-	_fire_ray()
+	# // FIX: R4-W1 霰弹枪多弹丸（每颗独立散布射线，共享 bloom 一份）
+	for _pellet in range(int(data.get("pellets", 1))):
+		_fire_ray()
 	last_shot_msec = Time.get_ticks_msec()
 	_kick = 0.06
 	# // FIX: D2/FX3 玩家与 bot 统一枪口焰火舌面片（共享资源，bot 中距可读）
@@ -318,7 +334,7 @@ func _build_viewmodel() -> void:
 	var gun := Node3D.new()
 	viewmodel.add_child(gun)
 	var metal := Toon.make_material(GUNMETAL, true, 0.004)
-	var accent_color: Color = {"rifle": Color(0.35, 0.42, 0.28), "dmr": Color(0.55, 0.42, 0.28), "smg": Color(0.25, 0.30, 0.40)}[weapon_id]
+	var accent_color: Color = {"rifle": Color(0.35, 0.42, 0.28), "dmr": Color(0.55, 0.42, 0.28), "smg": Color(0.25, 0.30, 0.40), "shotgun": Color(0.55, 0.38, 0.16), "lmg": Color(0.30, 0.34, 0.30)}[weapon_id]
 	var accent := Toon.make_material(accent_color, true, 0.004)
 
 	var recv := MeshInstance3D.new()

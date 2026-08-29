@@ -94,7 +94,16 @@
 | G6b | 旷野死亡契约：复活掉 1 件背包武器+卢比减半；死亡不覆盖"探索模式"文案 | main.gd |
 | B6c | 修概率性 `data.rpm` 崩溃守卫（_try_fire 对 data 空字典自愈重置） | weapon.gd（三连 sim 零复现） |
 
-> 未完成（XL/依赖前置，维持原状）：G7b 二周目存档（待 C5 存档服务）、R14-R20 架构重构（Phase 2/3 范围）、H6b 地表色斑根因、仓库/木箱纹理（本轮已做墙面 128px+mipmap+世界三面映射）。
+## R5 打磨轮已验证（2026-08-29，复审遗留最后一批实质项）
+
+| 项 | 内容 | 证据 |
+|---|---|---|
+| H6b | 地表色斑根因三连修：春季 ground_tint G 通道 1.0→0.96（汽水绿来源）；shader 宏噪声 ±11%→±8%；草散布阈值与地面干斑同源同向（原 < -0.05 vs >0.30 方向相反互相加深错位） | season_system.gd + ground.gdshader + props.gd |
+| 15a | 木箱/木质件接 plank 纹理（三面映射 0.5） | buildings.gd _m_wood |
+| G7b | **二周目存档最小闭环（C5-lite）**：user://save_v1.json 版本化原子写（tmp→rename）；结算写入 runs/best_rank/total_kills；启动读取并播报；bot skill 下限 0.7→0.8→0.9→1.0 随局数递增。**实测**：一局死亡后落盘 `{"runs":1,"best_rank":23}`，重载打印 `[save] runs=1 best=23 ng_floor=0.8`，损坏回退默认 | main.gd _load_save/_record_run/_write_save/_ng_skill_floor |
+| R3-TA6b | day_light 重复注册守卫（project.godot 声明后运行时 add 报错） | day_night.gd |
+
+> 未完成（维持原状）：R14-R20 架构重构（Phase 2/3 既定范围，本轮评估后不做——上帝类拆分风险大于收益）。
 
 > 未完成（全部为 XL 级或依赖外部前置）：
 > 未完成（全部为 XL 级或依赖外部前置）：F3 完整 EnvironmentDirector 架构（F3-light 已达成等效可见验收）、F8b 屋顶形制差异化、G7b 二周目存档难度增量（依赖 C5 XL 存档服务）、H4b puff 网格深度共享、H6b 地表薄荷色斑根因排查、以及 ISSUES § 多角色增量 5 的 R14-R20 架构重构项（上帝类拆分等，属 Phase 2/3 既定范围）。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。

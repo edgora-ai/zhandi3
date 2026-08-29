@@ -31,7 +31,7 @@ void fragment() {
 	float macro_patch = vnoise(v_world.xz * 0.035);
 	float fine_patch = vnoise(v_world.xz * 0.18 + vec2(17.3, 4.8));
 	vec3 col = COLOR.rgb * season_tint.rgb;
-	col *= 0.86 + macro_patch * 0.22 + fine_patch * 0.07;
+	col *= 0.90 + macro_patch * 0.16 + fine_patch * 0.06; // // FIX: R4-H6b 宏噪声振幅收敛（大尺度色斑变细腻）
 
 	// 陡坡增加横向岩层，不改变碰撞形状。
 	float steep = smoothstep(0.78, 0.48, v_world_normal.y);

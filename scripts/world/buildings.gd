@@ -60,6 +60,11 @@ func generate(terrain: Terrain) -> void:
 	_m_roof_b = Toon.make_material(ROOF_BLUE, true, 0.02)
 	_m_roof_d = Toon.make_material(ROOF_DARK, true, 0.02)
 	_m_wood = Toon.make_material(WOOD, true, 0.015)
+	# // FIX: R4-15 木箱/木质件接木板纹理（三面映射）
+	_m_wood.albedo_texture = TexGen.wall_plank()
+	_m_wood.uv1_triplanar = true
+	_m_wood.uv1_world_triplanar = true
+	_m_wood.uv1_scale = Vector3(0.5, 0.5, 0.5)
 	_m_wood_d = Toon.make_material(WOOD_DARK, true, 0.015)
 	_m_glass = Toon.make_material(GLASS, false)
 	_m_sand = Toon.make_material(SAND, true, 0.01)

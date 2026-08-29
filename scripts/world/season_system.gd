@@ -14,7 +14,7 @@ const DISPLAY_NAMES := {
 
 const PALETTES := {
 	"spring": {
-		"ground_tint": Color(0.88, 1.0, 0.86), "snow": 0.0, "wet": 0.05,
+		"ground_tint": Color(0.90, 0.96, 0.88), "snow": 0.0, "wet": 0.05, # // FIX: R4-H6b 春季 G 通道顶满是薄荷色斑来源之一
 		"water_shallow": Color(0.36, 0.80, 0.75), "water_deep": Color(0.05, 0.34, 0.53), "rain": 0.12, "ice": 0.0,
 		"grass_shadow": Color(0.10, 0.26, 0.07), "grass_dark": Color(0.20, 0.47, 0.11), "grass_light": Color(0.52, 0.75, 0.26),
 		"leaf_shadow": Color(0.10, 0.25, 0.08), "leaf_mid": Color(0.28, 0.54, 0.17), "leaf_high": Color(0.61, 0.79, 0.34),

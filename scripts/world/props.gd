@@ -530,7 +530,8 @@ func _scatter_grass(terrain: Terrain) -> void:
 			gz += step
 			if py < Terrain.WATER_LEVEL + 1.3 or py > 26.0:
 				continue
-			if terrain.get_patch_baked(px, pz) < -0.05:
+			# // FIX: R4-H6b 草过滤与地面干斑同源同向（原 < -0.05 与地面 >0.30 干斑方向相反，错位加深色斑感）
+			if terrain.get_patch_baked(px, pz) > 0.30:
 				continue
 			if terrain.get_normal_baked(px, pz).y <= 0.78:
 				continue

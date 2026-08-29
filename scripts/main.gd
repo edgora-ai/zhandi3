@@ -28,6 +28,34 @@ var _sim_vv_kills := 0
 var _sim_zone_deaths := 0
 var _match_t := 0.0 # // FIX: OPT-H3 结算存活时长
 var _airdrops := 0 # // FIX: OPT-G4 空投计数
+# // FIX: R4-G7b 二周目存档最小闭环（C5-lite）：结算写入 user://save_v1.json（原子写），
+# 新局读取出击次数推 bot skill 下限（0.7→0.9→1.1 封顶），重载可读、损坏回退默认
+const SAVE_PATH := "user://save_v1.json"
+var save_data := {"version": 1, "runs": 0, "best_rank": 99, "total_kills": 0}
+
+func _load_save() -> void:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return
+	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	if parsed is Dictionary and int(parsed.get("version", 0)) == 1:
+		save_data = parsed
+	else:
+		push_warning("[save] 损坏存档已回退默认值")
+
+func _write_save() -> void:
+	var tmp := SAVE_PATH + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(save_data))
+	f.close()
+	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(SAVE_PATH))
+
+func _ng_skill_floor() -> float:
+	return minf(0.7 + 0.1 * int(save_data.get("runs", 0)), 1.0)
 var _seed_value := -1 # // FIX: OPT-G7/REG4 --seed 值（-1 未指定）
 var total_combatants := BOT_COUNT + 1
 var _buff_acc := 0.0
@@ -156,6 +184,9 @@ func _ready() -> void:
 	daynight.name = "DayNight"
 	add_child(daynight)
 	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
+	_load_save() # // FIX: R4-G7b
+	if int(save_data.get("runs", 0)) > 0:
+		print("[save] runs=%d best=%d ng_floor=%.1f" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor()])
 	daynight.season_palette = seasons.current_palette # // FIX: OPT-F3-light 初始调色板（daynight 建好后回填）
 	daynight.blood_moon_started.connect(_on_blood_moon)
 	daynight.blood_moon_ended.connect(func() -> void:
@@ -556,6 +587,8 @@ func _spawn_bots(rng: RandomNumberGenerator) -> void:
 		add_child(bot)
 		var land := find_land_point(rng, 0.8)
 		bot.setup(BOT_NAMES[i], zone, terrain, land, _seed_value) # // FIX: OPT-G7
+		if _ng_skill_floor() > 0.7:
+			bot.skill = maxf(bot.skill, _ng_skill_floor()) # // FIX: R4-G7b 二周目难度增量
 		bot.global_position = land + Vector3(rng.randf_range(-20, 20), rng.randf_range(120.0, 170.0), rng.randf_range(-20, 20))
 		bot.rotation.y = rng.randf_range(0, TAU)
 		bot.died.connect(_on_combatant_died)
@@ -665,6 +698,14 @@ func _drop_loot_at(rng: RandomNumberGenerator, pos: Vector3) -> void:
 # ---------- 比赛事件 ----------
 
 # // FIX: OPT-H3 结算附加统计：存活时长 / 总输出伤害
+# // FIX: R4-G7b 结算入档：局数/最佳名次/总击杀，原子写
+func _record_run(rank: int) -> void:
+	save_data["runs"] = int(save_data.get("runs", 0)) + 1
+	save_data["best_rank"] = mini(int(save_data.get("best_rank", 99)), rank)
+	save_data["total_kills"] = int(save_data.get("total_kills", 0)) + player.kills
+	_write_save()
+
+
 func _end_stats() -> Array:
 	return [
 		["存活时长", "%d:%02d" % [int(_match_t) / 60, int(_match_t) % 60]],
@@ -737,6 +778,7 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 		sfx.play("defeat", -2.0)
 		sfx.play("heavy_impact", -4.0, 0.65)
 		var rank := _alive_count() + 1
+		_record_run(rank) # // FIX: R4-G7b 结算写档
 		get_tree().create_timer(1.5).timeout.connect(func() -> void:
 			hud.show_end(false, rank, player.kills, total_combatants, _end_stats())
 		)
@@ -745,6 +787,7 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 		match_over = true
 		player.input_locked = true
 		sfx.play("victory", -2.0)
+		_record_run(1) # // FIX: R4-G7b
 		hud.show_end(true, 1, player.kills, total_combatants, _end_stats())
 
 

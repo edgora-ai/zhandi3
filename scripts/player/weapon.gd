@@ -151,10 +151,12 @@ func current_spread() -> float:
 func _try_fire() -> void:
 	if weapon_id == "" or reloading or _cool > 0.0:
 		return
-	if data.is_empty():
-		print("[weapon] BUG data empty id='%s' owner=%s" % [weapon_id, owner_body.display_name if owner_body and owner_body.get("display_name") else str(owner_body)])
-		weapon_id = ""
-		return
+	if not data.has("rpm"):
+		print("[weapon] BUG data keys=%s id='%s' is_player=%s" % [str(data.keys()), weapon_id, str(is_player)])
+		if data.is_empty():
+			weapon_id = ""
+			return
+		data = WEAPONS[weapon_id] # 自愈：重挂正确数值表
 	if mag_left <= 0:
 		if is_player:
 			start_reload()

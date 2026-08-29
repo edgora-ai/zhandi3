@@ -95,6 +95,10 @@ def shot(name, dur, decay, thump_freq, lp):
 shot("shot_rifle.wav", 0.16, 0.030, 150.0, 0.35)
 shot("shot_dmr.wav", 0.30, 0.055, 110.0, 0.25)
 shot("shot_smg.wav", 0.10, 0.020, 180.0, 0.45)
+# // FIX: R4-7 远距枪声低通变体（>120m 切换"闷响"，原只变小不变闷）
+shot("shot_rifle_far.wav", 0.22, 0.060, 70.0, 0.06)
+shot("shot_dmr_far.wav", 0.40, 0.10, 55.0, 0.045)
+shot("shot_smg_far.wav", 0.16, 0.045, 85.0, 0.08)
 
 # 命中确认：短促咔哒
 write_wav("hit.wav", tone(0.05, 2400.0, 0.012, 0.35, "square"))
@@ -467,5 +471,15 @@ for j, x in enumerate(tone(0.26, 210.0, 0.16, 0.55)):
 for j, x in enumerate(noise_burst(0.08, 0.03, 0.10, 0.25)):
     zt[j] += x
 write_wav("zone_tick.wav", zt)
+
+# // FIX: R4-8 血月持续氛围层：小二度低音 drone 12s 无缝循环（loopify 接缝）
+bd = [0.0] * int(SR * 12.0)
+for f in [55.0, 58.27]:
+    for j, x in enumerate(tone(12.0, f, 30.0, 0.12)):
+        bd[j] += x
+bed = loopify(noise_burst(12.0, 18.0, 0.10, 0.05), 2.0)
+for j, x in enumerate(bed):
+    bd[j] += x
+write_wav("blood_drone.wav", bd)
 
 print("done")

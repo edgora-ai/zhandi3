@@ -179,6 +179,37 @@ func _body(parent: Node3D) -> StaticBody3D:
 	return b
 
 
+# 四坡屋顶：金字塔锥体（前向面顺时针绕序）// FIX: R4-F8b 屋顶形制差异化
+func _hip_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Material) -> void:
+	var hw := w * 0.5
+	var hd := d * 0.5
+	var apex := Vector3(0, h, -hd * 0.2)
+	var a := Vector3(-hw, 0, -hd)
+	var b := Vector3(hw, 0, -hd)
+	var c := Vector3(hw, 0, hd)
+	var dd := Vector3(-hw, 0, hd)
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	for tri in [[b, apex, a], [c, apex, b], [dd, apex, c], [a, apex, dd]]:
+		var n: Vector3 = (tri[1] - tri[0]).cross(tri[2] - tri[0]).normalized()
+		verts.append(tri[0])
+		verts.append(tri[2])
+		verts.append(tri[1])
+		for k in range(3):
+			normals.append(n)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position.y = y
+	parent.add_child(mi)
+
+
 # 人字屋顶：三棱柱网格（前向面顺时针绕序）
 func _gable_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Material) -> void:
 	var hw := w * 0.5
@@ -332,7 +363,7 @@ func _make_warehouse(p: Vector3, rot: float) -> void:
 	_col(body, Vector3(0.18, h, d), Vector3(w * 0.5, h * 0.5, 0))
 	# 宽大库门洞
 	_front_wall(g, body, w, h, -d * 0.5, _m_metal, 3.0, 2.9)
-	_gable_roof(g, w + 0.7, 1.6, d + 0.9, h, _m_roof_d)
+	_hip_roof(g, w + 0.7, 1.6, d + 0.9, h, _m_roof_d) # // FIX: R4-F8b 仓库四坡顶
 	# 仓库立向压条，弱化大块平墙的塑料盒感。
 	for x in range(-3, 4):
 		_part(Vector3(0.055, h - 0.2, 0.08), _m_wood_d, Vector3(float(x) * 1.15, h * 0.5, d * 0.5 + 0.08), g)

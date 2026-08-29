@@ -186,12 +186,17 @@ static func attack_ring(parent: Node3D, radius: float, color: Color) -> MeshInst
 	return ring
 
 
+static var _puff_meshes: Dictionary = {} # // FIX: R4-14 puff 网格按半径共享（拖尾 100 次/s 不再每次 new SphereMesh）
+
 static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: float) -> void:
-	var s := SphereMesh.new()
-	s.radius = radius
-	s.height = radius * 2.0
-	s.radial_segments = 6
-	s.rings = 3
+	var s: SphereMesh = _puff_meshes.get(radius)
+	if s == null:
+		s = SphereMesh.new()
+		s.radius = radius
+		s.height = radius * 2.0
+		s.radial_segments = 6
+		s.rings = 3
+		_puff_meshes[radius] = s
 	var mi := MeshInstance3D.new()
 	mi.mesh = s
 	# M6: 已核验 fix — 半透明 puff 初始 alpha 0.85 且 scale/alpha 同步淡出（非实心球）

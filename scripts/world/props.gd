@@ -31,7 +31,7 @@ var _pine_snow_mm: MultiMesh
 var _terrain: Terrain
 var _canopy_ranges: Dictionary = {}   # Tree node -> [broad_start, broad_count, pine_start, pine_count]
 
-const CANOPY_CARDS := 12
+const CANOPY_CARDS := 16 # // FIX: R4-16 冠层透天缝收敛（原 12 卡近看剪纸球）
 
 
 func generate(terrain: Terrain, rng_seed: int = 20260718) -> void:

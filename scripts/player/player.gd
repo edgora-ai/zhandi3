@@ -712,7 +712,8 @@ func _physics_process(delta: float) -> void:
 	if is_on_floor() and not is_swimming and not is_climbing and not is_gliding:
 		var _spd := Vector2(velocity.x, velocity.z).length()
 		if _spd > 1.5 and _footstep_cd <= 0.0:
-			_footstep_cd = 0.38 if _spd > 6.0 else 0.52
+			# // FIX: R4-9 步频=步幅/速度（原固定 0.38/0.52 两档，蹲走与疾跑同拍）
+			_footstep_cd = clampf(0.75 / maxf(_spd, 1.0), 0.26, 0.62)
 			var _sfx_f := get_tree().get_first_node_in_group("sfx_bank")
 			if _sfx_f:
 				# // FIX: OPT-E1/REG2 脚步按地面材质映射（草地/沙石/木板/水面），不再复用近战重击音
@@ -1106,10 +1107,13 @@ func _update_med_channel(delta: float) -> void:
 	if _med_channel_t <= 0.0:
 		return
 	_med_channel_t -= delta
+	if hud:
+		hud.set_med_progress(1.0 - _med_channel_t / 3.0)
 	if _med_channel_t <= 0.0:
 		hp = minf(max_hp, hp + _med_amount)
 		health_changed.emit(hp, armor)
 		if hud:
+			hud.set_med_progress(-1.0)
 			hud.add_feed("治疗完成 +%d" % int(_med_amount))
 		_med_amount = 0.0
 
@@ -1309,6 +1313,7 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		_med_channel_t = -1.0
 		_med_amount = 0.0
 		if hud:
+			hud.set_med_progress(-1.0)
 			hud.add_feed("治疗被打断！")
 	hp -= dmg
 	damaged.emit(dmg)

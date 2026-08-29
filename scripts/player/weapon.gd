@@ -16,7 +16,7 @@ const WEAPONS := {
 		"falloff_start": 120.0, "falloff_end": 220.0, "falloff_min": 0.75, # // FIX: OPT-C1 距离衰减
 	},
 	"dmr": {
-		"label": "射手步枪", "damage": 34.0, "head_mult": 2.2, "rpm": 150.0,
+		"label": "射手步枪", "damage": 35.0, # // FIX: R4-13 34×2 三发对 75甲+100血差 0.4 不死的悬崖 "head_mult": 2.2, "rpm": 150.0,
 		"mag": 12, "start_reserve": 36, "spread": 0.8, "ads_spread": 0.12,
 		"reload": 2.1, "auto": false, "zoom": 2.4, "range": 350.0, "recoil": 1.2,
 		"falloff_start": 250.0, "falloff_end": 350.0, "falloff_min": 0.85, # // FIX: OPT-C1
@@ -57,6 +57,7 @@ var _reload_left := 0.0
 var _kick := 0.0
 var _bob_t := 0.0
 var _bloom := 0.0 # // FIX: OPT-C2 连射 bloom（度），每发 +0.15 上限 1.2，停火回落
+var _forced_dir := Vector3.ZERO # // FIX: R4-11 压制弹强制方向
 
 
 func setup(p_owner: CharacterBody3D, p_is_player: bool) -> void:
@@ -103,6 +104,20 @@ func pull_trigger() -> void:
 	_try_fire()
 
 
+# // FIX: R4-11 bot 压制弹：朝指定方向强制一发（带额外散布）
+func pull_trigger_dir(dir: Vector3) -> void:
+	if weapon_id == "" or reloading or _cool > 0.0 or mag_left <= 0:
+		return
+	_cool = 60.0 / data.rpm
+	mag_left -= 1
+	_forced_dir = dir
+	_fire_ray()
+	_forced_dir = Vector3.ZERO
+	last_shot_msec = Time.get_ticks_msec()
+	FX.muzzle_flash(muzzle_world())
+	fired.emit()
+
+
 func start_reload() -> void:
 	if reloading or weapon_id == "" or mag_left >= data.mag or reserve <= 0:
 		return
@@ -135,6 +150,10 @@ func current_spread() -> float:
 
 func _try_fire() -> void:
 	if weapon_id == "" or reloading or _cool > 0.0:
+		return
+	if data.is_empty():
+		print("[weapon] BUG data empty id='%s' owner=%s" % [weapon_id, owner_body.display_name if owner_body and owner_body.get("display_name") else str(owner_body)])
+		weapon_id = ""
 		return
 	if mag_left <= 0:
 		if is_player:
@@ -169,6 +188,9 @@ func _fire_ray() -> void:
 		dir = owner_body.get_aim_dir()
 	# // FIX: OPT-C2 视角系圆锥采样（原世界轴加噪在俯射/沿轴瞄准时散布塌缩）
 	var s := deg_to_rad(current_spread() + _bloom * (0.5 if is_ads else 1.0))
+	if _forced_dir != Vector3.ZERO:
+		dir = _forced_dir
+		s += deg_to_rad(4.0) # 压制弹额外散布
 	var up_ref := Vector3.UP if absf(dir.dot(Vector3.UP)) < 0.95 else Vector3.FORWARD
 	var right := dir.cross(up_ref).normalized()
 	var upv := right.cross(dir).normalized()

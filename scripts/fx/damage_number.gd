@@ -8,6 +8,8 @@ static var _recent_ms: Array[int] = []
 static var _last_text := ""
 static var _last_pos := Vector3.ZERO
 static var _last_ms := 0
+static var _last_label: DamageNumber = null # // FIX: R4-10 AOE 聚合目标
+static var _last_num := 0
 
 var _t := 0.0
 
@@ -16,7 +18,10 @@ static func spawn_at(parent: Node, pos: Vector3, text_value: String, color: Colo
 	var now := Time.get_ticks_msec()
 	# 滑窗限频：200ms 内至多 8 个，超出直接丢弃；同文本同位置 80ms 内合并 # // FIX: M7
 	# // FIX: OPT-H5/FX19 AOE 多目标合并：merged=true 时并入最近一单总数（"+37"式聚合），不再吞字
-	if merged and text_value == _last_text and pos.distance_to(_last_pos) < 30.0 and now - _last_ms < 200:
+	if merged and text_value.is_valid_int() and _last_label and is_instance_valid(_last_label) and now - _last_ms < 200 and pos.distance_to(_last_pos) < 30.0:
+		# // FIX: R4-10 AOE 真聚合：+N 累加到最后一条数字（原实现是丢弃）
+		_last_num += int(text_value)
+		_last_label.text = "%d↑" % _last_num
 		return
 	_recent_ms = _recent_ms.filter(func(t: int) -> bool: return now - t < 200)
 	if _recent_ms.size() >= 8:
@@ -42,6 +47,9 @@ static func spawn_at(parent: Node, pos: Vector3, text_value: String, color: Colo
 	n.no_depth_test = false
 	n.position = pos + Vector3(randf_range(-0.25, 0.25), randf_range(0.0, 0.2), randf_range(-0.25, 0.25))
 	parent.add_child(n)
+	if text_value.is_valid_int():
+		_last_label = n
+		_last_num = int(text_value)
 
 
 func _process(delta: float) -> void:

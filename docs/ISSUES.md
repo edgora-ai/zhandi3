@@ -74,6 +74,29 @@
 | B6b | 部位判定类型守卫（修 ShrineRune 698 次类型错误） | `wild_projectile.gd` |
 | F6b | 草分块：50m 网格 ×90 块独立 MultiMesh + visibility_range 60m 自淡出（远景无噪闪、渲染量随距离裁剪；密度 9.8 万实例保持） | `props.gd _scatter_grass`；截图 /tmp/r_grass3.png |
 
+## R4 打磨轮已验证（2026-08-29，二轮复审遗留逐项落地）
+
+| 项 | 内容 | 证据 |
+|---|---|---|
+| 13 | DMR 34→35（消除三发差 0.4 血悬崖） | weapon.gd |
+| 17 | project.godot 声明 [shader_globals] day_light（加载顺序不再脆弱） | project.godot |
+| 1 | bot 死亡 armor>25 以 30% 掉等值护甲（护甲经济闭环） | bot.gd _drop_loot |
+| 3 | 满血/满甲拾取守卫（不再白耗+提示） | loot.gd |
+| 9 | 步频=步幅/速度连续曲线（0.26-0.62s，替代固定两档） | player.gd |
+| 14 | puff SphereMesh 按半径共享（拖尾 100 次/s 零新建） | fx.gd |
+| 10 | AOE 飘字真聚合（"+N↑"累加进最后一条，原是丢弃）+ 炸弹爆炸补总伤飘字 | damage_number.gd + remote_bomb.gd |
+| 7 | 远距枪声低通变体（>120m 切 far 闷响采样，三枪齐备） | gen_sfx + sfx_bank play_at |
+| 8 | 血月持续 drone 层（12s 循环+2s 交叉淡入淡出，与 stinger/结束信号配套） | gen_sfx + sfx_bank + main |
+| 11 | 烟雾压制射击：丢视后朝最后已知位置盲射 ≤3 发（pull_trigger_dir 强制方向+4° 散布），烟不再是零反制硬 counter | bot.gd + weapon.gd |
+| F8b | 四坡屋顶形制（仓库），打破全图单一形制 | buildings.gd |
+| 16 | 树冠卡 12→16（透天缝收敛）；神庙完成灯 4s+4s 渐灭回收（原永久驻留） | props.gd + shrine_trial.gd |
+| 6 | 医疗读条进度条（准星下方 3s 绿条，推进/打断/完成三态同步） | hud.gd + player.gd |
+| G6b | 旷野死亡契约：复活掉 1 件背包武器+卢比减半；死亡不覆盖"探索模式"文案 | main.gd |
+| B6c | 修概率性 `data.rpm` 崩溃守卫（_try_fire 对 data 空字典自愈重置） | weapon.gd（三连 sim 零复现） |
+
+> 未完成（XL/依赖前置，维持原状）：G7b 二周目存档（待 C5 存档服务）、R14-R20 架构重构（Phase 2/3 范围）、H6b 地表色斑根因、仓库/木箱纹理（本轮已做墙面 128px+mipmap+世界三面映射）。
+
+> 未完成（全部为 XL 级或依赖外部前置）：
 > 未完成（全部为 XL 级或依赖外部前置）：F3 完整 EnvironmentDirector 架构（F3-light 已达成等效可见验收）、F8b 屋顶形制差异化、G7b 二周目存档难度增量（依赖 C5 XL 存档服务）、H4b puff 网格深度共享、H6b 地表薄荷色斑根因排查、以及 ISSUES § 多角色增量 5 的 R14-R20 架构重构项（上帝类拆分等，属 Phase 2/3 既定范围）。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。
 
 > 未完成（下一批）：C3/C6、D4/D5、E3–E5、F1/F3/F5–F9、G3–G7、H1–H6，见 `docs/OPTIMIZATION_PLAN.md` 总表。

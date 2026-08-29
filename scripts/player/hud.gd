@@ -22,6 +22,8 @@ var _interact_label: Label
 var _capture_bar: ColorRect
 var _capture_wrap: Control
 var _capture_label: Label
+var _med_wrap: Control
+var _med_bar: ColorRect # // FIX: R4-6
 var _stamina_segs: Array[ColorRect] = []
 var _stamina_wrap: Control
 var _minimap_wrap: Control
@@ -341,6 +343,17 @@ func _build_top() -> void:
 	_capture_bar = _mk_rect(_capture_wrap, Vector2(2, 26), Vector2(0, 4), Color(1.0, 0.85, 0.3))
 	_capture_wrap.visible = false
 
+	# // FIX: R4-6 医疗读条进度条（原只有 feed 文案，玩家无法感知剩余治疗时间）
+	_med_wrap = Control.new()
+	_med_wrap.set_anchors_preset(Control.PRESET_CENTER)
+	_med_wrap.position = Vector2(-90, 66)
+	_ui.add_child(_med_wrap)
+	var med_bg := _mk_rect(_med_wrap, Vector2(0, 24), Vector2(180, 8), Color(0, 0, 0, 0.45))
+	med_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_med_bar = _mk_rect(_med_wrap, Vector2(2, 26), Vector2(0, 4), Color(0.35, 0.95, 0.55))
+	_med_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_med_wrap.visible = false
+
 
 func set_zone_text(t: String) -> void:
 	_zone_label.text = t
@@ -455,6 +468,15 @@ func flash_damage() -> void:
 	_vignette.modulate.a = 1.0
 	var tw := _vignette.create_tween()
 	tw.tween_property(_vignette, "modulate:a", 0.0, 0.6)
+
+
+# // FIX: R4-6 医疗读条进度（p∈[0,1]，<0 隐藏）
+func set_med_progress(p: float) -> void:
+	if _med_wrap == null:
+		return
+	_med_wrap.visible = p >= 0.0
+	if p >= 0.0:
+		_med_bar.size.x = 176.0 * clampf(p, 0.0, 1.0)
 
 
 func set_danger(on: bool) -> void:

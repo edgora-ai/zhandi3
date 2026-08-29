@@ -45,7 +45,11 @@ const SOUNDS := {
 	"animal_bear": "res://assets/sfx/animal_bear.wav",
 	"mount_neigh": "res://assets/sfx/mount_neigh.wav",
 	"chest_open": "res://assets/sfx/chest_open.wav",
-	"blood_stinger": "res://assets/sfx/blood_stinger.wav", # // FIX: R2-3 血月 stinger 此前未注册（死调用）
+	"blood_stinger": "res://assets/sfx/blood_stinger.wav",
+	"blood_drone": "res://assets/sfx/blood_drone.wav", # // FIX: R4-8 血月持续氛围层
+	"shot_rifle_far": "res://assets/sfx/shot_rifle_far.wav", # // FIX: R4-7 远距闷响
+	"shot_dmr_far": "res://assets/sfx/shot_dmr_far.wav",
+	"shot_smg_far": "res://assets/sfx/shot_smg_far.wav", # // FIX: R2-3 血月 stinger 此前未注册（死调用）
 	"zone_tick": "res://assets/sfx/zone_tick.wav", # // FIX: R2-8 圈外掉血专用低鸣（原复用 hit.wav）
 }
 
@@ -151,6 +155,12 @@ func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 
 	var p := _pick_3d()
 	p.bus = _bus_for(name)
 	p.global_position = pos
+	# // FIX: R4-7 远距枪声切低通变体（闷响），原只变小不变闷
+	var far_name := name.replace("_rifle", "_rifle_far").replace("_dmr", "_dmr_far").replace("_smg", "_smg_far")
+	if far_name != name and _streams.has(far_name) and _streams[far_name] != null:
+		var cam := get_viewport().get_camera_3d()
+		if cam and cam.global_position.distance_to(pos) > 120.0:
+			name = far_name
 	p.stream = _streams[name]
 	p.volume_db = volume_db
 	p.pitch_scale = pitch * randf_range(0.94, 1.06)
@@ -238,6 +248,32 @@ func set_night_music(night: bool) -> void:
 		return
 	_night_on = night
 	_apply_music_volumes(3.0)
+
+
+# // FIX: R4-8 血月持续氛围层：drone 2s 交叉淡入淡出（与 stinger/压低音乐配套）
+var _blood_player: AudioStreamPlayer
+var _blood_on := false
+
+func set_blood_drone(on: bool) -> void:
+	if on == _blood_on:
+		return
+	_blood_on = on
+	if on:
+		if _blood_player == null:
+			var track: AudioStreamWAV = load("res://assets/sfx/blood_drone.wav")
+			track.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			track.loop_end = int(track.get_length() * track.mix_rate)
+			_blood_player = AudioStreamPlayer.new()
+			_blood_player.bus = "Ambience"
+			_blood_player.stream = track
+			_blood_player.volume_db = -40.0
+			add_child(_blood_player)
+		_blood_player.play()
+		create_tween().tween_property(_blood_player, "volume_db", -12.0, 2.0)
+	elif _blood_player:
+		var tw := create_tween()
+		tw.tween_property(_blood_player, "volume_db", -40.0, 2.0)
+		tw.tween_callback(_blood_player.stop)
 
 
 # Boss 战音乐：进入战区渐强鼓点、压暗日常配乐；脱离战区淡回。

@@ -73,6 +73,7 @@ func detonate() -> void:
 	var pos := global_position
 	# 敌伤：范围衰减。玩家走专用自伤分支，去重避免 40+12 双伤。
 	var damaged: Dictionary = {}
+	var total := 0 # // FIX: R4-10 聚合总伤
 	var scene_player: Node = null
 	if scene and scene.get("player") != null:
 		scene_player = scene.get("player")
@@ -91,7 +92,10 @@ func detonate() -> void:
 				continue
 			if target.has_method("take_damage"):
 				target.take_damage(DAMAGE * clampf(1.0 - d / RADIUS, 0.25, 1.0), source if source else self, "body")
+				total += int(DAMAGE * clampf(1.0 - d / RADIUS, 0.25, 1.0)) # // FIX: R4-10 爆炸总伤聚合
 				damaged[target.get_instance_id()] = true
+	if total > 0:
+		DamageNumber.spawn_at(get_tree().current_scene, pos + Vector3(0, 1.2, 0), str(total), Color(1.0, 0.6, 0.2))
 	# 可炸物：裂岩等可破坏物按全额伤害结算。
 	for target in get_tree().get_nodes_in_group("crackable"):
 		var cd: float = target.global_position.distance_to(pos)

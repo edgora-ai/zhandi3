@@ -37,6 +37,7 @@ var _loot_fail_counts: Dictionary = {} # // FIX: OPT-A2 强化：指数退避防
 var _alert_t := 0.0
 var _alert_from_pos := Vector3.ZERO
 var _alert_source_id := 0 # // FIX: R2-B3 受击源追踪
+var _suppress_left := 0 # // FIX: R4-11 压制弹余量（进交战时补满 3 发）
 var _last_seen_pos := Vector3.ZERO # // FIX: OPT-A3 最后已知位置，丢视后向其搜索
 var capture_goal: CapturePoint = null
 
@@ -367,6 +368,7 @@ func _think_tick() -> void:
 		aim_target = enemy
 		_lose_sight = 0.0
 		_last_seen_pos = enemy.global_position
+		_suppress_left = 3 # // FIX: R4-11
 		return
 	if state == State.FIGHT:
 		# // FIX: R2-B3b 交战态查圈：圈外且残血强制撤离（原 outside 算完即被 early-return 吞掉，bot 站圈里对枪到毒死）
@@ -730,8 +732,13 @@ func _fight_fire(delta: float) -> void:
 	var dist := global_position.distance_to(aim_target.global_position)
 	if dist > weapon.data.range * 0.85:
 		return
-	# // FIX: OPT-A3/CB6 丢失视线 >0.3s 即停火（穿墙/入烟不再倾泻曳光），仅允许朝最后已知位置警戒
+	# // FIX: R4-11 烟雾压制：丢视后朝最后已知位置盲射最多 3 发（原入烟=完全无敌窗），超出即真停火
 	if _lose_sight > 0.3:
+		if _suppress_left > 0 and weapon.mag_left > 0 and _burst_pause <= 0.0 and _last_seen_pos != Vector3.ZERO:
+			_suppress_left -= 1
+			_burst_pause = randf_range(0.5, 0.8)
+			var to_last: Vector3 = (_last_seen_pos + Vector3(0, 1.0, 0) - get_aim_origin()).normalized()
+			weapon.pull_trigger_dir(to_last)
 		return
 	if _smoke_blocks(get_aim_origin(), aim_target.global_position + Vector3(0, 1.1, 0)):
 		return
@@ -846,6 +853,9 @@ func _drop_loot() -> void:
 		Loot.spawn(get_parent(), pos + Vector3(0.5, 0, 0), "weapon", weapon.weapon_id, 0, 2)
 	if randf() < 0.35:
 		Loot.spawn(get_parent(), pos + Vector3(-0.5, 0, 0), "medkit", "", 50, 1)
+	# // FIX: R4-1 bot 死亡掉护甲（原 armor 被尸体带走，护甲经济单向流失）
+	if armor > 25.0 and randf() < 0.3:
+		Loot.spawn(get_parent(), pos + Vector3(0.5, 0, 0.5), "armor", "", int(armor), 2)
 
 
 func _update_corpse(delta: float) -> void:

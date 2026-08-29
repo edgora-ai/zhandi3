@@ -355,6 +355,11 @@ func apply_to(target: CharacterBody3D) -> void:
 			if target.has_method("give_weapon"):
 				target.give_weapon(weapon_id)
 		"armor":
+			# // FIX: R4-3 满甲按 E 不再白耗（原直接销毁 no-op）
+			if target is Player and target.armor >= 99.0:
+				if target.hud:
+					target.hud.add_feed("护甲已满")
+				return
 			target.armor = minf(100.0, target.armor + amount)
 			if target.has_signal("health_changed"):
 				target.health_changed.emit(target.hp, target.armor)
@@ -365,6 +370,10 @@ func apply_to(target: CharacterBody3D) -> void:
 			# // FIX: OPT-G4/PG11 玩家 medkit 改 3s 读条（受击打断不消耗，可被针对）；bot 保持即拾即用
 			if target is Player and target.get("hp") < cap - 1.0:
 				target.start_med_channel(float(amount))
+			elif target is Player and target.get("hp") >= cap - 1.0:
+				if target.hud:
+					target.hud.add_feed("生命已满")
+				return
 			else:
 				target.hp = minf(cap, target.hp + amount)
 				if target.has_signal("health_changed"):

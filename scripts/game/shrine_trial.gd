@@ -162,6 +162,11 @@ func _complete() -> void:
 	light.omni_range = 16.0
 	light.position = Vector3(0, 3.5, -3.5)
 	add_child(light)
+	# // FIX: R4-16b 完成灯 8s 渐灭回收（原每庙一盏永久驻留，4 庙只增不减）
+	var tw := create_tween()
+	tw.tween_interval(4.0)
+	tw.tween_property(light, "light_energy", 0.0, 4.0)
+	tw.tween_callback(light.queue_free)
 
 
 func hud_status(pos: Vector3) -> Array:

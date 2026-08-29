@@ -162,6 +162,8 @@ func _ready() -> void:
 		# // FIX: R2-3 血月结束解除 Boss 鼓点并恢复日常音乐（原无解除路径，鼓点整夜循环）
 		if sfx.has_method("set_boss_music"):
 			sfx.set_boss_music(false)
+		if sfx.has_method("set_blood_drone"):
+			sfx.set_blood_drone(false) # // FIX: R4-8
 		hud.add_feed("血月消退了")
 	)
 	weather = Weather.new()
@@ -700,7 +702,9 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 		killer_name = "你" if killer == player else killer.display_name
 	var victim_name: String = "你" if victim == player else victim.display_name
 	hud.add_feed("%s 淘汰了 %s" % [killer_name, victim_name])
-	hud.set_alive(_alive_count())
+	# // FIX: R4-G6b 旷野探索模式不刷"存活 N"（原无条件覆盖探索模式文案）
+	if _map_id != "wild":
+		hud.set_alive(_alive_count())
 	hud.set_kills(player.kills)
 	# // FIX: OPT-A1/A2 验收探针：bot 互杀占比 / 毒圈致死计数（--sim KPI 输出用）
 	if victim is Bot:
@@ -715,6 +719,14 @@ func _on_combatant_died(victim: Variant, killer: Variant) -> void:
 
 	if victim == player:
 		if _map_id == "wild":
+			# // FIX: R4-G6b 复活代价（原死亡零成本=永生沙盒）：掉 1 件背包武器+卢比减半
+			if player.backpack_weapons.size() > 0:
+				var lost: Dictionary = player.backpack_weapons.pop_back()
+				Loot.spawn(self, player.global_position + Vector3(0.8, 0.2, 0), "weapon", str(lost.get("id", "smg")), int(lost.get("mag", 0)), 1)
+				player._refresh_backpack()
+				hud.add_feed("你掉落了背包里的 %s" % Weapon.WEAPONS[str(lost.get("id", "smg"))].label)
+			player.rupees = int(player.rupees * 0.5)
+			hud.set_rupees(player.rupees) # // FIX: R4-G6b 用实际存在的 set_rupees（rupees_changed 信号不存在）
 			# 原创旷野式死亡：不终局，红闪“你死了”，2.2 秒后在最近神庙满血重生。
 			sfx.play("defeat", -2.0)
 			sfx.play("heavy_impact", -4.0, 0.62)
@@ -787,6 +799,8 @@ func _on_blood_moon() -> void:
 	hud.add_feed("血月升起……怪物苏醒了")
 	# // FIX: OPT-E5/FX16 血月 stinger + 音乐压低（氛围高潮音频记忆点）
 	sfx.play("blood_stinger", -2.0)
+	if sfx.has_method("set_blood_drone"):
+		sfx.set_blood_drone(true) # // FIX: R4-8 持续 drone 层
 	if sfx.has_method("set_boss_music"):
 		sfx.set_boss_music(true)
 	sfx.play("zone_alarm", -2.0)

@@ -419,6 +419,7 @@ func _toggle_stasis() -> void:
 		hud.add_feed("强大的敌人只能被短暂凝滞")
 	_stasis_prev_mode = best.get_process_mode()
 	best.set_process_mode(Node.PROCESS_MODE_DISABLED)
+	best.set_meta("frozen_by_stasis", true)
 	_stasis_shell = MeshInstance3D.new()
 	var sm := SphereMesh.new()
 	sm.radius = 1.3
@@ -452,6 +453,8 @@ func _release_stasis() -> void:
 	if t == null or not is_instance_valid(t):
 		return
 	t.set_process_mode(_stasis_prev_mode)
+	if t.has_meta("frozen_by_stasis"):
+		t.remove_meta("frozen_by_stasis")
 	if t.alive and _stasis_dmg > 0.0:
 		var dir := t.global_position - global_position
 		dir.y = 0.0
@@ -1251,6 +1254,9 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 	if Time.get_ticks_msec() / 1000.0 < _revive_iframe_end:
 		damaged.emit(0.0)
 		return
+	# // FIX: R4-12 目标侧冻结减半：被时停冻结的目标受任意来源伤害减半（原仅 weapon.gd 施法者路径覆盖，bot 弹等绕过就满伤）
+	if get_meta("frozen_by_stasis", false):
+		amount *= 0.5
 	var dmg := amount
 	dmg *= damage_taken_mult
 	# // FIX: OPT-G3/PG5 驾驶员受击伤害 ×0.5（恢复受击层后不再无敌，但载具提供掩蔽减伤）

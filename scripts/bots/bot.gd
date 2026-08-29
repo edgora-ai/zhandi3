@@ -804,6 +804,9 @@ func _blocked(from: Vector3, dir: Vector3) -> bool:
 func take_damage(amount: float, from: Variant = null, part: String = "body") -> void:
 	if not alive:
 		return
+	# // FIX: R4-12 目标侧冻结减半：被玩家时停冻结的 bot 受任意来源伤害减半（原仅 weapon.gd 施法者路径覆盖，bot 弹等绕过就满伤）
+	if get_meta("frozen_by_stasis", false):
+		amount *= 0.5
 	var dmg := amount
 	# // FIX: OPT-C3 步枪穿甲：来源为步枪时吸收 0.6→0.45，与玩家侧同规则
 	var absorb_ratio := 0.6

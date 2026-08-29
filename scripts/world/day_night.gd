@@ -11,6 +11,7 @@ var _night_index := 0
 var _last_midnight := -1.0
 
 signal blood_moon_started
+signal blood_moon_ended # // FIX: R2-3 血月结束广播（Boss 音乐/氛围层解除）
 
 var _env: Environment
 var _sky_mat: ProceduralSkyMaterial
@@ -94,6 +95,7 @@ func _check_midnight(prev: float, now: float) -> void:
 			blood_moon_started.emit()
 	if prev < 0.94 and t >= 0.94:
 		blood_moon = false
+		blood_moon_ended.emit() # // FIX: R2-3
 
 
 # TODO(M4): EnvironmentDirector 统一合成 — Season/DayNight/Weather 仅上报权重，
@@ -119,15 +121,18 @@ func _apply() -> void:
 	_sky_mat.sky_horizon_color = horizon
 	_sky_mat.ground_bottom_color = horizon.darkened(0.55)
 	_sky_mat.ground_horizon_color = horizon
-	_env.ambient_light_energy = lerpf(0.12, 0.5, day)
+	# // FIX: R3-TA6 闪电期间 ambient 写权让位天气（原每帧覆盖使闪光存活不过 1 帧）
+	var wx: Node = get_parent().get_node_or_null("Weather")
+	if wx == null or wx.get("ambient_flash") == null or float(wx.get("ambient_flash")) <= 0.01:
+		_env.ambient_light_energy = lerpf(0.12, 0.5, day)
 	_env.fog_light_color = FOG_NIGHT.lerp(season_fog, day).lerp(FOG_DUSK, dusk * 0.5)
-	if season_palette.has("fog_density"):
-		_env.fog_density = lerpf(0.0016, float(season_palette["fog_density"]) * (0.68 if _env.get("meta_wild") else 1.0), day)
 	if season_palette.has("exposure"):
 		_env.tonemap_exposure = float(season_palette["exposure"])
 	if blood_moon:
 		_env.fog_light_color = _env.fog_light_color.lerp(Color(0.55, 0.12, 0.10), 0.7)
-	_env.fog_density = lerpf(0.0016, 0.0009, day)
+	# // FIX: R3-TA2 季节雾密度真正生效（原季节行被本行无条件覆盖=死代码）；meta_wild 恒假分支一并删除
+	var season_fog_d: float = float(season_palette.get("fog_density", 0.0009)) if season_palette.has("fog_density") else 0.0009
+	_env.fog_density = lerpf(0.0016, season_fog_d, day)
 	# // FIX: OPT-F2/TA3 unshaded 植被/水面随昼夜明暗（全局 shader 参数，夜晚 ≤ 白天 30%）
 	if not _daylight_gp_ready:
 		RenderingServer.global_shader_parameter_add("day_light", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)

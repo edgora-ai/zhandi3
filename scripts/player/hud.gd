@@ -202,7 +202,8 @@ func update_minimap(player: Player, zone: Zone = null) -> void:
 		_minimap_zone.size = Vector2(radius_px * 2, radius_px * 2)
 		# // FIX: OPT-H1/FX10 缩圈中/待缩时叠加下一目标圈虚线（同源坐标，误差 ≤2px）
 		if _minimap_zone_next:
-			var show_next: bool = zone.active and zone.phase < 5 and (zone.shrinking or zone.timer < 15.0)
+			# // FIX: R2-C1a 等待期 _target_* 是上一阶段陈旧目标，仅在收缩期显示预览
+			var show_next: bool = zone.active and zone.phase < 5 and zone.shrinking
 			_minimap_zone_next.visible = show_next
 			if show_next:
 				var tc: Vector3 = zone.next_target() # (center_x, radius, center_z)
@@ -491,7 +492,9 @@ func _update_heartbeat(on: bool) -> void:
 			if stream:
 				stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 				stream.loop_begin = 0
-				stream.loop_end = stream.data.size() / 2 # 16-bit 单声道帧数
+				# // FIX: R2-C2b 格式守卫（16bit 单声道才按 bytes/2 折算帧数，避免日后导入变更静默错拍）
+				if stream.format == AudioStreamWAV.FORMAT_16_BITS and not stream.stereo:
+					stream.loop_end = stream.data.size() / 2
 			_heartbeat.stream = stream
 			_heartbeat.bus = "SFX"
 			_heartbeat.volume_db = -8.0
@@ -510,6 +513,17 @@ func _update_heartbeat(on: bool) -> void:
 		if sfx_bus >= 0 and _lowpass_idx >= 0:
 			AudioServer.remove_bus_effect(sfx_bus, _lowpass_idx)
 			_lowpass_idx = -1
+
+
+func _exit_tree() -> void:
+	# // FIX: R2-4 场景重载泄漏：低通挂全局 SFX bus，HUD 释放时必须对称移除
+	# （死亡触发 set_low_hp(true) 后按 R 重开，旧泄漏让整局闷在 600Hz）
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	if sfx_bus >= 0 and _lowpass_idx >= 0:
+		AudioServer.remove_bus_effect(sfx_bus, _lowpass_idx)
+		_lowpass_idx = -1
+	if _heartbeat:
+		_heartbeat.stop()
 
 
 # ---------- 受击方向指示 ----------

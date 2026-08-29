@@ -158,6 +158,12 @@ func _ready() -> void:
 	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
 	daynight.season_palette = seasons.current_palette # // FIX: OPT-F3-light 初始调色板（daynight 建好后回填）
 	daynight.blood_moon_started.connect(_on_blood_moon)
+	daynight.blood_moon_ended.connect(func() -> void:
+		# // FIX: R2-3 血月结束解除 Boss 鼓点并恢复日常音乐（原无解除路径，鼓点整夜循环）
+		if sfx.has_method("set_boss_music"):
+			sfx.set_boss_music(false)
+		hud.add_feed("血月消退了")
+	)
 	weather = Weather.new()
 	weather.name = "Weather"
 	add_child(weather)
@@ -570,7 +576,7 @@ func _spawn_wild_bots(rng: RandomNumberGenerator) -> void:
 		# // FIX: OPT-G6/PG7 每 bot 落点半径保底一件武器（原 7 件/9 人多数空手）
 		var wl := land + Vector3(rng.randf_range(-6, 6), 0.15, rng.randf_range(-6, 6))
 		wl.y = terrain.get_height(wl.x, wl.z) + 0.15
-		Loot.spawn(self, wl, "weapon", ["smg", "rifle", "dmr"][i % 3], 0, 1 + (i % 2))
+		Loot.spawn(self, wl, "weapon", ["smg", "rifle", "smg", "rifle", "dmr"][i % 5], 0, 1 + (i % 2)) # // FIX: R2-C2c DMR 25%→20%
 		Loot.spawn(self, wl + Vector3(0.8, 0, 0), "ammo", "", 60, 1)
 		bot.global_position = land + Vector3(rng.randf_range(-12, 12), rng.randf_range(70.0, 120.0), rng.randf_range(-12, 12))
 		bot.rotation.y = rng.randf_range(0.0, TAU)
@@ -667,19 +673,25 @@ func _end_stats() -> Array:
 # // FIX: OPT-G4/PG9 空投：决赛圈前补给（DMR/r3甲/医疗/弹药），光柱醒目
 func _spawn_airdrop() -> void:
 	var c := zone.next_target()
-	var ang := randf() * TAU
-	var r := randf() * 0.7 * c.y
-	var pos := Vector3(c.x + cos(ang) * r, 0, c.z + sin(ang) * r)
-	pos.y = terrain.get_height(pos.x, pos.z)
-	if pos.y < Terrain.WATER_LEVEL + 0.5:
+	# // FIX: R3-P1-5 落点播种（纳入 --seed 复现口径）+ 8 次重试（原水面落点整批静默蒸发）
+	var arng := RandomNumberGenerator.new()
+	arng.seed = hash(str(_seed_value, "_airdrop", _airdrops)) if _seed_value >= 0 else randi()
+	for _attempt in range(8):
+		var ang := arng.randf() * TAU
+		var r := arng.randf() * 0.7 * c.y
+		var pos := Vector3(c.x + cos(ang) * r, 0, c.z + sin(ang) * r)
+		pos.y = terrain.get_height(pos.x, pos.z)
+		if pos.y < Terrain.WATER_LEVEL + 0.5:
+			continue
+		pos.y += 0.15
+		Loot.spawn(self, pos + Vector3(0.6, 0, 0.6), "weapon", "dmr", 0, 3)
+		Loot.spawn(self, pos + Vector3(-0.6, 0, 0.6), "armor", "", 75, 3)
+		Loot.spawn(self, pos + Vector3(0.6, 0, -0.6), "medkit", "", 60, 2)
+		Loot.spawn(self, pos + Vector3(-0.6, 0, -0.6), "ammo", "", 120, 2)
+		Loot.spawn(self, pos, "fuel", "", 1, 2)
+		hud.add_feed("补给空投已投放在圈内，注意光柱！")
 		return
-	pos.y += 0.15
-	Loot.spawn(self, pos + Vector3(0.6, 0, 0.6), "weapon", "dmr", 0, 3)
-	Loot.spawn(self, pos + Vector3(-0.6, 0, 0.6), "armor", "", 75, 3)
-	Loot.spawn(self, pos + Vector3(0.6, 0, -0.6), "medkit", "", 60, 2)
-	Loot.spawn(self, pos + Vector3(-0.6, 0, -0.6), "ammo", "", 120, 2)
-	Loot.spawn(self, pos, "fuel", "", 1, 2)
-	hud.add_feed("补给空投已投放在圈内，注意光柱！")
+	hud.add_feed("空投被气流吹回了海面……")
 
 
 func _on_combatant_died(victim: Variant, killer: Variant) -> void:
@@ -1157,6 +1169,20 @@ func _process(delta: float) -> void:
 		c.position.x += 1.6 * delta
 		if c.position.x > 460.0:
 			c.position.x = -460.0
+	# // FIX: R2-C1d 夜云压暗（原 unshaded 纯白夜间仍刺眼）
+	var cd := 1.0
+	if daynight:
+		var elev := sin(daynight.t * TAU)
+		cd = lerpf(0.22, 1.0, smoothstep(-0.12, 0.25, elev))
+	if _cloud_mat:
+		_cloud_mat.albedo_color = Color(1.0 * cd, 1.0 * cd, 1.0 * cd, 0.88)
+	# // FIX: R3-TA5b 雪/雨/季节粒子同曲线压暗（原冬夜"亮雪蚊群"）
+	if weather and weather.get("snow_mat") != null:
+		var sb: Color = weather.snow_base
+		weather.snow_mat.albedo_color = Color(sb.r * cd, sb.g * cd, sb.b * cd, sb.a)
+	if seasons and seasons.get("wx_mat") != null:
+		var wb: Color = seasons.wx_base
+		seasons.wx_mat.albedo_color = Color(wb.r * cd, wb.g * cd, wb.b * cd, wb.a)
 
 	if _ft_frames >= 0:
 		_ft_frames += 1
@@ -1217,7 +1243,7 @@ func _process(delta: float) -> void:
 	if not player.alive:
 		return
 	hud.set_stamina(player.stamina / player.max_stamina)
-	hud.update_minimap(player)
+	hud.update_minimap(player, zone) # // FIX: R3-P02 唯一调用点漏传 zone，安全圈/预览圈从未渲染
 	hud.set_spread(6.0 + player.weapon.current_spread() * 9.0)
 	hud.set_crosshair_visible(player.weapon.weapon_id != "")
 	if player.nearby_loot:
@@ -2128,6 +2154,7 @@ func _setup_environment() -> void:
 
 
 var _clouds: Array[Node3D] = []
+var _cloud_mat: StandardMaterial3D # // FIX: R2-C1d 夜云压暗
 
 func _spawn_clouds() -> void:
 	if OS.get_cmdline_user_args().has("--noclouds"):
@@ -2140,6 +2167,7 @@ func _spawn_clouds() -> void:
 	mat.albedo_color = Color(1.0, 1.0, 1.0, 0.88)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.disable_fog = true
+	_cloud_mat = mat
 	for i in range(22):
 		var cloud := Node3D.new()
 		# // FIX: OPT-H6/VIS5 高度带抬升（不再贴山腰）+ 三种云形（团块/长条/双层）

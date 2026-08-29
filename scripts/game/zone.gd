@@ -146,4 +146,4 @@ func _damage_tick(delta: float) -> void:
 			if c is Player:
 				var sfx := get_tree().get_first_node_in_group("sfx_bank")
 				if sfx:
-					sfx.play("hit", -14.0, 0.55)
+					sfx.play("zone_tick", -10.0, 1.0) # // FIX: R2-8 专用低鸣（原复用 hit.wav 确认音）

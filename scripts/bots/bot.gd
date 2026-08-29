@@ -36,6 +36,7 @@ var _loot_fail_counts: Dictionary = {} # // FIX: OPT-A2 强化：指数退避防
 # // FIX: OPT-A3 受击警觉期：转向但不开火，无视线不锁定
 var _alert_t := 0.0
 var _alert_from_pos := Vector3.ZERO
+var _alert_source_id := 0 # // FIX: R2-B3 受击源追踪
 var _last_seen_pos := Vector3.ZERO # // FIX: OPT-A3 最后已知位置，丢视后向其搜索
 var capture_goal: CapturePoint = null
 
@@ -345,7 +346,7 @@ func give_weapon(id: String) -> void:
 
 
 func give_ammo(amount: int) -> void:
-	weapon.reserve = mini(999, weapon.reserve + amount)
+	weapon.reserve = mini(240, weapon.reserve + amount) # // FIX: R2-C2d 人机对等（原 999=实战无限）
 	# // FIX: H3 换弹受限说明：Bot 同 Player 共用 Weapon.start_reload/mag 钳制，999为硬上限，空匣必经换弹期
 
 
@@ -368,6 +369,12 @@ func _think_tick() -> void:
 		_last_seen_pos = enemy.global_position
 		return
 	if state == State.FIGHT:
+		# // FIX: R2-B3b 交战态查圈：圈外且残血强制撤离（原 outside 算完即被 early-return 吞掉，bot 站圈里对枪到毒死）
+		if outside and hp < MAX_HP * 0.6:
+			state = State.ROTATE
+			aim_target = null
+			move_target = _random_point_in_zone()
+			return
 		# // FIX: OPT-A3 丢视 >0.3s 停火（_fight_fire 内 _lose_sight 闸），
 		# 1.2s 后放弃目标转 ROTATE；期间朝最后已知位置警戒移动
 		_lose_sight += 0.3
@@ -790,9 +797,19 @@ func take_damage(amount: float, from: Variant = null, part: String = "body") -> 
 	# 无视线不会隔墙锁定 aim_target；交战态保持当前目标不被打扰
 	if from is Node3D and from.is_inside_tree():
 		if state != State.FIGHT:
-			_alert_t = 0.5
-			_alert_from_pos = from.global_position
-			state = State.ROTATE
+			var sid: int = from.get_instance_id()
+			# // FIX: R2-B3 警觉压制漏洞：原每次受击都重置 0.5s 且禁射，持续开火可让 bot 永不还击
+			if sid != _alert_source_id or _alert_t <= 0.0:
+				_alert_source_id = sid
+				_alert_t = 0.5
+				_alert_from_pos = from.global_position
+				state = State.ROTATE
+			else:
+				# 同一来源的第二次受击：警觉窗结束，转入交战还击
+				_alert_t = 0.0 # // FIX: R3-P0-1 未清 alert 会让 _fight_fire 永久 return（bot 成木桩）
+				state = State.FIGHT
+				aim_target = from
+				_lose_sight = 0.0
 	if hp <= 0.0:
 		die(from)
 

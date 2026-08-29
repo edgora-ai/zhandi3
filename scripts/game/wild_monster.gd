@@ -48,7 +48,7 @@ func _ready() -> void:
 	col.position.y = 0.78
 	add_child(col)
 	_build_model()
-	_attack_cue = FX.attack_ring(self, 0.72, Color(1.0, 0.34, 0.08, 0.76))
+	_attack_cue = FX.attack_ring(self, 2.15, Color(1.0, 0.34, 0.08, 0.76)) # // FIX: R2-B5 环=伤害距离（原 0.72 vs 2.15 反向误导）
 
 
 func _build_model() -> void:

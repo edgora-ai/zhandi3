@@ -10,6 +10,7 @@ var display_name := "维佐法师"
 
 var _home := Vector3.ZERO
 var _cast_cd := 1.5
+var _cast_windup := -1.0 # // FIX: R2-B4 施法前摇计时
 var _tp_cd := 0.0
 var _strafe := 1.0
 var _anim := 0.0
@@ -186,6 +187,17 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z) + PI, delta * 5.0)
 	# 施法与悬停动画。
 	if dist < 22.0 and _cast_cd <= 0.0 and player.alive:
-		_cast()
+		# // FIX: R2-B4/CB13c 原瞬发无前摇：0.45s 前摇+充能音+LoS（坡后不再盲射）
+		_cast_cd = 3.2
+		_cast_windup = 0.45
+		var _sfx_w := get_tree().get_first_node_in_group("sfx_bank")
+		if _sfx_w:
+			_sfx_w.play_at("enemy_charge", global_position + Vector3(0, 1.4, 0), -8.0, 1.35)
+	if _cast_windup > 0.0:
+		_cast_windup -= delta
+		if _cast_windup <= 0.0 and dist < 26.0 and player.alive:
+			var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.4, 0), player.global_position + Vector3(0, 1.0, 0), 1, [get_rid()])
+			if get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+				_cast()
 	if _ap and _anim_hold <= 0.0:
 		_play(&"hover")

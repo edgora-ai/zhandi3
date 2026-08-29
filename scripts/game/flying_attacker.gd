@@ -13,6 +13,7 @@ var kills := 0
 var _home := Vector3.ZERO
 var _time := 0.0
 var _shot_cooldown := 1.5
+var _windup := -1.0 # // FIX: R2-B4 开火前摇计时
 var _rotors: Array[Node3D] = []
 
 
@@ -124,8 +125,19 @@ func _physics_process(delta: float) -> void:
 		if away.length() < 18.0:
 			target += away.normalized() * 14.0
 		if _shot_cooldown <= 0.0:
-			_shoot()
+			# // FIX: R2-B4/CB13b 原零前摇瞬发无音效：0.45s 前摇+充能音+LoS（与投石/守卫同标准）
 			_shot_cooldown = 2.2
+			_windup = 0.45
+			var _sfx_c := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_c:
+				_sfx_c.play_at("enemy_charge", global_position, -8.0, 1.25)
+		if _windup > 0.0:
+			_windup -= delta
+			# // FIX: R2-B4 发射前 LoS：坡后/墙后不再盲射
+			if _windup <= 0.0 and player:
+				var q := PhysicsRayQueryParameters3D.create(global_position, player.global_position + Vector3(0, 1.0, 0), 1, [get_rid()])
+				if get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+					_shoot()
 	global_position = global_position.lerp(target, minf(1.0, delta * 1.25))
 	look_at(player.global_position + Vector3(0, 1.0, 0), Vector3.UP)
 

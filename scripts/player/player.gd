@@ -142,6 +142,7 @@ var _melee_target: CharacterBody3D = null
 var melee_damage := MELEE_DAMAGE
 var _footstep_cd := 0.0
 var _last_frame_vy := 0.0 # // FIX: OPT-H5 落地冲击速度（扬尘强度）
+var _was_in_water := false # // FIX: R2-5 入水边沿检测
 var _climb_sfx_cd := 0.0
 var _swim_sfx_cd := 0.0
 var _landed_last_frame := true
@@ -389,7 +390,9 @@ func _toggle_stasis() -> void:
 			if to_t.length() > 20.0:
 				continue
 			var dt := to_t.normalized().dot(fwd)
-			if dt > best_dot:
+			# // FIX: R2-B5/R21 时停加 LoS：隔墙/坡后不再白嫖冻结
+			var los_q := PhysicsRayQueryParameters3D.create(camera.global_position, target.global_position + Vector3(0, 1.0, 0), 1, [get_rid()])
+			if get_world_3d().direct_space_state.intersect_ray(los_q).is_empty() and dt > best_dot:
 				best_dot = dt
 				best = target
 	if best == null:
@@ -398,7 +401,8 @@ func _toggle_stasis() -> void:
 	_stasis_target = best
 	_stasis_dmg = 0.0
 	_stasis_next_ok_ms = Time.get_ticks_msec() + 15000
-	var is_boss: bool = "max_hp" in best and float(best.get("max_hp")) >= 150.0
+	# // FIX: R2-B1 原 "max_hp" in best 恒 false（全工程无人定义 max_hp）→ Boss 判定死代码，Hinox/龙/守卫仍被冻 5s
+	var is_boss: bool = best.is_in_group("wild_enemy") and float(best.get("hp")) >= 150.0
 	var freeze_ms := 1500 if is_boss else 5000
 	_stasis_end_ms = Time.get_ticks_msec() + freeze_ms
 	if is_boss and hud:
@@ -631,8 +635,8 @@ func _check_timed_consumables() -> void:
 	# 墙钟计时，不受 Engine.time_scale 影响；需在所有 early return 前调用
 	if _hitstop_end_ms > 0 and Time.get_ticks_msec() >= _hitstop_end_ms:
 		_hitstop_end_ms = 0
-		if not flurry:
-			Engine.time_scale = 1.0
+		# // FIX: R2-B5e 原 flurry 期间顿帧结束后停在 0.05（if not flurry 跳过恢复），慢动作被冻结
+		Engine.time_scale = 0.22 if flurry else 1.0
 	if _stasis_end_ms > 0 and Time.get_ticks_msec() >= _stasis_end_ms:
 		_release_stasis()
 	if _elixir_stam_end_ms > 0 and Time.get_ticks_msec() >= _elixir_stam_end_ms:
@@ -748,8 +752,16 @@ func _physics_process(delta: float) -> void:
 		_scan_loot()
 		_scan_cd = 0.12
 	if water_now:
+		# // FIX: R2-5 入水边沿：水花/水声只在进出水时触发（原 _update_swimming 内每帧播放，60次/s 抢占音池）
+		if not _was_in_water:
+			var _sfx_w := get_tree().get_first_node_in_group("sfx_bank")
+			if _sfx_w:
+				_sfx_w.play_at("water_splash", global_position, -6.0)
+			FX.impact(global_position + Vector3(0, 0.2, 0), Color(0.80, 0.92, 1.0))
+		_was_in_water = true
 		_update_swimming(delta, wish)
 		return
+	_was_in_water = false
 	if is_swimming:
 		is_swimming = false
 		_set_player_capsule("prone" if prone else "stand")
@@ -883,6 +895,12 @@ func _physics_process(delta: float) -> void:
 
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		# // FIX: R3-P1-4 读条期间开火自动打断治疗（原可边打边吸，读条脆弱窗设计失效）
+		if _med_channel_t > 0.0 and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_med_channel_t = -1.0
+			_med_amount = 0.0
+			if hud:
+				hud.add_feed("开火打断了治疗")
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			if _magnet_prop:
 				_throw_magnet()
@@ -1299,7 +1317,8 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		var to_a: Vector3 = (from as Node3D).global_position - global_position
 		to_a.y = 0.0
 		if to_a.length_squared() > 0.01:
-			var local := global_transform.basis.inverse() * to_a
+			# // FIX: R2-C1b 相机系方位角（骑乘自由视角 ±90° 时不再偏移）
+			var local := camera.global_transform.basis.inverse() * to_a
 			hud.show_damage_direction(atan2(local.x, -local.z) - PI * 0.5)
 	# // FIX: M11 命中/受击镜头抖动分级（可开关，见 _shake_enabled 注释）— 已做 camera shake，命中/爆炸分级如下
 	_shake_amp = clampf(dmg / 30.0, 0.08, 0.45) # // FIX: M11 受击分级：<15dmg 0.18s / >=15dmg 0.28s，Haptics 可在 _trigger_shake 内 Input.vibrate_handheld(80+amp*120) 接入（可开关）
@@ -1975,11 +1994,7 @@ func _update_swimming(delta: float, wish: Vector3) -> void:
 		is_dropping = false
 		landed.emit()
 	is_swimming = true
-	# // FIX: OPT-E3/FX20 入水水花+水声
-	var _sfx_sp := get_tree().get_first_node_in_group("sfx_bank")
-	if _sfx_sp:
-		_sfx_sp.play_at("water_splash", global_position, -6.0)
-		FX.impact(global_position + Vector3(0, 0.2, 0), Color(0.80, 0.92, 1.0))
+	# // FIX: R2-5 入水水花/水声已上移至 water_now 边沿（此处原每物理帧触发，60次/s 抢占音池）
 	prone = false
 	var surface := terrain.get_water_level(global_position.x, global_position.z)
 	var swim_speed := SWIM_SPEED * (1.18 if Input.is_action_pressed("sprint") else 1.0)

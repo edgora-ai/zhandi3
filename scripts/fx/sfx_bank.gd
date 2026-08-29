@@ -45,6 +45,8 @@ const SOUNDS := {
 	"animal_bear": "res://assets/sfx/animal_bear.wav",
 	"mount_neigh": "res://assets/sfx/mount_neigh.wav",
 	"chest_open": "res://assets/sfx/chest_open.wav",
+	"blood_stinger": "res://assets/sfx/blood_stinger.wav", # // FIX: R2-3 血月 stinger 此前未注册（死调用）
+	"zone_tick": "res://assets/sfx/zone_tick.wav", # // FIX: R2-8 圈外掉血专用低鸣（原复用 hit.wav）
 }
 
 var _streams := {}
@@ -125,6 +127,10 @@ func _log(msg: String) -> void:
 
 func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if not _streams.has(name):
+		print("[sfx] WARN missing sound: ", name) # // FIX: R2-C2a 静默失败曾让 blood_stinger 缺键溜过验收
+		return
+	if _streams[name] == null:
+		print("[sfx] WARN null stream: ", name)
 		return
 	var p := _pick_2d()
 	p.bus = _bus_for(name)
@@ -137,6 +143,10 @@ func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 
 func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if not _streams.has(name):
+		print("[sfx] WARN missing sound: ", name)
+		return
+	if _streams[name] == null:
+		print("[sfx] WARN null stream: ", name)
 		return
 	var p := _pick_3d()
 	p.bus = _bus_for(name)

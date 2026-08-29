@@ -460,4 +460,12 @@ bs = mix(tone(0.9, 65.4, 0.5, 0.55), tone(0.9, 69.3, 0.5, 0.45))
 bs = mix(bs, sweep(1.4, 180.0, 48.0, 1.0, 0.35))
 write_wav("blood_stinger.wav", bs)
 
+# // FIX: R2-8 圈外掉血 tick：低频嗡鸣+呼吸感（主频 <600Hz，与 hit.wav 2.4kHz 确认音区分）
+zt = [0.0] * int(SR * 0.28)
+for j, x in enumerate(tone(0.26, 210.0, 0.16, 0.55)):
+    zt[j] += x * (1.0 + 0.3 * math.sin(2 * math.pi * 9.0 * j / SR))
+for j, x in enumerate(noise_burst(0.08, 0.03, 0.10, 0.25)):
+    zt[j] += x
+write_wav("zone_tick.wav", zt)
+
 print("done")

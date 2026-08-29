@@ -119,16 +119,23 @@ func _physics_process(delta: float) -> void:
 					if collider.hud:
 						collider.hud.add_feed("弹反！")
 					return
-				# 普通格挡：减伤结算后投射物消耗
-				(collider as Player)._drain_stamina(10.0)
-				(collider as Player).take_damage(damage * 0.25, source if source and is_instance_valid(source) else null, "body")
+				# 普通格挡：减伤结算后投射物消耗（// FIX: R2-B5 精力不足时不再享受 75% 减伤，与枪弹路径同 gate）
+				if (collider as Player).get("stamina") != null and float((collider as Player).get("stamina")) > 0.0:
+					(collider as Player)._drain_stamina(10.0)
+					(collider as Player).take_damage(damage * 0.25, source if source and is_instance_valid(source) else null, "body")
+				else:
+					(collider as Player).take_damage(damage, source if source and is_instance_valid(source) else null, "body")
 				FX.parry_flash(global_position)
 				queue_free()
 				return
 		if OS.get_cmdline_user_args().has("--wildtest"):
 			print("[wildtest] projectile collision kind=%s collider=%s pos=%s" % [kind, str(collider), str(global_position)])
 		var valid_source: Node = source if source and is_instance_valid(source) else null
-		if collider and collider != valid_source and collider.has_method("take_damage"):
+		# // FIX: R2-B5 阵营过滤：野怪投射物不再互伤/杀动物（龙火球清营地、投石怪互耗）；
+		# bot（combatant 组，非 wild_enemy/wildlife）保持可被打（R5 验收）
+		var wild_source := valid_source != null and not (valid_source is Player) and not (valid_source is Bot)
+		var is_wild_target: bool = collider != null and (collider.is_in_group("wild_enemy") or collider.is_in_group("wildlife"))
+		if collider and collider != valid_source and collider.has_method("take_damage") and not (wild_source and is_wild_target):
 			# // FIX: OPT-B6 部位判定：按被击中形状求部位，箭爆头 ×1.5（可触发西诺克斯独眼）
 			var part := "body"
 			var shape_idx: Variant = collision.get_collider_shape()
@@ -145,5 +152,6 @@ func _physics_process(delta: float) -> void:
 					w.hit_landed.emit(part)
 		FX.impact(global_position, Color(1.0, 0.25, 0.05) if kind == "fire" else Color(0.25, 0.88, 1.0) if kind == "energy" else Color(0.62, 0.52, 0.38))
 		queue_free()
-	rotate_x(delta * 7.0)
-	rotate_z(delta * 5.0)
+	if kind != "arrow":
+		rotate_x(delta * 7.0)
+		rotate_z(delta * 5.0) # // FIX: R2-C1c 箭矢直飞（原 7rad/s 翻滚）

@@ -341,7 +341,7 @@ func snowland_factor(x: float, z: float, y: float, y0: float = 24.0, y1: float =
 func _build_road_mask() -> void:
 	_road_mask.resize(ROAD_MASK_GRID * ROAD_MASK_GRID)
 	var cell := SIZE / ROAD_MASK_GRID
-	var reach := 4.2 + cell * 0.71
+	var reach := 4.2 + cell * 0.35 # // FIX: R3-TA4 掩码过宽（原 0.71 格→无草带最宽约 19m vs 路宽 4.2m）
 	for gz in range(ROAD_MASK_GRID):
 		for gx in range(ROAD_MASK_GRID):
 			var c := Vector2(-HALF + (gx + 0.5) * cell, -HALF + (gz + 0.5) * cell)

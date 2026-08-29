@@ -133,7 +133,9 @@ func set_season(season_name: String) -> void:
 	print("[season] %s (%s)" % [season_name, display_name])
 
 
-var current_palette := {} # // FIX: OPT-F3-light/R19/TA4 季节只发布调色板，天空/雾/太阳由 DayNight 单点合成（原两处互覆盖，冬季仍春天蓝天）
+var current_palette := {}
+var wx_mat: StandardMaterial3D = null # // FIX: R3-TA5b
+var wx_base := Color.WHITE # // FIX: OPT-F3-light/R19/TA4 季节只发布调色板，天空/雾/太阳由 DayNight 单点合成（原两处互覆盖，冬季仍春天蓝天）
 
 func _apply_environment(palette: Dictionary) -> void:
 	current_palette = palette
@@ -178,6 +180,8 @@ func _configure_weather(kind: String, color: Color) -> void:
 	ptex.height = 16
 	material.albedo_texture = ptex
 	quad.material = material
+	wx_mat = material # // FIX: R3-TA5b 夜间粒子压暗引用
+	wx_base = color
 	var count := 120
 	if kind == "snow":
 		count = 620

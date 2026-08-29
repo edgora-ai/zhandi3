@@ -232,11 +232,15 @@ func _physics_process(delta: float) -> void:
 	var chase := 2.6 if _enraged else 1.6
 	var angle := _time * rate
 	var hover_h := 45.0 + sin(_time * 0.43) * 9.0
-	# // FIX: OPT-C6c 俯冲阶段：低空 8m 掠地（可近战/可盾反），结束后自动回高空
+	# // FIX: OPT-C6c 俯冲阶段：低空掠地（可近战/可盾反），结束后自动回高空
+	var next := center + Vector3(cos(angle) * 42.0, hover_h, sin(angle) * 42.0)
 	if _dive_t >= 0.0:
 		_dive_t -= delta
-		hover_h = 8.0
-	var next := center + Vector3(cos(angle) * 42.0, hover_h, sin(angle) * 42.0)
+		# // FIX: R2-B2 俯冲贴地形采样（原绝对 y=8 在西弧钻进火山山体），离地 6m 保证近战弧真实可达
+		var ground_y: float = 0.0
+		if player and player.get("terrain") != null:
+			ground_y = player.terrain.get_height(next.x, next.z)
+		next.y = maxf(ground_y + 6.0, hover_h * 0.15)
 	var forward := (next - global_position).normalized()
 	global_position = global_position.lerp(next, minf(1.0, delta * chase))
 	if forward.length_squared() > 0.01:

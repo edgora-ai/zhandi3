@@ -36,6 +36,9 @@ const FALL_SPEED := 22.0
 
 var _rain_player: AudioStreamPlayer
 var _snow_player: AudioStreamPlayer
+var ambient_flash := 0.0 # // FIX: R3-TA6 闪电独占 ambient 写权的声明窗
+var snow_mat: StandardMaterial3D = null # // FIX: R3-TA5b 夜雪压暗（由 main 驱动）
+var snow_base := Color(0.96, 0.96, 0.98)
 
 func setup(p_terrain: Terrain, p_player: Player, env: Environment, seed_value: int = -1) -> void:
 	terrain = p_terrain
@@ -100,6 +103,7 @@ func _build_snow() -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(0.96, 0.97, 1.0, 0.8)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	snow_mat = mat # // FIX: R3-TA5b 夜雪压暗引用
 	for i in range(SNOW_COUNT):
 		_flakes.append(Vector3(_rng.randf_range(-AREA, AREA), _rng.randf_range(0, 22.0), _rng.randf_range(-AREA, AREA)))
 		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, _flakes[i]))
@@ -205,8 +209,11 @@ func _process(delta: float) -> void:
 			_lightning_t = _rng.randf_range(8.0, 20.0)
 			if not OS.get_cmdline_user_args().has("--wildtest"):
 				_strike_lightning()
+	# // FIX: R3-TA6 闪光期间由天气独占 ambient 写权（原被 DayNight 每帧覆盖，闪光存活不过 1 帧）
 	if _env and _env.ambient_light_energy > 0.6:
-		_env.ambient_light_energy = move_toward(_env.ambient_light_energy, 0.5, delta * 3.0)
+		ambient_flash = maxf(0.0, ambient_flash - delta)
+		if ambient_flash <= 0.0:
+			_env.ambient_light_energy = move_toward(_env.ambient_light_energy, 0.5, delta * 3.0)
 
 
 # 落雷：玩家附近 25~45m 随机点；手持金属武器时 35% 概率劈向玩家（原创旷野式引雷）。
@@ -228,6 +235,7 @@ func _strike_lightning() -> void:
 	_spawn_bolt(pos)
 	if _env:
 		_env.ambient_light_energy = 1.4
+		ambient_flash = 0.3 # // FIX: R3-TA6
 	# 雷声按距离延迟（声速 340m/s）。
 	var delay: float = pos.distance_to(player.global_position) / 340.0
 	var sfx := get_tree().get_first_node_in_group("sfx_bank")

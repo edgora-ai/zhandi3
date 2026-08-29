@@ -46,12 +46,15 @@ func generate(terrain: Terrain) -> void:
 	# // FIX: OPT-F8/TA11 墙面接程序化纹理（三面映射，近看不再是纯色平板）
 	_m_wall.albedo_texture = TexGen.wall_plaster()
 	_m_wall.uv1_triplanar = true
+	_m_wall.uv1_world_triplanar = true # // FIX: R3-TA5 砖缝跨部件连续
 	_m_wall.uv1_scale = Vector3(0.35, 0.35, 0.35)
 	_m_wood_wall.albedo_texture = TexGen.wall_plank()
 	_m_wood_wall.uv1_triplanar = true
+	_m_wood_wall.uv1_world_triplanar = true
 	_m_wood_wall.uv1_scale = Vector3(0.4, 0.4, 0.4)
 	_m_brick.albedo_texture = TexGen.wall_brick()
 	_m_brick.uv1_triplanar = true
+	_m_brick.uv1_world_triplanar = true
 	_m_brick.uv1_scale = Vector3(0.4, 0.4, 0.4)
 	_m_roof_r = Toon.make_material(ROOF_RED, true, 0.02)
 	_m_roof_b = Toon.make_material(ROOF_BLUE, true, 0.02)

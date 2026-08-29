@@ -22,7 +22,8 @@ const WEAPONS := {
 		"falloff_start": 250.0, "falloff_end": 350.0, "falloff_min": 0.85, # // FIX: OPT-C1
 	},
 	"smg": {
-		"label": "冲锋枪", "damage": 9.0, "head_mult": 1.8, "rpm": 800.0,
+		# // FIX: R2-B4 裸 DPS 120→96（原 SMG ≤60m 全域最快，步枪生态位数学不成立——复审 TTK 矩阵结论）
+		"label": "冲锋枪", "damage": 8.0, "head_mult": 1.8, "rpm": 800.0,
 		"mag": 36, "start_reserve": 108, "spread": 2.0, "ads_spread": 1.0,
 		"reload": 1.5, "auto": true, "zoom": 1.15, "range": 130.0, "recoil": 0.2,
 		"falloff_start": 60.0, "falloff_end": 130.0, "falloff_min": 0.40, # // FIX: OPT-C1 近战段武器远距惩罚
@@ -211,7 +212,7 @@ func _fire_ray() -> void:
 				FX.impact(end_point, Color(0.55, 0.38, 0.18))
 			elif col is CharacterBody3D:
 				FX.blood(end_point)
-			elif col is Guardian or col.has_method("is_metal"):
+			elif col is Guardian or col.has_method("is_metal") or col.is_in_group("metal_prop"): # // FIX: R2-C2e
 				FX.impact(end_point, Color(1.0, 0.85, 0.35))
 			else:
 				FX.impact(end_point, Color(0.62, 0.58, 0.48))

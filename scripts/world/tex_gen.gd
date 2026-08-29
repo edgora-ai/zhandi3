@@ -17,6 +17,7 @@ static func _load_or_make(key: String, gen: Callable) -> ImageTexture:
 	if img == null or img.is_empty():
 		img = gen.call()
 		img.save_png(path)
+	img.generate_mipmaps() # // FIX: R3-TA5 远处墙面高频闪烁
 	return ImageTexture.create_from_image(img)
 
 
@@ -99,7 +100,7 @@ static func wall_plaster() -> ImageTexture:
 	return _load_or_make("wall_plaster", _gen_wall_plaster)
 
 static func _gen_wall_plaster() -> Image:
-	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8) # // FIX: R3-TA5 64px 近看糊板→128
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
 	for y in range(64):
@@ -113,7 +114,7 @@ static func wall_plank() -> ImageTexture:
 	return _load_or_make("wall_plank", _gen_wall_plank)
 
 static func _gen_wall_plank() -> Image:
-	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 12
 	for y in range(64):
@@ -133,7 +134,7 @@ static func wall_brick() -> ImageTexture:
 	return _load_or_make("wall_brick", _gen_wall_brick)
 
 static func _gen_wall_brick() -> Image:
-	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 13
 	for y in range(64):

@@ -327,21 +327,16 @@ func _explode(from: Variant) -> void:
 	var sfx := get_tree().get_first_node_in_group("sfx_bank")
 	if sfx:
 		sfx.play_at("explosion", global_position, -2.0)
+	var prev_driver: Player = driver # // FIX: R3-P1-3 exit() 后 driver=null，AoE 需排除前驾驶员（原双算 80 伤）
 	if driver:
-		var d := driver
 		exit()
-		d.take_damage(40.0, from, "body")
+		prev_driver.take_damage(40.0, from, "body")
 	for c in get_tree().get_nodes_in_group("combatant"):
-		if c.alive and c != driver and global_position.distance_to(c.global_position) < 6.0:
+		if c.alive and c != prev_driver and global_position.distance_to(c.global_position) < 6.0:
 			c.take_damage(40.0, from, "body")
 	queue_free()
 
 
-# // FIX: OPT-G3/M2 油桶补给：驾驶员携油桶时加油 +60
-func refuel(cans: int) -> float:
-	var add := minf(float(cans) * 60.0, 100.0 - fuel)
-	fuel += add
-	return add
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -368,14 +363,18 @@ func _physics_process(delta: float) -> void:
 	var accel_rate := COAST_DECEL
 	# // FIX: OPT-G3/M2 燃料系统：行驶耗油 1.1/s；油尽限速 6m/s；油量<30 自动消耗驾驶员油桶 +60
 	if driver and absf(throttle) > 0.05 and alive:
+		var fuel_before := fuel
 		fuel = maxf(0.0, fuel - 1.1 * delta)
-		if fuel <= 0.0:
+		# // FIX: R3-P1-6 油量<30 预警并自动用桶（与注释口径一致，原拖到 0 才用桶且零 UX）
+		if fuel < 30.0 and fuel_before >= 30.0 and driver.hud:
+			driver.hud.add_feed("燃油不足 30%%（携带油桶 %d）" % driver.fuel_cans)
+		if fuel < 30.0:
 			if driver.fuel_cans > 0:
 				driver.fuel_cans -= 1
 				fuel += 60.0
 				if driver.hud:
-					driver.hud.add_feed("用掉一桶燃油（剩余 %d 桶）" % driver.fuel_cans)
-			elif driver.hud and Engine.get_process_frames() % 120 == 0:
+					driver.hud.add_feed("自动用掉一桶燃油（剩余 %d 桶）" % driver.fuel_cans)
+			elif fuel <= 0.0 and driver.hud and Engine.get_process_frames() % 120 == 0:
 				driver.hud.add_feed("燃油耗尽！最高 6m/s，找油桶补给")
 	if fuel <= 0.0:
 		target_speed = minf(TOP_SPEED, 6.0)

@@ -568,6 +568,7 @@ func _scatter_grass(terrain: Terrain) -> void:
 		cmi.material_override = _grass_shader_mat
 		cmi.position = chunk_origin
 		cmi.visibility_range_end = 60.0
+		cmi.visibility_range_end_margin = 12.0 # // FIX: R3-TA3 硬切→渐隐带（原 60m 圆周瞬时消失）
 		cmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		cmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(cmi)

@@ -104,7 +104,8 @@
 | R3-TA6b | day_light 重复注册守卫（project.godot 声明后运行时 add 报错） | day_night.gd |
 
 > R5b 追加：bot 换枪升级（更稀有且玩家 12m 内，旧枪落地）；R11-lite 首局三步教学（WASD/E/跑圈，仅 save runs==0 触发，老玩家自动跳过）。
-> 未完成（维持原状）：R14-R20 架构重构（Phase 2/3 既定范围，本轮评估后不做——上帝类拆分风险大于收益）。
+> R6 架构切片：P5 血月全类型注册验证闭环（12 类点位+respawn 分支实测在位，过时"占位"注释收口）；R19 收口（Environment 写者契约文档化：DayNight 单点+天气 ambient 闪电让位，_fog_base 死变量删除）；R14 最小切面落地——main._process 的 72 行 HUD 刷新块外迁为 `scripts/player/hud_presenter.gd`（HudPresenter.refresh(main)，静态入口可测试）。R20 测试整体外迁与 R15/R16/R18 维持 Phase 2/3（外迁深度耦合 main 状态，机械替换风险大于收益）。
+> 未完成（维持原状）：R14 后续切面（玩家子系统/wild_world 拆分）、R15 全局耦合收敛、R16 怪物基类/工厂、R18 调试键位门控、R20 测试外迁。
 
 > 未完成（全部为 XL 级或依赖外部前置）：
 > 未完成（全部为 XL 级或依赖外部前置）：F3 完整 EnvironmentDirector 架构（F3-light 已达成等效可见验收）、F8b 屋顶形制差异化、G7b 二周目存档难度增量（依赖 C5 XL 存档服务）、H4b puff 网格深度共享、H6b 地表薄荷色斑根因排查、以及 ISSUES § 多角色增量 5 的 R14-R20 架构重构项（上帝类拆分等，属 Phase 2/3 既定范围）。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。

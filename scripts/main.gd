@@ -1325,78 +1325,8 @@ func _process(delta: float) -> void:
 
 	if not player.alive:
 		return
-	hud.set_stamina(player.stamina / player.max_stamina)
-	hud.update_minimap(player, zone) # // FIX: R3-P02 唯一调用点漏传 zone，安全圈/预览圈从未渲染
-	hud.set_spread(6.0 + player.weapon.current_spread() * 9.0)
-	hud.set_crosshair_visible(player.weapon.weapon_id != "")
-	if player.nearby_loot:
-		hud.set_interact("按 E 拾取  " + player.nearby_loot.describe())
-	elif player.vehicle:
-		hud.set_interact("按 F 下车")
-	elif player.nearby_vehicle:
-		var ride_value: Variant = player.nearby_vehicle.get("ride_label")
-		var ride_text := str(ride_value) if ride_value != null else "驾驶吉普车"
-		hud.set_interact("按 F %s" % ride_text)
-	elif player.nearby_npc:
-		hud.set_interact("按 E 与%s交谈" % str(player.nearby_npc.get("npc_name")))
-	elif player.nearby_fish:
-		hud.set_interact("按 E 抓鱼")
-	elif player.nearby_bed:
-		hud.set_interact("按 E 睡到天亮")
-	elif player.nearby_shrine_door:
-		hud.set_interact("按 E 进入神庙")
-	elif player.nearby_shrine_exit:
-		hud.set_interact("按 E 离开神庙")
-	else:
-		hud.set_interact("")
-	hud.set_weapon_name(player.weapon.label())
-	if player.weapon.weapon_id == "":
-		hud.set_ammo_text("--")
-	if _map_id == "wild" and wild_world:
-		var state := ""
-		if player.is_swimming:
-			state = " · 游泳（Space 上浮 / C 下潜）"
-		elif player.is_climbing:
-			state = " · 攀爬中（W/S 上下 · Space 蹬离）"
-		elif player.is_gliding:
-			state = " · 滑翔伞展开（W 俯冲 / S 减速）"
-		elif player.vehicle:
-			state = " · 骑乘中"
-		elif not player.is_on_floor() and player.velocity.y < -0.55:
-			state = " · 按住 Space 展开滑翔伞"
-		hud.set_zone_text(wild_world.get_region_name(player.global_position))
-		hud.set_world_state("原创旷野 · %s%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state])
-		var quest_text := quest_status_text()
-		if quest_text != "":
-			hud.set_world_state("原创旷野 · %s%s\n%s\nM 地图  ·  N 背包  ·  F 骑乘  ·  H 口哨  ·  T 时光" % [daynight.phase_name() if daynight else "", state, quest_text])
-	else:
-		hud.set_zone_text(zone.status_text())
-		hud.set_world_state("群岛战场\nM 地图选择")
-		hud.set_danger(zone.active and zone.is_outside(player.global_position))
-	# 占点提示
-	var shown := false
-	if _map_id == "wild" and wild_world:
-		for trial in wild_world.trials:
-			var ts: Array = trial.hud_status(player.global_position)
-			if ts[1] >= 0.0:
-				hud.set_capture(ts[0], ts[1])
-				shown = true
-				break
-		# 巨龙血条：接近火山巨龙时显示（试炼条优先）。
-		if not shown:
-			for enemy in get_tree().get_nodes_in_group("wild_enemy"):
-				if enemy is WildDragon and enemy.alive and enemy.global_position.distance_to(player.global_position) < 110.0:
-					hud.set_capture("火山巨龙", enemy.hp / 260.0)
-					shown = true
-					break
-	for cp in capture_points:
-		var st: Array = cp.hud_status(player)
-		if st[1] >= 0.0:
-			hud.set_capture(st[0], st[1])
-			shown = true
-			break
-	if not shown:
-		hud.set_capture("", -1.0)
+	HudPresenter.refresh(self) # // FIX: R14 HUD 每帧刷新块外迁（见 player/hud_presenter.gd）
+
 
 
 func _update_wild_test() -> void:

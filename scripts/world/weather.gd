@@ -20,7 +20,8 @@ var _state_len := 100.0
 var _rain_mm: MultiMeshInstance3D
 var _drops: Array[Vector3] = []
 var _env: Environment
-var _fog_base := 0.0009
+# // FIX: R19 收口审计：_fog_base 死变量删除；本类对 Environment 的写权仅剩
+# "ambient 闪电闪光"（写权协议：ambient_flash>0 期间 DayNight 让位），fog/exposure/sky 全归 DayNight 单点
 var _lightning_t := 0.0
 var _rng := RandomNumberGenerator.new()
 # M4: Environment 合成分解 — Weather 的湿润独立通道，DayNight/World 再统一合成。

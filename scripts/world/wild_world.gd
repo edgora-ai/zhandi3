@@ -27,7 +27,8 @@ var _animal_specs: Array = []
 var _moblin_points: Array = []
 var _liz_points: Array = []
 var _guardian_points: Array = []
-# Phase3 血月扩展占位 (P5/D7)：后期类型用空数组 + _enemy_near 分支，保证 Phase3 可验证且不改现行为
+# // FIX: R4-P5 血月全类型注册已闭环（原占位注释过时）：怪物/动物/莫布林/蜥蜴/守卫/丘丘/蝙蝠/骷髅/法师/西诺克斯/飞行器/巨龙
+# 共 12 类点位在生成期填充（见各 _xxx_points 初始化），respawn_monsters 按 _enemy_near 同类判活补齐
 var _chuchu_points: Array = []
 var _keese_points: Array = []
 var _stal_points: Array = []
@@ -1064,7 +1065,7 @@ func respawn_monsters() -> int:
 			guardian.position = _ground(gp, 0.05)
 			add_child(guardian)
 			respawned += 1
-	# Phase3 血月扩展占位：Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon 各走 _enemy_near 分支，保证未来扩展可 headless 验证
+	# // FIX: R4-P5 血月补齐分支（Stal/Keese/Wizzrobe/Chuchu/Hinox/Flyer/Dragon）已全量生效
 	for cp in _chuchu_points:
 		if not _enemy_near(cp, 12.0, "chuchu"):
 			Chuchu.create(self, terrain, player, _ground(cp, 0.05))

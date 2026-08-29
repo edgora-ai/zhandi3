@@ -512,11 +512,10 @@ func _scatter_grass(terrain: Terrain) -> void:
 	_grass_shader_mat = ShaderMaterial.new()
 	_grass_shader_mat.shader = load("res://assets/shaders/grass.gdshader")
 	_grass_shader_mat.set_shader_parameter("u_blade", TexGen.grass_blades())
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = tuft
-	mm.instance_count = GRASS_COUNT
+	# // FIX: OPT-F6b/TA7 草分块：50m 网格桶装，每块独立 MultiMeshInstance + visibility_range 60m 淡出
+	# （单节点 MultiMesh 的 visibility_range 是整节点级，必须分块才能做距离淡出）
+	var _chunk := 50.0
+	var _chunks: Dictionary = {} # Vector2i -> PackedVector3Array（可长草点）
 	# 预筛可长草网格：坡度/树线/水线/草甸噪声一次过，之后只从合格点抽样，不再大规模拒绝采样。
 	var spots: Array[Vector3] = []
 	var step := 2.0
@@ -538,25 +537,42 @@ func _scatter_grass(terrain: Terrain) -> void:
 			# // FIX: OPT-F6/TA7 路面 4.2m 与沙滩带内不种草（原草长在路中央/河滩）
 			if terrain.is_near_road(px, pz):
 				continue
-			spots.append(Vector3(px, py, pz))
+			var key := Vector2i(int(floor(px / _chunk)), int(floor(pz / _chunk)))
+			if not _chunks.has(key):
+				_chunks[key] = PackedVector3Array()
+			_chunks[key].append(Vector3(px, py, pz))
 		gx += step
+	# 每块限量采样（总量不超 GRASS_COUNT），独立 MultiMesh + 距离淡出
+	var per_chunk_budget: int = maxi(64, GRASS_COUNT / maxi(1, _chunks.size()))
 	var placed := 0
-	while placed < GRASS_COUNT and placed < spots.size():
-		var p: Vector3 = spots[_rng.randi_range(0, spots.size() - 1)]
-		# 3 片交叉卡片各向同性，无需 Y 旋转；只保留倾斜与缩放
-		var basis := Basis(Vector3.UP, _rng.randf_range(0.0, TAU))
-		basis = basis.scaled(Vector3.ONE * _rng.randf_range(0.8, 1.35))
-		mm.set_instance_transform(placed, Transform3D(basis, p))
-		var tint := Color(1, 1, 1).lerp(Color(0.95, 1.0, 0.6), _rng.randf() * 0.6)
-		mm.set_instance_color(placed, tint)
-		placed += 1
-	mm.instance_count = placed
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "Grass"
-	mmi.multimesh = mm
-	mmi.material_override = _grass_shader_mat
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mmi)
+	for key in _chunks.keys():
+		var pts: PackedVector3Array = _chunks[key]
+		var chunk_origin := Vector3(key.x * _chunk, 0, key.y * _chunk) # // FIX: 声明前移到实例变换之前
+		var cmm := MultiMesh.new()
+		cmm.transform_format = MultiMesh.TRANSFORM_3D
+		cmm.use_colors = true
+		cmm.mesh = tuft
+		var n := mini(per_chunk_budget, pts.size() * 8) # 块内可重复抽样，保持原密度
+		cmm.instance_count = n
+		for i in range(n):
+			var p: Vector3 = pts[_rng.randi_range(0, pts.size() - 1)]
+			var basis := Basis(Vector3.UP, _rng.randf_range(0.0, TAU))
+			basis = basis.scaled(Vector3.ONE * _rng.randf_range(0.8, 1.35))
+			# // FIX: 实例变换用块内局部坐标（节点在 chunk_origin，世界坐标会被二次偏移飘上天）
+			cmm.set_instance_transform(i, Transform3D(basis, p - chunk_origin))
+			var tint := Color(1, 1, 1).lerp(Color(0.95, 1.0, 0.6), _rng.randf() * 0.6)
+			cmm.set_instance_color(i, tint)
+		var cmi := MultiMeshInstance3D.new()
+		cmi.name = "Grass_%d_%d" % [key.x, key.y]
+		cmi.multimesh = cmm
+		cmi.material_override = _grass_shader_mat
+		cmi.position = chunk_origin
+		cmi.visibility_range_end = 60.0
+		cmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+		cmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(cmi)
+		placed += n
+	print("[props] grass chunks=%d placed=%d" % [_chunks.size(), placed])
 
 
 func _scatter_flowers(terrain: Terrain) -> void:

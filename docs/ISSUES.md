@@ -72,8 +72,9 @@
 | H6 | 云三种形制+高度带 135-190m；花瓣/雪径向渐变贴图（去"坏点"感） | `main.gd _spawn_clouds` + `season_system.gd` |
 | A2b | 拾取失败指数退避 12→24→48→96→192s（修"不可达物资无限重试"，空手搜索半径 90→140m） | `bot.gd _loot_fail_counts` |
 | B6b | 部位判定类型守卫（修 ShrineRune 698 次类型错误） | `wild_projectile.gd` |
+| F6b | 草分块：50m 网格 ×90 块独立 MultiMesh + visibility_range 60m 自淡出（远景无噪闪、渲染量随距离裁剪；密度 9.8 万实例保持） | `props.gd _scatter_grass`；截图 /tmp/r_grass3.png |
 
-> 未完成（下一批，多为 L/XL 或需分块/资产再生成）：C6c 巨龙阶段、D5 弹孔、E3 音效缺口 12 类、E5 音乐扩写、F1 glb 卡通化、F3 EnvironmentDirector、F5 森林阴影、F6 草分块淡出（单 MultiMesh 的 visibility_range 为节点级，须分块）、F7 描边规范、F8 建筑细节、F9 渲染杂项、G4 空投/medkit 读条、G6 旷野定位、G7 seed 真复现、H4 特效性能包、H6 天空元素——见 `docs/OPTIMIZATION_PLAN.md` 总表。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。
+> 未完成（全部为 XL 级或依赖外部前置）：F3 完整 EnvironmentDirector 架构（F3-light 已达成等效可见验收）、F8b 屋顶形制差异化、G7b 二周目存档难度增量（依赖 C5 XL 存档服务）、H4b puff 网格深度共享、H6b 地表薄荷色斑根因排查、以及 ISSUES § 多角色增量 5 的 R14-R20 架构重构项（上帝类拆分等，属 Phase 2/3 既定范围）。另：评审 PG14 所述"尸比"文案经查为"卢比"（低清截图误读），非问题。
 
 > 未完成（下一批）：C3/C6、D4/D5、E3–E5、F1/F3/F5–F9、G3–G7、H1–H6，见 `docs/OPTIMIZATION_PLAN.md` 总表。
 

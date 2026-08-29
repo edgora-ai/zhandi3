@@ -1716,6 +1716,11 @@ func _find_melee_target() -> CharacterBody3D:
 			var facing := forward.dot(to_target / distance)
 			if facing < 0.18:
 				continue
+			# // FIX: R21 隔墙近战：锁定时查 LoS，无直达即隔墙不锁定
+			var los_q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.9, 0), target.global_position + Vector3(0, 0.8, 0), 1, [get_rid()])
+			var hit := get_world_3d().direct_space_state.intersect_ray(los_q)
+			if not hit.is_empty() and hit.get("collider") != target:
+				continue
 			var score := facing * 2.2 - distance * 0.18
 			if score > best_score:
 				best_score = score
@@ -1794,6 +1799,11 @@ func _apply_melee_hit() -> void:
 				continue
 			var to_t: Vector3 = target.global_position + Vector3(0, 0.8, 0) - camera.global_position
 			if to_t.length() > 2.6 or to_t.normalized().dot(forward) < 0.5:
+				continue
+			# // FIX: R21 隔墙近战：弧形判定前查 LoS，隔墙不命中
+			var los2 := PhysicsRayQueryParameters3D.create(camera.global_position, target.global_position + Vector3(0, 0.8, 0), 1, [get_rid()])
+			var hit2 := get_world_3d().direct_space_state.intersect_ray(los2)
+			if not hit2.is_empty() and hit2.get("collider") != target:
 				continue
 			if target.has_method("take_damage"):
 				target.take_damage(hit_dmg, self, "body")

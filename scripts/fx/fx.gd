@@ -4,6 +4,8 @@ class_name FX
 # // FIX: D2/FX11 共享静态资源：枪口焰/曳光网格与材质全局复用，运行时零 new Mesh/Material
 static var _flash_mesh: QuadMesh
 static var _flash_mat: StandardMaterial3D
+static var _tracer_mesh: BoxMesh # // FIX: H4b tracer 单位网格（scale.z=dist，运行时零 new Mesh）
+static var _tracer_mats: Dictionary = {} # // FIX: H4b tracer 材质缓存（Color 键，≤8）
 
 static func _scene() -> Node:
 	return (Engine.get_main_loop() as SceneTree).current_scene
@@ -45,18 +47,26 @@ static func tracer(from: Vector3, to: Vector3, color: Color = Color(1.0, 0.88, 0
 	var dist := from.distance_to(to)
 	if dist < 1.0:
 		return
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(width, width, dist)
+	if _tracer_mesh == null:
+		_tracer_mesh = BoxMesh.new()
+		_tracer_mesh.size = Vector3(1, 1, 1)
+	var mat: Variant = _tracer_mats.get(color)
+	if mat == null:
+		mat = _unshaded(color)
+		if _tracer_mats.size() >= 8:
+			_tracer_mats.clear()
+		_tracer_mats[color] = mat
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = _unshaded(color)
+	mi.mesh = _tracer_mesh
+	mi.material_override = mat as Material
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.scale = Vector3(width, width, dist)
 	_scene().add_child(mi)
 	mi.global_position = (from + to) * 0.5
 	mi.look_at(to, Vector3.UP)
 	var tw := mi.create_tween()
 	tw.tween_interval(0.05)
-	tw.tween_property(mi, "scale", Vector3(0.15, 0.15, 1.0), 0.09)
+	tw.tween_property(mi, "scale", Vector3(width * 0.15, width * 0.15, dist), 0.09)
 	tw.tween_callback(mi.queue_free)
 
 

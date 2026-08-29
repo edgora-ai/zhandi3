@@ -977,11 +977,12 @@ func _spawn_mounts() -> void:
 		horse.position = _ground(horse_points[i], 0.06)
 		add_child(horse)
 		horse.rotation.y = float(i) * 1.37 + 0.35
+	# // FIX: R10 起始摩托外迁（原 -103,78 距起始 46m，500m 横穿被压缩；现远至东原野/火山前，需步/攀/塔/筏解锁后才达）
 	var bike := WildMotorcycle.new()
 	bike.terrain = terrain
-	bike.position = _ground(Vector3(-103, 0, 78), 0.08)
+	bike.position = _ground(Vector3(142, 0, -62), 0.08)
 	add_child(bike)
-	bike.rotation.y = -0.3
+	bike.rotation.y = 2.1
 
 
 func _spawn_mushrooms() -> void:

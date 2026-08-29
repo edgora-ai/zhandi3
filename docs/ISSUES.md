@@ -104,6 +104,7 @@
 | R3-TA6b | day_light 重复注册守卫（project.godot 声明后运行时 add 报错） | day_night.gd |
 
 > R5b 追加：bot 换枪升级（更稀有且玩家 12m 内，旧枪落地）；R11-lite 首局三步教学（WASD/E/跑圈，仅 save runs==0 触发，老玩家自动跳过）。
+> R7 架构切片二：天空/环境/云构建（`_setup_environment` + `_spawn_clouds`，~130 行）外迁为 `scripts/world/sky_builder.gd`（SkyBuilder.build_environment/spawn_clouds 静态入口）；main.gd 2308→2123 行。R20 测试函数（_update_wild_test ~750 行）深度耦合 main 状态，维持 Phase 2/3。
 > R6 架构切片：P5 血月全类型注册验证闭环（12 类点位+respawn 分支实测在位，过时"占位"注释收口）；R19 收口（Environment 写者契约文档化：DayNight 单点+天气 ambient 闪电让位，_fog_base 死变量删除）；R14 最小切面落地——main._process 的 72 行 HUD 刷新块外迁为 `scripts/player/hud_presenter.gd`（HudPresenter.refresh(main)，静态入口可测试）。R20 测试整体外迁与 R15/R16/R18 维持 Phase 2/3（外迁深度耦合 main 状态，机械替换风险大于收益）。
 > 未完成（维持原状）：R14 后续切面（玩家子系统/wild_world 拆分）、R15 全局耦合收敛、R16 怪物基类/工厂、R18 调试键位门控、R20 测试外迁。
 

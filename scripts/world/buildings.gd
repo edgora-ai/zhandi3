@@ -213,6 +213,16 @@ func _hip_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Mate
 	mi.material_override = mat
 	mi.position.y = y
 	parent.add_child(mi)
+	# // FIX: F8b 补雪盖（与 _gable_roof 同逻辑，冬季显隐一致；原 _hip_roof 无 snow cap 导致仓库冬季无雪）
+	var snow := MeshInstance3D.new()
+	snow.mesh = mesh
+	snow.material_override = _m_snow
+	snow.position.y = y + 0.045
+	snow.scale = Vector3(1.012, 1.012, 1.012)
+	snow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	snow.visible = false
+	parent.add_child(snow)
+	_snow_caps.append(snow)
 
 
 # 人字屋顶：三棱柱网格（前向面顺时针绕序）
@@ -336,7 +346,11 @@ func _make_house(p: Vector3, rot: float, two_story: bool) -> void:
 		_window(g, Vector3(w * 0.5 + 0.06, 1.5, -0.6), PI * 0.5)
 
 	var roof_h := 1.5 if two_story else 1.3
-	_gable_roof(g, w + 0.7, roof_h, d + 0.9, h, roof_mat)
+	# // FIX: F8b 小屋屋顶掷硬币（原 100% 人字导致全图 gable>83% 超 60% 门禁；45% 四坡期望 gable~55%、单村 ≥2 形制 97%）
+	if _rng.randf() < 0.45:
+		_hip_roof(g, w + 0.7, roof_h, d + 0.9, h, _m_roof_d)
+	else:
+		_gable_roof(g, w + 0.7, roof_h, d + 0.9, h, roof_mat)
 	# 深色屋脊与檐口，把单块屋顶拆成可读的层次。
 	_part(Vector3(0.18, 0.18, d + 1.05), _m_wood_d, Vector3(0, h + roof_h + 0.04, 0), g)
 	_part(Vector3(w + 0.85, 0.14, 0.18), _m_wood_d, Vector3(0, h + 0.02, d * 0.5 + 0.46), g)

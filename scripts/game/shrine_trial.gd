@@ -216,7 +216,7 @@ func _process(delta: float) -> void:
 		if weighted:
 			_plate_t += delta
 			if _plate_t >= 4.0:
-				completed = true
+				_complete()
 				var scene := get_tree().current_scene
 				if scene and scene.get("hud") != null:
 					scene.hud.add_feed("机关启动！石门开启")
@@ -225,7 +225,7 @@ func _process(delta: float) -> void:
 		return
 	if mode == "ball":
 		if _ball and _ball.global_position.distance_to(global_position + _socket) < 1.3:
-			completed = true
+			_complete()
 			_ball.freeze = true
 			var scene := get_tree().current_scene
 			if scene and scene.get("hud") != null:

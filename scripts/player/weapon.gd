@@ -16,7 +16,7 @@ const WEAPONS := {
 		"falloff_start": 120.0, "falloff_end": 220.0, "falloff_min": 0.75, # // FIX: OPT-C1 距离衰减
 	},
 	"dmr": {
-		"label": "射手步枪", "damage": 35.0, # // FIX: R4-13 34×2 三发对 75甲+100血差 0.4 不死的悬崖 "head_mult": 2.2, "rpm": 150.0,
+		"label": "射手步枪", "damage": 35.0, "head_mult": 2.2, "rpm": 150.0, # // FIX: R4-13 34×2 三发对 75甲+100血差 0.4 不死的悬崖
 		"mag": 12, "start_reserve": 36, "spread": 0.8, "ads_spread": 0.12,
 		"reload": 2.1, "auto": false, "zoom": 2.4, "range": 350.0, "recoil": 1.2,
 		"falloff_start": 250.0, "falloff_end": 350.0, "falloff_min": 0.85, # // FIX: OPT-C1

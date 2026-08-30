@@ -40,6 +40,8 @@ var _snow_player: AudioStreamPlayer
 var ambient_flash := 0.0 # // FIX: R3-TA6 闪电独占 ambient 写权的声明窗
 var snow_mat: StandardMaterial3D = null # // FIX: R3-TA5b 夜雪压暗（由 main 驱动）
 var snow_base := Color(0.96, 0.96, 0.98)
+var rain_mat: StandardMaterial3D = null # // FIX: 建模B04 雨幕夜压暗（与 snow_mat 同链路走 main cd）
+var rain_base := Color(0.75, 0.85, 0.95, 0.4)
 
 func setup(p_terrain: Terrain, p_player: Player, env: Environment, seed_value: int = -1) -> void:
 	terrain = p_terrain
@@ -81,6 +83,8 @@ func _build_rain() -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(0.75, 0.85, 0.95, 0.4)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rain_mat = mat # // FIX: 建模B04
+	rain_base = mat.albedo_color
 	for i in range(DROP_COUNT):
 		_drops.append(Vector3(_rng.randf_range(-AREA, AREA), _rng.randf_range(0, 22.0), _rng.randf_range(-AREA, AREA)))
 		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, _drops[i]))

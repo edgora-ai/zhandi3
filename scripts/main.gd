@@ -1304,6 +1304,10 @@ func _process(delta: float) -> void:
 	if weather and weather.get("snow_mat") != null:
 		var sb: Color = weather.snow_base
 		weather.snow_mat.albedo_color = Color(sb.r * cd, sb.g * cd, sb.b * cd, sb.a)
+	# // FIX: 建模B04 雨幕同链路压暗（原 rain unshaded 夜间满亮，违 F2 ≤30%；现随 cd 0.22→1.0 同雪/花瓣）
+	if weather and weather.get("rain_mat") != null:
+		var rb: Color = weather.rain_base
+		weather.rain_mat.albedo_color = Color(rb.r * cd, rb.g * cd, rb.b * cd, rb.a)
 	if seasons and seasons.get("wx_mat") != null:
 		var wb: Color = seasons.wx_base
 		seasons.wx_mat.albedo_color = Color(wb.r * cd, wb.g * cd, wb.b * cd, wb.a)

@@ -3,7 +3,7 @@ class_name TexGen
 
 
 ## 树叶簇贴图：圆盘内散布上百片带叶脉的叶子，alpha 裁剪
-const TEX_CACHE_VERSION := 1
+const TEX_CACHE_VERSION := 2 # // FIX: 建模B01 128全填 cache bust
 
 
 ## 磁盘缓存：程序化贴图只在首次生成时付费，之后启动直接读 PNG（像素无损）。
@@ -103,8 +103,8 @@ static func _gen_wall_plaster() -> Image:
 	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8) # // FIX: R3-TA5 64px 近看糊板→128
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
-	for y in range(64):
-		for x in range(64):
+	for y in range(128):
+		for x in range(128):
 			var n := rng.randf_range(-0.06, 0.06) + 0.04 * sin(float(x) * 0.4) + 0.03 * sin(float(y) * 0.23)
 			var c := 0.82 + n
 			img.set_pixel(x, y, Color(c, c * 0.965, c * 0.88, 1.0))
@@ -117,10 +117,10 @@ static func _gen_wall_plank() -> Image:
 	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 12
-	for y in range(64):
+	for y in range(128):
 		var plank := y / 16
 		var seam := (y % 16) == 0
-		for x in range(64):
+		for x in range(128):
 			var n := rng.randf_range(-0.05, 0.05) + 0.03 * sin(float(x) * 0.9 + float(plank) * 2.1)
 			var c := 0.60 + n
 			if seam:
@@ -137,10 +137,10 @@ static func _gen_wall_brick() -> Image:
 	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 13
-	for y in range(64):
+	for y in range(128):
 		var row := y / 8
 		var offset := (row % 2) * 8
-		for x in range(64):
+		for x in range(128):
 			var bx := (x + offset) % 16
 			var by := y % 8
 			var mortar := by == 0 or bx == 0

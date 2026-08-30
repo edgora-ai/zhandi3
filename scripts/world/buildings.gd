@@ -196,7 +196,8 @@ func _hip_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Mate
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	for tri in [[b, apex, a], [c, apex, b], [dd, apex, c], [a, apex, dd]]:
-		var n: Vector3 = (tri[1] - tri[0]).cross(tri[2] - tri[0]).normalized()
+		var n: Vector3 = (tri[1] - tri[0]).cross(tri[2] - tri[0]).normalized() # // FIX: 建模B02 法线随绕序反向（原 n 与交换后绕序相反致一侧反光）
+		n = -n
 		verts.append(tri[0])
 		verts.append(tri[2])
 		verts.append(tri[1])
@@ -239,7 +240,8 @@ func _gable_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Ma
 	var normals := PackedVector3Array()
 	for tri in [[a, c, b], [dd, e, f], [a, e, dd], [a, b, e], [a, dd, f], [a, f, c], [b, c, f], [b, f, e]]:
 		var n: Vector3 = (tri[1] - tri[0]).cross(tri[2] - tri[0]).normalized()
-		# Godot 前向面为顺时针绕序：交换后两顶点，法线方向保持不变
+		# // FIX: 建模B02 同上，n 取反与顺时针对齐
+		n = -n
 		verts.append(tri[0])
 		verts.append(tri[2])
 		verts.append(tri[1])

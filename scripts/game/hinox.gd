@@ -196,9 +196,16 @@ func _physics_process(delta: float) -> void:
 						player.velocity += push.normalized() * 7.0 + Vector3(0, 4.0, 0)
 			elif _strike_kind == "throw":
 				var from := global_position + Vector3(0, 3.6, 0)
-				var dir := (player.global_position + Vector3(0, 1.0, 0) - from).normalized()
+				# // FIX: R22 投石预判+重力补偿（原打当前位置可匀速风筝；现 0.25s 预判 + g=9 解算抛物线初速，远距命中率回升）
+				var pred := player.global_position + Vector3(0, 1.0, 0) + player.velocity * 0.25
+				var to_pred := pred - from
+				var horiz := Vector2(to_pred.x, to_pred.z).length()
+				var speed := 20.0
+				var t := horiz / maxf(1.0, speed)
+				var vy := (to_pred.y + 0.5 * 9.0 * t * t) / maxf(0.01, t)
+				var dir := Vector3(to_pred.x, vy, to_pred.z).normalized()
 				var rock := WildProjectile.new()
-				rock.configure("rock", dir * 20.0, 20.0, self)
+				rock.configure("rock", dir * speed, 20.0, self)
 				get_tree().current_scene.add_child(rock)
 				rock.global_position = from + dir * 1.5
 				var _sfx_t := get_tree().get_first_node_in_group("sfx_bank")

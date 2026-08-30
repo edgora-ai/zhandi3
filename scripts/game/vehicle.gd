@@ -371,7 +371,7 @@ func _physics_process(delta: float) -> void:
 		if fuel < 30.0:
 			if driver.fuel_cans > 0:
 				driver.fuel_cans -= 1
-				fuel += 60.0
+				fuel = minf(100.0, fuel + 60.0) # // FIX: 燃料钳制 100（原可超 145，HUD 百分比溢出）
 				if driver.hud:
 					driver.hud.add_feed("自动用掉一桶燃油（剩余 %d 桶）" % driver.fuel_cans)
 			elif fuel <= 0.0 and driver.hud and Engine.get_process_frames() % 120 == 0:

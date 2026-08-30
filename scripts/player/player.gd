@@ -311,8 +311,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_stasis()
 		elif event.is_action_pressed("magnet"):
 			_toggle_magnet()
-		elif event.physical_keycode == KEY_F10:
-			# // FIX: R9 F10 设置面板（不占 Esc 原行为）
+		elif OS.is_debug_build() and event.physical_keycode == KEY_F10:
+			# // FIX: R9/H-01 F10 设置面板仅 debug 构建（原直绑物理键无门控）
 			if hud:
 				hud.toggle_settings(self)
 		elif event.is_action_pressed("weapon_slot_1"):

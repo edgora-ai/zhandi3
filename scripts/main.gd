@@ -59,6 +59,7 @@ func _write_save() -> void:
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(SAVE_PATH))
 
 func _ng_skill_floor() -> float:
+	# // FIX: G7b ng_floor 可观测探针（--sim/--wildtest 可 grep skill_floor）
 	return minf(0.7 + 0.1 * int(save_data.get("runs", 0)), 1.0)
 var _seed_value := -1 # // FIX: OPT-G7/REG4 --seed 值（-1 未指定）
 var total_combatants := BOT_COUNT + 1
@@ -189,9 +190,8 @@ func _ready() -> void:
 	add_child(daynight)
 	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
 	_load_save() # // FIX: R4-G7b
-	if int(save_data.get("runs", 0)) > 0:
-		print("[save] runs=%d best=%d ng_floor=%.1f" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor()])
-	elif _map_id == "battlefield":
+	print("[save] runs=%d best=%d ng_floor=%.1f seed=%d" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor(), _seed_value])
+	if _map_id == "battlefield" and int(save_data.get("runs", 0)) == 0:
 		# // FIX: R11-lite 首局三步教学（老玩家局自动跳过）
 		_tutorial_step = 0
 		_tutorial_t = 3.0

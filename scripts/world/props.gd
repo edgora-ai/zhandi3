@@ -194,7 +194,8 @@ func _build_card_multimesh(name: String, transforms: Array[Transform3D], colors:
 	mmi.multimesh = mm
 	mmi.material_override = mat
 	# // FIX: OPT-F5/TA6 冠层卡片开投影：森林地表有树影斑驳（草/花仍关闭，控影子预算）
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if "Cards" in name else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# // FIX: 建模B03 树冠阴影改 OFF（原 billboard 顶点用 INV_VIEW_MATRIX 面向相机，阴影 pass 同走导致阴影随视角跳变；后续需代理阴影体积）
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
 	if name == "BroadleafCards":
 		_broad_mm = mm

@@ -206,6 +206,7 @@ var _radar_active := false
 
 func trigger_radar(duration: float = 5.0) -> void:  # // FIX: AUD-3.9
 	_radar_active = true
+	# 雷达脉冲：占点后 40m 内敌可在小地图高亮 5s（由 hud 查询 is_radar_active 驱动，可视化在 Phase 3 收口）
 	_radar_until = Time.get_ticks_msec() / 1000.0 + duration
 
 func is_radar_active() -> bool:

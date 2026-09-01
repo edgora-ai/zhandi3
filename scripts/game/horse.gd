@@ -485,7 +485,7 @@ func _physics_process(delta: float) -> void:
 	var wish := Vector3.ZERO
 	if driver and (input_forward > 0.05 or (absf(input_side) > 0.05 and input_forward >= 0.0)):
 		var cam_basis := Basis(Vector3.UP, rotation.y + _camera_yaw)
-		wish = cam_basis * Vector3(input_side, 0.0, -maxf(input_forward, 0.15))
+		wish = cam_basis * Vector3(input_side, 0.0, -max(input_forward, 0.05))  # // FIX: HORSE 轻推 A/D 不再强制 0.15 前向，减少 wish 抖
 		wish.y = 0.0
 		wish = wish.normalized()
 
@@ -503,10 +503,11 @@ func _physics_process(delta: float) -> void:
 			accel_rate = ACCEL * 0.7
 	speed = move_toward(speed, target_speed, accel_rate * delta)
 	var speed_ratio := clampf(absf(speed) / GALLOP_SPEED, 0.0, 1.0)
+	# // FIX: HORSE 转向随速衰减指数化 + 接管 TURN_SPEED（原 2.6->1.0 线性，高速 57°/s 太肉且 TURN_SPEED 未使用）
 	if wish.length_squared() > 0.01 and speed > 0.2:
 		var target_yaw := atan2(-wish.x, -wish.z)
 		var yaw_diff := wrapf(target_yaw - rotation.y, -PI, PI)
-		var max_turn := lerpf(2.6, 1.0, speed_ratio) * delta
+		var max_turn := lerpf(TURN_SPEED * 1.4, TURN_SPEED * 0.55, pow(speed_ratio, 1.5)) * delta
 		rotation.y += clampf(yaw_diff, -max_turn, max_turn)
 		_steer = clampf(yaw_diff * 1.6, -1.0, 1.0)
 	elif absf(input_side) > 0.05 and absf(input_forward) <= 0.05:
@@ -519,14 +520,14 @@ func _physics_process(delta: float) -> void:
 	var forward := -global_transform.basis.z
 	forward.y = 0.0
 	forward = forward.normalized()
-	# 道路自动跟随：松手骑行时贴近道路中线（原创旷野式的“马会看路”）。
-	if driver and absf(input_forward) <= 0.05 and absf(input_side) <= 0.05 and speed > 2.0:
+	# 道路自动跟随：仅松手且速度适中、近路时轻跟，不抢方向
+	if driver and absf(input_forward) <= 0.05 and absf(input_side) <= 0.05 and speed > 4.0:
 		var follow := _nearest_road()
-		if follow["dist"] < 7.0:
+		if follow["dist"] < 4.0:
 			var road_dir: Vector3 = follow["dir"]
 			if road_dir.dot(forward) < 0.0:
 				road_dir = -road_dir
-			rotation.y = lerp_angle(rotation.y, atan2(-road_dir.x, -road_dir.z), minf(1.0, delta * 1.1))
+			rotation.y = lerp_angle(rotation.y, atan2(-road_dir.x, -road_dir.z), minf(1.0, delta * 0.45))  # // FIX: HORSE 跟路 7m->4m, 1.1->0.45, 2.0->4.0
 	var next := global_position + forward * speed * delta * 1.8
 	if terrain:
 		var next_normal := terrain.get_normal(next.x, next.z, 1.2)

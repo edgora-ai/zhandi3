@@ -1,5 +1,6 @@
 class_name WildCreature
 extends CharacterBody3D
+const WILD_CREATURE_PRELOADS := {"bear":"res://assets/models/bear.glb","boar":"res://assets/models/boar.glb","wolf":"res://assets/models/wolf.glb"}  # // FIX: AUD-P0-4 preload map
 ## 阔野动物：野猪、狼、熊、鸟。具有游荡/逃跑/反击行为，死亡掉落肉。
 
 var species := "boar"

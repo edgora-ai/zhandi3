@@ -160,7 +160,7 @@ func play_at(name: String, pos: Vector3, volume_db: float = 0.0, pitch: float = 
 	p.bus = _bus_for(name)
 	p.global_position = pos
 	# // FIX: R4-7 远距枪声切低通变体（闷响），原只变小不变闷
-	var far_name := name.replace("_rifle", "_rifle_far").replace("_dmr", "_dmr_far").replace("_smg", "_smg_far")
+	var far_name := name.replace("_rifle", "_rifle_far").replace("_dmr", "_dmr_far").replace("_smg", "_smg_far").replace("_shotgun", "_shotgun_far").replace("_lmg", "_lmg_far")  # // FIX: AUD-P0-8 远距闷响补 shotgun/lmg
 	if far_name != name and _streams.has(far_name) and _streams[far_name] != null:
 		var cam := get_viewport().get_camera_3d()
 		if cam and cam.global_position.distance_to(pos) > 120.0:

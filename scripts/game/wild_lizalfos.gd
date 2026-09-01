@@ -1,5 +1,6 @@
 class_name WildLizalfos
 extends CharacterBody3D
+const LIZALFOS_GLB = preload("res://assets/models/lizalfos.glb")  # // FIX: AUD-P0-4 preload
 ## 蜥蜴战士：环绕游走的高速敌人，冷不丁突进扑咬，中距吐舌。
 
 var terrain: Terrain
@@ -61,7 +62,7 @@ func _ready() -> void:
 func _try_glb_visual() -> bool:
 	if not ResourceLoader.exists("res://assets/models/lizalfos.glb"):
 		return false
-	var scene_res := load("res://assets/models/lizalfos.glb") as PackedScene
+	var scene_res := LIZALFOS_GLB as PackedScene
 	if scene_res == null:
 		return false
 	_glb = scene_res.instantiate()

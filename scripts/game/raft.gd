@@ -211,8 +211,8 @@ func exit() -> void:
 
 func _physics_process(delta: float) -> void:
 	if driver:
-		var f := float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
-		var r := float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
+		var f := Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+		var r := Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 		if debug_forward != 0.0:
 			f = debug_forward
 		var target := f * SPEED

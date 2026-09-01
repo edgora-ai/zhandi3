@@ -584,6 +584,9 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	var a := land + Vector3(rng.randf_range(-5, 5), 0, rng.randf_range(-5, 5))
 	a.y = terrain.get_height(a.x, a.z) + 0.1
 	Loot.spawn(self, a, "armor", "", 25, 1)
+	var ammo_pos := land + Vector3(rng.randf_range(-3, 3), 0, rng.randf_range(-3, 3))
+	ammo_pos.y = terrain.get_height(ammo_pos.x, ammo_pos.z) + 0.1
+	Loot.spawn(self, ammo_pos, "ammo", "", 45, 1)  # // FIX: AUD-P0-8 落点补弹药 45（空手进圈率 0）
 	if _map_id == "wild":
 		Loot.spawn(self, land + Vector3(-2.5, 0.15, 2.0), "mushroom", "", 3, 1)
 

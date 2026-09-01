@@ -330,8 +330,8 @@ func _physics_process(delta: float) -> void:
 	var throttle := 0.0
 	var side_input := 0.0
 	if driver:
-		throttle = float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
-		side_input = float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
+		throttle = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+		side_input = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 		if debug_forward != 0.0:
 			throttle = debug_forward
 		if debug_turn != 0.0:

@@ -113,6 +113,8 @@ var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
 var _airborne_time := 0.0
+var _coyote_t := 0.0  # // FIX: AUD-P0-3 coyote 0.15s 墙钟
+var _jump_buf_t := 0.0  # // FIX: AUD-P0-3 jump buffer 0.18s 墙钟
 var _glider_open := 0.0
 var _melee_cd := 0.0
 var _combo_i := 0
@@ -691,6 +693,15 @@ func _surface_footstep() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	# // FIX: AUD-P0-3 coyote + buffer 墙钟（前置于所有 early return）
+	if is_on_floor():
+		_coyote_t = 0.15
+	else:
+		_coyote_t = maxf(0.0, _coyote_t - delta)
+	if Input.is_action_just_pressed("jump"):
+		_jump_buf_t = 0.18
+	else:
+		_jump_buf_t = maxf(0.0, _jump_buf_t - delta)
 	_last_frame_vy = velocity.y # // FIX: OPT-H5 记录落地前垂直速度
 	_check_timed_consumables()
 	_update_shake(delta)
@@ -824,10 +835,19 @@ func _physics_process(delta: float) -> void:
 		if is_dropping:
 			is_dropping = false
 			landed.emit()
-		if Input.is_action_pressed("jump"):
+		if _jump_buf_t > 0.0 and _coyote_t > 0.0:
+			velocity.y = JUMP_VEL
+			_jump_buf_t = 0.0
+			_coyote_t = 0.0
+		elif Input.is_action_pressed("jump"):
 			velocity.y = JUMP_VEL
 	else:
 		_landed_last_frame = false
+		# // FIX: AUD-P0-3 空中 coyote 窗内仍可起跳（buffer 同 _coyote_t 校验）
+		if _jump_buf_t > 0.0 and _coyote_t > 0.0:
+			velocity.y = JUMP_VEL
+			_jump_buf_t = 0.0
+			_coyote_t = 0.0
 		_airborne_time += delta
 		# 初次空降和之后从任意悬崖跃下都能展开；普通小跳因离地高度不足不会误触。
 		var clearance := 99.0
@@ -908,7 +928,7 @@ func _physics_process(delta: float) -> void:
 
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		if Input.is_action_pressed("fire"):  # // FIX: AUD-P0-1 fire 进 InputMap
 			if _magnet_prop:
 				_throw_magnet()
 			elif weapon.weapon_id == "bow":
@@ -925,7 +945,7 @@ func _physics_process(delta: float) -> void:
 				_melee_swing()
 		elif weapon.weapon_id == "bow" and _bow_draw > 0.0:
 			_fire_arrow()
-		var rmb := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+		var rmb := Input.is_action_pressed("ads")  # // FIX: AUD-P0-1 ads 进 InputMap
 		if debug_block:
 			rmb = true
 		weapon.set_ads(rmb and weapon.weapon_id != "")

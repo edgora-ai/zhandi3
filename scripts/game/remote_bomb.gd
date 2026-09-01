@@ -151,4 +151,5 @@ func _flash(parent: Node, pos: Vector3) -> void:
 	var tween := flash.create_tween()
 	tween.tween_property(flash, "scale", Vector3.ONE * RADIUS * 0.9, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(fmat, "albedo_color:a", 0.0, 0.30)
+	tween.parallel().tween_property(fmat, "emission_energy_multiplier", 0.0, 0.30)  # // FIX: AUD-P0-7 emission 并行衰减
 	tween.tween_callback(flash.queue_free)

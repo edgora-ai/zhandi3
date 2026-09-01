@@ -374,8 +374,8 @@ func _road_near(x: float, z: float) -> bool:
 func _build_water() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(SIZE, SIZE) if profile == "wild" else Vector2(SIZE * 1.1, SIZE * 1.1)
-	plane.subdivide_width = 64
-	plane.subdivide_depth = 64
+	plane.subdivide_width = 32  # // FIX: AUD-P0-8 水面 64->32 减半
+	plane.subdivide_depth = 32
 	var water := MeshInstance3D.new()
 	water.name = "Water"
 	water.mesh = plane

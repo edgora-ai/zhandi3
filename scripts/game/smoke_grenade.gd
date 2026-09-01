@@ -61,7 +61,7 @@ func _start_smoke() -> void:
 		_smoke_mat.albedo_color = Color(0.92, 0.93, 0.95, 0.55)
 		_smoke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_smoke_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_smoke_mat.disable_fog = true
+		_smoke_mat.disable_fog = false  # // FIX: AUD-P0-7 入雾
 	for i in range(11):
 		var puff := MeshInstance3D.new()
 		puff.mesh = _smoke_mesh

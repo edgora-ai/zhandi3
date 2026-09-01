@@ -473,9 +473,9 @@ func _physics_process(delta: float) -> void:
 	var input_side := 0.0
 	var galloping := false
 	if driver:
-		input_forward = float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
-		input_side = float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A))
-		galloping = Input.is_key_pressed(KEY_SHIFT)
+		input_forward = Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+		input_side = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
+		galloping = Input.is_action_pressed("sprint")  # // FIX: AUD-P0-2 InputMap
 		if debug_forward != 0.0:
 			input_forward = debug_forward
 		if debug_turn != 0.0:

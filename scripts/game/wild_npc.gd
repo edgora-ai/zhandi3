@@ -1,5 +1,6 @@
 class_name WildNPC
 extends CharacterBody3D
+const VILLAGER_GLB = preload("res://assets/models/villager.glb")  # // FIX: AUD-P0-4 preload
 ## 友好的旅人 NPC：在地标附近停留或小范围游走，靠近时可按 E 交谈。
 
 var terrain: Terrain
@@ -64,7 +65,7 @@ func _ready() -> void:
 func _try_glb_visual() -> bool:
 	if not ResourceLoader.exists("res://assets/models/villager.glb"):
 		return false
-	var scene_res := load("res://assets/models/villager.glb") as PackedScene
+	var scene_res := VILLAGER_GLB as PackedScene
 	if scene_res == null:
 		return false
 	_glb = scene_res.instantiate()

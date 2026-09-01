@@ -1,5 +1,6 @@
 class_name Bot
 extends CharacterBody3D
+const SOLDIER_GLB = preload("res://assets/models/soldier.glb")  # // FIX: AUD-P0-4 preload
 ## AI 战士：空降 → 搜刮 → 跑圈/占点 → 交战。贴地移动 + 简单避障，无限后备弹药
 
 signal died(victim, killer)
@@ -121,7 +122,7 @@ func _ready() -> void:
 func _try_glb_visual() -> bool:
 	if not ResourceLoader.exists("res://assets/models/soldier.glb"):
 		return false
-	var scene_res := load("res://assets/models/soldier.glb") as PackedScene
+	var scene_res := SOLDIER_GLB as PackedScene
 	if scene_res == null:
 		return false
 	_glb = scene_res.instantiate()

@@ -302,6 +302,39 @@
 
 ---
 
+## AUD 四维审计增量（2026-09-01，手感/玩法/特效/模型打磨）
+
+> 来源 `docs/REVIEW_20260901.md` 四维审计；ID `AUD-` 与既有 `C/H/M/L/R` 并列，互不覆盖。验收口径：`fix(AUD-xxx):` + `// FIX: AUD-xxx` 可追踪；`headless 零 ERROR` 基座；固定 `--seed 7` 二次一致。
+
+### AUD-P0（阻断，不修则手柄不可玩/首刷卡/表现穿帮）
+
+| ID | 标题 | 证据 file:line | Phase | 状态 | 验收标准（可验证） |
+|----|------|----------------|-------|------|-------------------|
+| AUD-P0-1 | 摇杆 deadzone 0.5 + 7 键位冲突，手柄不可玩 | `project.godot:32-159` `player.gd:568` | Phase1 1.11 | 待修复 | `grep deadzone` 均 0.18；手柄右摇/扳机可完成 `--wildtest`；`grep -r "KEY_" scripts/player` 仍 0；T/V 等冲突为 0 |
+| AUD-P0-2 | 载具绕过 InputMap，手柄/重映射失效 | `vehicle.gd:354` `horse.gd:475` `wild_motorcycle.gd:330` `raft.gd:214` | Phase1 1.12 | 待修复 | `is_key_pressed(KEY_W)` 清零；改 `get_action_strength("move_forward/back/left/right")`；手柄左摇可驾驶 20m |
+| AUD-P0-3 | 跳跃无 coyote/buffer，楼梯丢跳 ~15% | `player.gd:809` `floor_snap 0.5` | Phase1 1.13 | 待修复 | 墙钟 `coyote 0.15 + buffer 0.18`；探针 100 次楼梯跳成功率 >98% |
+| AUD-P0-4 | GLB 同步 `load()` 首刷 hitch 5-15ms×N | `wild_moblin.gd:66` `wild_lizalfos.gd:64` `wild_creature.gd:78` `wild_dragon.gd:54` `wild_npc.gd:67` | Phase1 1.14 | 待修复 | `preload` + 集中注入 + `call_deferred ≤4/帧`；`[boot_t]` 首刷 -60%；`--wildtest` 零 hitch |
+| AUD-P0-5 | 描边双遍 draw×2（600+ 实例） | `toon.gd:11,17` | Phase1 1.15 | 待修复 | 草/花/树冠禁 `next_pass`，角色 0.014/建筑 0.018 分级；`--sim` draw calls 峰值 -30% |
+| AUD-P0-6 | 弹孔池仅查 `_decals[0]` 悬垂漏检 | `fx.gd:111` | Phase1 1.16 | 待修复 | `filter(is_instance_valid)` 全扫；`--reloadtest` 720 帧零 freed |
+| AUD-P0-7 | 烟雾荧光云 + 爆炸黑芯 | `smoke_grenade.gd:63` `remote_bomb.gd:152` | Phase1 1.17 | 待修复 | `disable_fog=false + day_light`；`emission→0` 并行；夜景烟雾 ≤ 白天 40%；爆炸 0.3s 无黑芯 |
+| AUD-P0-8 | 水面过算 + 闪电/云未池化 | `water.gdshader:49` `weather.gd:271` `sky_builder.gd:99` | Phase1 1.18 | 待修复 | 水 64→32 + varying；闪电静态化；云 MultiMesh 1 draw；水面 1.4ms→0.7ms |
+
+### AUD-P1（手感/留存/帧率达标）
+
+| ID | 标题 | 证据 file:line | Phase | 状态 | 验收标准 |
+|----|------|----------------|-------|------|----------|
+| AUD-P1-1 | 地形 GRID 192 单 Mesh 无 LOD | `terrain.gd:8,213` | Phase2 2.10 | 待修复 | `GRID 96 + 四象限 visibility_range`；低端核显 30fps；`--sim` p95 draw≤600 |
+| AUD-P1-2 | 建筑 `BoxMesh.new()` 不共享 | `buildings.gd:159` `wild_world.gd:192` | Phase2 2.11 | 待修复 | `shared_box` 单例 + 120/250m 视距；draw calls -15% |
+| AUD-P1-3 | 移动/射击曲线不可学习 | `player.gd:794` `weapon.gd:73` | Phase2 2.12 | 待修复 | `ACCEL 20+friction18 / AIR 8 / bloom 0.09/0.65/6.5 + 固定弹道`；`--firetest` TTK 拉开 15% |
+| AUD-P1-4 | GPU 粒子池缺失，每发 new Mesh+tween | `fx.gd:59,173,245` | Phase2 2.13 | 待修复 | `GPUParticles3D` 32/64 三套 + MultiMesh 池；SMG 13发/s 零 new Material |
+| AUD-P1-5 | 局外零正向成长，仅难度递增 | `main.gd:37,61` | Phase2 2.14 | 待修复 | `total_kills→天赋点` 3选1 写入 `save_v1`；重载生效；二周目可测增强 |
+| AUD-P1-6 | 投放固定可背板 | `buildings.gd:42` `wild_world.gd:713` | Phase2 2.15 | 待修复 | `hash(seed) ±6m` 抖动；`--seed 7 vs 13` 布局不一致 |
+| AUD-P1-7 | 雨雪零生存代价 | `weather.gd:133` | Phase2 2.16 | 待修复 | 雨 `移速×0.92 攀爬×1.25`；湿时探针达标 |
+
+> AUD 与既有 `C/H/M/L + R` 并列，Phase 划分见 `docs/ROADMAP.md v2`；本段状态随 `fix(AUD-xxx)` 合入逐项更新为“已修（commit）”。
+
+---
+
 ## 已验证修复（本轮 headless 均 EXIT:0，待持续回归）
 
 | 项 | 修复提交 | 验证 |

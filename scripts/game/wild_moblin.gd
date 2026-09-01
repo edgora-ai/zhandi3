@@ -1,5 +1,6 @@
 class_name WildMoblin
 extends CharacterBody3D
+const MOBLIN_GLB = preload("res://assets/models/moblin.glb")  # // FIX: AUD-P0-4 preload
 ## 莫布林：大体型慢速重击。长前摇举棒（眼睛变红）→ 猛击，是给格挡/闪避喂招的敌人。
 
 var terrain: Terrain
@@ -64,7 +65,7 @@ func _ready() -> void:
 func _try_glb_visual() -> bool:
 	if not ResourceLoader.exists("res://assets/models/moblin.glb"):
 		return false
-	var scene_res := load("res://assets/models/moblin.glb") as PackedScene
+	var scene_res := MOBLIN_GLB as PackedScene
 	if scene_res == null:
 		return false
 	_glb = scene_res.instantiate()

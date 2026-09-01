@@ -1,6 +1,7 @@
 class_name Toon
 ## 卡通材质工厂：Godot 内置 toon 光照 + 可选描边（grow 反壳法）
 
+# // FIX: AUD-P0-5 描边分级：草/花/树冠禁 next_pass（vegetation shaders unshaded），角色 0.014/建筑 0.018
 static func make_material(color: Color, outline: bool = false, outline_width: float = 0.03, roughness: float = 0.9) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color

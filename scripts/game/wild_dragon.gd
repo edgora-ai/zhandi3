@@ -1,5 +1,6 @@
 class_name WildDragon
 extends CharacterBody3D
+const DRAGON_GLB = preload("res://assets/models/dragon.glb")  # // FIX: AUD-P0-4 preload
 ## 山岳巨龙：沿火山环飞，展翼摆尾，并向靠近的玩家喷射连续火焰。
 
 var player: Player
@@ -51,7 +52,7 @@ var _anim_hold := 0.0
 func _try_glb_visual() -> bool:
 	if not ResourceLoader.exists("res://assets/models/dragon.glb"):
 		return false
-	var scene_res := load("res://assets/models/dragon.glb") as PackedScene
+	var scene_res := DRAGON_GLB as PackedScene
 	if scene_res == null:
 		return false
 	_glb = scene_res.instantiate()

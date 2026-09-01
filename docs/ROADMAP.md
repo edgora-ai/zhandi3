@@ -1,15 +1,16 @@
-# zhandi3 路线图 · 可验收版
+# zhandi3 路线图 · 可验收版 (v2 — 20260901 四维审计增量)
 
 > 与 `docs/ISSUES.md` 同为唯一真实来源。`ISSUES.md` 定义“是什么/为什么”，本文件定义“何时做/做到什么算做完/怎么验证”。
-> 基线 `main@31db100`，Godot 4.7 Forward Plus。所有验收均以可执行的 `godot --headless` / 探针日志 / 截图为判据，不以口头描述为准。
+> 基线 `main@a25e2bb` (Godot 4.7 Forward Plus) 叠加 `docs/REVIEW_20260901.md` 四维审计结论。所有验收均以可执行的 `godot --headless` / 探针日志 / 截图为判据。
+> **v2 变更**：在既有 4 Phase 上叠加 `AUD-P0/P1` 15 项增量（特效/模型/操作/玩法四维打磨），不推翻既有门禁，仅扩展 Phase 1-3 的任务清单与准出。
 
 ## 总览
 
 | Phase | 名称 | 周期 | 核心目标 | 准出门禁 |
 |-------|------|------|----------|----------|
-| Phase 1 | 阻断（Blocker） | 4–6 周 | 消灭崩溃/悬垂/软锁与交付阻断，恢复 headless 零 ERROR 基座 | §1 门禁全绿 |
-| Phase 2 | 体验（Experience） | 6–8 周 | 新玩家 5 分钟可自学；HUD/导航/输入/性能达到可玩发行阈值 | §2 门禁全绿 |
-| Phase 3 | 内容（Content） | 8–12 周 | 区域化玩法与重复度治理，野图从“演示”升级为“世界” | §3 门禁全绿 |
+| Phase 1 | 阻断（Blocker）+ 热修 Hotfix | 4–6 周 + 1–2d 热修 | 消灭崩溃/悬垂/软锁，叠加手柄可用/跳跃不丢/首刷不卡/表现不穿帮 | §1 门禁 + AUD-P0 全绿 |
+| Phase 2 | 体验（Experience）+ 迭代 Iteration | 6–8 周 + 1 周迭代 | 新玩家 5 分钟可自学；HUD/导航/输入/性能达到可玩发行阈值；帧率/手感/留存达标 | §2 门禁 + 帧率 P50≥60 / 1% low≥45 / p95 draw calls≤600 |
+| Phase 3 | 内容（Content）+ 打磨 Polish | 8–12 周 + 按需打磨 | 区域化玩法与重复度治理，野图从“演示”升级为“世界”，宣发最后一米 | §3 门禁全绿 |
 | Phase 4 | 发行（Ship） | 4–6 周 | 平台交付、合规、商店与定价闭环 | §4 门禁全绿 |
 
 > 人力假设：1–2 人 AI 辅助迭代；每项修复单分支、单项验证、合入后才开下一项；每周至少一次窗口抽检截图。
@@ -24,14 +25,15 @@
 2. **三回归锁死**：`--feedtest` / `--focusrecoverytest` / `--seasontest` 均 EXIT:0 且断言通过
 3. **帧率基座**（Phase 2 起强制）：Mobile/Low 档 1280×720 固定路线 120s，P50 ≥60 FPS，1% low ≥45 FPS，p95 draw calls ≤600
 4. **文档一致**：`README.md` / 启动统计 / `ISSUES.md` / 本文件对同一数量的描述一致（神庙/种子/NPC 等从注册表生成，不手写）
+5. **新增（v2）**：固定 `--seed 7` 二次运行结果一致；`--firetest` 伤害-距离表可 grep；夜景截图 `day_light` 曲线可验证
 
 ---
 
-## Phase 1 — 阻断 4–6 周
+## Phase 1 — 阻断 4–6 周 + 热修 1–2d
 
-**目标**：任何玩家在不看 README 的情况下可完整跑通一局 Wild 与一局 Battlefield，且自动化回归零 ERROR。
+**目标**：任何玩家在不看 README 的情况下可完整跑通一局 Wild 与一局 Battlefield，且自动化回归零 ERROR；叠加热修后手柄可用、跳跃不丢、首刷不卡。
 
-### 任务清单
+### 任务清单（既有）
 
 | # | 任务 | 关联 ISSUE | 交付物 | 验收标准（可验证） |
 |---|------|------------|--------|-------------------|
@@ -46,13 +48,27 @@
 | 1.9 | 血月类型污染（同类判活） | P4/D6 | 同类才抑制 | 跨类不抑制；`--wildtest` 血月后各类型按预期补齐（Phase 3 补全前仅已注册类型） |
 | 1.10 | InputMap 基座 + 存档基座 | C4/C5/G2/R18-19 | `project.godot` InputMap 全量；`user://save_v1.json` 版本化原子写入；`EnvironmentDirector` 占位 | 键位重映射后行为一致；损坏存档回退不崩；Season/DayNight/Weather 不再直写 Environment（Phase 2 完成合成器） |
 
-**Phase 1 准出**：`--wildtest` / `--sim` / `--feedtest` / `--focusrecoverytest` / `--seasontest` 全绿且零 ERROR；窗口抽检着陆/游泳/骑乘/抓鱼/背包各 1 次无显性回退。
+### 任务清单（v2 热修增量 — AUD-P0）
+
+| # | 任务 | 关联 AUD | 交付物 | 验收标准（可验证） |
+|---|------|----------|--------|-------------------|
+| 1.11 | 摇杆死区+7 键位冲突修复 | AUD-P0-1 | `project.godot` deadzone 0.18，`move_back Joy13→11` 等 7 处解冲突，新增 `ads`/`fire` 进 InputMap | `grep deadzone` 均 0.18；手柄右摇/扳机可完成 `--wildtest`；`grep -r "KEY_" scripts/player` 仍 0 |
+| 1.12 | 载具 InputMap 化 | AUD-P0-2 | `vehicle.gd:354` `horse.gd:475` `wild_motorcycle.gd:330` `raft.gd:214` 改 `get_action_strength` | 重映射后行为一致；手柄左摇可驾驶 20m |
+| 1.13 | 跳跃 coyote+buffer | AUD-P0-3 | `player.gd:809` 墙钟 `coyote 0.15 + buffer 0.18` | 探针 100 次楼梯跳成功率 >98% |
+| 1.14 | GLB preload 池化 | AUD-P0-4 | `wild_moblin.gd:66` 等 5 处 `preload` + 集中注入 + `call_deferred ≤4/帧` | `[boot_t]` 首刷 -60%；`--wildtest` 零 hitch |
+| 1.15 | 描边分级与草/花禁描边 | AUD-P0-5 | `toon.gd:11,17` 角色 0.014/建筑 0.018，草/花/树冠禁 next_pass | `--sim` draw calls 峰值 -30% |
+| 1.16 | 弹孔池全量有效性巡检 | AUD-P0-6 | `fx.gd:111` 改 `filter(is_instance_valid)` 全扫 | `--reloadtest` 720 帧零 freed |
+| 1.17 | 烟雾/爆炸昼夜与雾一致 | AUD-P0-7 | `smoke_grenade.gd:63` `disable_fog=false + day_light`；`remote_bomb.gd:152` emission 并行衰减 | 夜景烟雾 ≤ 白天 40%；爆炸 0.3s 无黑芯 |
+| 1.18 | 水面/闪电/云池化 | AUD-P0-8 | `water.gdshader:49` 64→32 + varying；`weather.gd:271` 静态化；`sky_builder.gd:99` MultiMesh | 水面 1.4ms→0.7ms；云 100→1 draw |
+| 1.19 | 落点保底补弹药 | G-P0-3 | `main.gd:583` 追加 `ammo 45` | 空手进圈率 0；`--sim` 首圈人均弹药 ≥40 |
+
+**Phase 1 准出（v2）**：`--wildtest` / `--sim` / `--feedtest` / `--focusrecoverytest` / `--seasontest` 全绿且零 ERROR；窗口抽检着陆/游泳/骑乘/抓鱼/背包各 1 次无显性回退；新增 1.11–1.19 探针全绿（见验证矩阵）。
 
 ---
 
-## Phase 2 — 体验 6–8 周
+## Phase 2 — 体验 6–8 周 + 迭代 1 周
 
-**目标**：新玩家无需 README，3 分钟内完成“空降→搜刮→交战→跑圈→占点/神庙”基础闭环；HUD 与输入达到可发行阈值。
+**目标**：新玩家无需 README，3 分钟内完成“空降→搜刮→交战→跑圈→占点/神庙”基础闭环；HUD 与输入达到可发行阈值；叠加帧率/手感/留存达标。
 
 | # | 任务 | 关联 ISSUE | 交付物 | 验收标准 |
 |---|------|------------|--------|----------|
@@ -66,13 +82,25 @@
 | 2.8 | 成长与经济预算审计 | H19/H20/M1/M2/M15 | 种子/鱼/商店预算与封顶；医疗以 `max_hp` 为钳制；载具成本/解锁 | 长测经济曲线不发散；获宝珠后满血为新上限；载具不再无成本压缩尺度 |
 | 2.9 | 环境合成器 | M4/R19/World H1 | `EnvironmentDirector` 唯一合成 Season×DayNight×Weather | 季节基色×昼夜×天气一次计算；互覆盖回归为 0；四季探针一致 |
 
-**Phase 2 准出**：新玩家走查通过 + HUD 响应式截图回归 + Mobile/Low 帧率门禁 + 输入/手柄可完成一局。
+### 任务清单（v2 迭代增量 — AUD-P1）
+
+| # | 任务 | 关联 AUD | 交付物 | 验收标准 |
+|---|------|----------|--------|----------|
+| 2.10 | 地形 LOD + 四象限视距 | AUD-P1-1 | `terrain.gd:8,213` GRID 96 + `visibility_range` | 低端核显 30fps 达标；`--sim` p95 draw≤600 |
+| 2.11 | 建筑共享 Mesh + 视距 | AUD-P1-2 | `buildings.gd:159` shared_box 单例 + 120/250m | draw calls -15% |
+| 2.12 | 移动/射击曲线可学习化 | AUD-P1-3 | `ACCEL 20+friction18 / bloom 0.09/0.65/6.5 + 固定弹道` | 压枪可练；TTK 拉开 15%（`--firetest` 表） |
+| 2.13 | GPU 粒子池（血/烟/火花） | AUD-P1-4 | `GPUParticles3D` 32/64 三套 + MultiMesh 池 | SMG 13发/s 零 new Material |
+| 2.14 | 局外天赋三选一 | AUD-P1-5 | `main.gd:37,61` `total_kills→天赋点` 写入 `save_v1` | 重载天赋生效；二周目可测增强 |
+| 2.15 | 投放种子化（地标抖动） | AUD-P1-6 | `buildings.gd:42` `wild_world.gd:713` `hash(seed) ±6m` | `--seed 7 vs 13` 布局不一致 |
+| 2.16 | 雨雪生存化 | AUD-P1-7 | `weather.gd:133` 雨 `移速×0.92 攀爬×1.25` | 湿时攀爬/移动探针达标 |
+
+**Phase 2 准出**：新玩家走查通过 + HUD 响应式截图回归 + Mobile/Low 帧率门禁 + 输入/手柄可完成一局；新增 2.10–2.16 KPI 全绿。
 
 ---
 
-## Phase 3 — 内容 8–12 周
+## Phase 3 — 内容 8–12 周 + 打磨按需
 
-**目标**：治理重复度，建立区域化玩法与可复用内容管线，野图从“演示”升级为“世界”。
+**目标**：治理重复度，建立区域化玩法与可复用内容管线，野图从“演示”升级为“世界”；叠加宣发最后一米。
 
 | # | 任务 | 关联 ISSUE | 交付物 | 验收标准 |
 |---|------|------------|--------|----------|
@@ -84,7 +112,16 @@
 | 3.6 | 世界分区与 LOD/HLOD | Perf 3-5/M14/R? | 20–40m chunk；静态网格合并；距离可见/阴影分级；水/草分块 | 远区碰撞/实例按距休眠；p95 draw calls ≤600；冷启动到可操作 ≤4s |
 | 3.7 | 遭遇与营地原型化 | World M1 | 河岸/雪地/火山/遗迹营地原型分化 | 同一营地不再复用同一结构/守军/奖励 |
 
-**Phase 3 准出**：固定种子下区域重访有差异化决策；新增内容不增加人均 headless ERROR；性能门禁仍绿。
+### 任务清单（v2 打磨增量）
+
+| # | 任务 | 关联 AUD | 交付物 | 验收标准 |
+|---|------|----------|--------|----------|
+| 3.8 | 云 MultiMesh + 水面 shader 瘦身收口 | AUD-P0-8/P2 | 云 1 draw；水面 varying 化 | 视觉抽检 + 帧率门禁 |
+| 3.9 | 据点雷达/弹药补给 | 玩法 P1 | 占点给 `雷达 5s 脉冲` 或 `弹药` | 探针：占点后 40m 内敌高亮 5s |
+| 3.10 | 任务二段与 Stinger 采样 | 特效/玩法 P2 | 护送后追击线；`hinox_down/boss_victory` 专用采样 | 探针 `[stinger]` 日志 + 听感区分 |
+| 3.11 | `*.import` 分级与 PBR/Toon 收敛 | 模型 P1 | billboard 关切线/烘焙；`WildMonster` 复用骨架 | 显存 -15%；同屏风格一致 |
+
+**Phase 3 准出**：固定种子下区域重访有差异化决策；新增内容不增加人均 headless ERROR；性能门禁仍绿；视觉抽检通过。
 
 ---
 
@@ -107,7 +144,9 @@
 
 ---
 
-## 优先级总表（S→M，去重后 Top 15）
+## 优先级总表（S→M，去重后 Top 15 + AUD Top 15）
+
+### 既有 Top 15
 
 | rank | 项 | 归属 | 验收锚点 |
 |------|----|------|----------|
@@ -127,6 +166,26 @@
 | 14 | HUD 响应式与战斗反馈 | H10-H13/R13 | 2.3/2.6 |
 | 15 | AI/物理主线程分帧 | H7/H9 | 2.7 |
 
+### AUD Top 15（20260901 四维审计增量）
+
+| rank | ID | 一句话 | 归属 | 验收锚点 |
+|------|----|--------|------|----------|
+| 1 | AUD-P0-1 | 摇杆死区+键位冲突 | 操作 P0 | 1.11 |
+| 2 | AUD-P0-2 | 载具 InputMap 化 | 操作 P0 | 1.12 |
+| 3 | AUD-P0-3 | coyote+buffer | 操作 P0 | 1.13 |
+| 4 | AUD-P0-4 | GLB preload | 模型 P0 | 1.14 |
+| 5 | AUD-P0-5 | 描边分级 | 模型 P0 | 1.15 |
+| 6 | AUD-P0-6 | 弹孔池全检 | 特效 P0 | 1.16 |
+| 7 | AUD-P0-7 | 烟雾/爆炸入雾昼夜 | 特效 P0 | 1.17 |
+| 8 | AUD-P0-8 | 水面/闪电/云池化 | 特效 P0 | 1.18 |
+| 9 | AUD-P1-1 | 地形 LOD | 模型 P1 | 2.10 |
+| 10 | AUD-P1-2 | 建筑共享 | 模型 P1 | 2.11 |
+| 11 | AUD-P1-3 | 移动/射击曲线可学习 | 操作 P1 | 2.12 |
+| 12 | AUD-P1-4 | GPU 粒子池 | 特效 P1 | 2.13 |
+| 13 | AUD-P1-5 | 局外天赋 | 玩法 P1 | 2.14 |
+| 14 | AUD-P1-6 | 种子化地标 | 玩法 P1 | 2.15 |
+| 15 | AUD-P1-7 | 雨雪生存化 | 玩法 P1 | 2.16 |
+
 > 注：C3/C6/C7（export/IP/复玩）为发行域，不挤占 S 级玩法修复，按 Phase 4 并行。
 
 ---
@@ -144,6 +203,11 @@ tools/Godot.app/Contents/MacOS/Godot --headless --path . --fixed-fps 60 --quit-a
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm --seed 7
 # 窗口抽检
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/probe.png --frames 300 --seed 7
+# AUD 新增探针（随任务落地）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm --seed 7  # 伤害-距离表（AUD-P1-3）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 600 -- --wildtest --seed 7 --seed 13  # 布局 hash 对比（AUD-P1-6）
+tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/aud_night.png --frames 300 --seed 7  # 夜景压暗（AUD-P0-7/8）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 720 -- --reloadtest --seed 7  # 弹孔池（AUD-P0-6）
 ```
 
-> 本文件与 `docs/ISSUES.md` 共同为唯一真实来源；Top 15 Backlog 以 Critical/High/S 级为序，Phase 划分与门禁均以此为准。
+> 本文件与 `docs/ISSUES.md` 共同为唯一真实来源；Top 15 Backlog 以 Critical/High/S 级为序，Phase 划分与门禁均以此为准。新增 AUD 段与既有 C/H/M/L 并列，互不覆盖。

@@ -11,8 +11,9 @@ signal backpack_changed
 
 @export var WALK_SPEED := 5.5 # // FIX: M13 @export 魔法数抽离
 @export var SPRINT_SPEED := 8.6 # // FIX: M13
-const ACCEL := 30.0
-const AIR_ACCEL := 14.0
+const ACCEL := 20.0  # // FIX: AUD-P1-3 地面加速 30->20
+const AIR_ACCEL := 8.0  # // FIX: AUD-P1-3 空中 14->8 (26%地面，减少肥皂)
+const FRICTION := 18.0  # // FIX: AUD-P1-3 地面摩擦分离
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 var MOUSE_SENS := 0.0022 # // FIX: R4-U1 设置面板可调灵敏度（原 const）
@@ -209,7 +210,7 @@ func _ready() -> void:
 func add_recoil(deg: float) -> void:
 	pitch = clampf(pitch + deg_to_rad(deg), -1.45, 1.45)
 	camera.rotation.x = pitch
-	rotate_y(randf_range(-0.3, 0.3) * deg_to_rad(deg))
+	rotate_y(randf_range(-0.08, 0.08) * deg_to_rad(deg))  # // FIX: AUD-P1-3 后坐随机 ±0.08 可学习
 
 
 func get_aim_origin() -> Vector3:
@@ -802,9 +803,12 @@ func _physics_process(delta: float) -> void:
 	if blocking:
 		speed *= 0.5
 
-	var accel := ACCEL if is_on_floor() else AIR_ACCEL
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
-	hv = hv.move_toward(wish * speed, accel * delta)
+	if wish.length_squared() < 0.001:
+		hv = hv.move_toward(Vector3.ZERO, FRICTION * delta)  # // FIX: AUD-P1-3 摩擦分离，急停更自然
+	else:
+		var accel := ACCEL if is_on_floor() else AIR_ACCEL
+		hv = hv.move_toward(wish * speed, accel * delta)
 	velocity.x = hv.x
 	velocity.z = hv.z
 

@@ -33,6 +33,7 @@ var _m_sand: StandardMaterial3D
 var _m_metal: StandardMaterial3D
 var _m_snow: StandardMaterial3D
 var _snow_caps: Array[MeshInstance3D] = []
+var _shared_box_mats: Dictionary = {}  # // FIX: AUD-P1-2 共享 BoxMesh 按尺寸缓存（数百 BoxMesh->按尺寸去重）
 
 var _terrain: Terrain
 
@@ -154,11 +155,19 @@ func _make_village(center: Vector3) -> void:
 
 # ---------- 基础件 ----------
 
-func _part(size: Vector3, mat: Material, pos: Vector3, parent: Node3D, rot_y: float = 0.0, rot_x: float = 0.0) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
+func _get_shared_box(size: Vector3) -> BoxMesh:
+	# // FIX: AUD-P1-2 按尺寸去重：全图数百 new BoxMesh -> 按尺寸缓存
+	var key := "%s" % str(size)
+	if _shared_box_mats.has(key):
+		return _shared_box_mats[key] as BoxMesh
 	var bm := BoxMesh.new()
 	bm.size = size
-	mi.mesh = bm
+	_shared_box_mats[key] = bm
+	return bm
+
+func _part(size: Vector3, mat: Material, pos: Vector3, parent: Node3D, rot_y: float = 0.0, rot_x: float = 0.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = _get_shared_box(size)  # // FIX: AUD-P1-2 共享 BoxMesh
 	mi.material_override = mat
 	mi.position = pos
 	mi.rotation.y = rot_y

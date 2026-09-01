@@ -261,6 +261,7 @@ func _build() -> void:
 	_ground_material = ShaderMaterial.new()
 	_ground_material.shader = load("res://assets/shaders/ground.gdshader")
 	mesh_instance.material_override = _ground_material
+	mesh_instance.visibility_range_end = 800.0  # // FIX: AUD-P1-1 地形视距兜底（远景剔除占位）
 	add_child(mesh_instance)
 
 	var body := StaticBody3D.new()

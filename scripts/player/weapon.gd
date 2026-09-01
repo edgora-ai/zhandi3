@@ -11,7 +11,7 @@ signal weapon_changed(id: String) # // FIX: VIS1 武器名事件驱动：--scree
 const WEAPONS := {
 	"rifle": {
 		"label": "突击步枪", "damage": 12.0, "head_mult": 2.0, "rpm": 540.0,
-		"mag": 30, "start_reserve": 90, "spread": 1.3, "ads_spread": 0.45,
+		"mag": 30, "start_reserve": 90, "spread": 1.3, "ads_spread": 0.35,  # // FIX: AUD-P1-3 rifle 机瞄 0.45->0.35
 		"reload": 1.8, "auto": true, "zoom": 1.3, "range": 220.0, "recoil": 0.35,
 		"falloff_start": 120.0, "falloff_end": 220.0, "falloff_min": 0.75, # // FIX: OPT-C1 距离衰减
 	},
@@ -178,7 +178,7 @@ func _try_fire() -> void:
 	_cool = 60.0 / data.rpm
 	mag_left -= 1
 	# // FIX: OPT-C2 bloom 累积（机瞄减半），停火在 _process 回落
-	_bloom = minf(_bloom + 0.15, 1.2)
+	_bloom = minf(_bloom + 0.09, 0.65)  # // FIX: AUD-P1-3 bloom 0.15->0.09 上限1.2->0.65（0.1s回落可控）
 	# // FIX: R4-W1 霰弹枪多弹丸（每颗独立散布射线，共享 bloom 一份）
 	for _pellet in range(int(data.get("pellets", 1))):
 		_fire_ray()
@@ -277,7 +277,7 @@ func muzzle_world() -> Vector3:
 func _process(delta: float) -> void:
 	_cool = maxf(0.0, _cool - delta)
 	# // FIX: OPT-C2 bloom 停火回落（约 0.3s 归零）
-	_bloom = maxf(0.0, _bloom - delta * 4.0)
+	_bloom = maxf(0.0, _bloom - delta * 6.5)  # // FIX: AUD-P1-3 衰减 4.0->6.5
 	if reloading:
 		_reload_left -= delta
 		if _reload_left <= 0.0:

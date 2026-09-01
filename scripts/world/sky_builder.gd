@@ -79,6 +79,7 @@ static func build_environment(m: Node) -> void:
 	spawn_clouds(m)
 
 
+# // FIX: AUD-P1-4 云池规划：当前 22团×5球=110 draw，目标 MultiMesh(110) 单 draw（Phase 3 收口，此处先标记）
 static func spawn_clouds(m: Node) -> void:
 	if OS.get_cmdline_user_args().has("--noclouds"):
 		return

@@ -6,6 +6,8 @@ static var _flash_mesh: QuadMesh
 static var _flash_mat: StandardMaterial3D
 static var _tracer_mesh: BoxMesh # // FIX: H4b tracer 单位网格（scale.z=dist，运行时零 new Mesh）
 static var _tracer_mats: Dictionary = {} # // FIX: H4b tracer 材质缓存（Color 键，≤8）
+static var _tracer_pool: Array[MeshInstance3D] = []  # // FIX: AUD-P1-4 tracer 实例池（复用，避免每发 new）
+static var _tracer_pool_idx := 0
 
 static func _scene() -> Node:
 	return (Engine.get_main_loop() as SceneTree).current_scene
@@ -56,18 +58,27 @@ static func tracer(from: Vector3, to: Vector3, color: Color = Color(1.0, 0.88, 0
 		if _tracer_mats.size() >= 8:
 			_tracer_mats.clear()
 		_tracer_mats[color] = mat
-	var mi := MeshInstance3D.new()
-	mi.mesh = _tracer_mesh
+	var mi: MeshInstance3D
+	if _tracer_pool.size() < 32:
+		mi = MeshInstance3D.new()
+		mi.mesh = _tracer_mesh
+		_tracer_pool.append(mi)
+		_scene().add_child(mi)
+	else:
+		mi = _tracer_pool[_tracer_pool_idx]
+		_tracer_pool_idx = (_tracer_pool_idx + 1) % _tracer_pool.size()
 	mi.material_override = mat as Material
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.scale = Vector3(width, width, dist)
-	_scene().add_child(mi)
+	if mi.get_parent() == null:
+		_scene().add_child(mi)
 	mi.global_position = (from + to) * 0.5
 	mi.look_at(to, Vector3.UP)
+	mi.visible = true
 	var tw := mi.create_tween()
 	tw.tween_interval(0.05)
 	tw.tween_property(mi, "scale", Vector3(width * 0.15, width * 0.15, dist), 0.09)
-	tw.tween_callback(mi.queue_free)
+	tw.tween_callback(func() -> void: mi.visible = false)  # // FIX: AUD-P1-4 池化复用，不 queue_free
 
 
 static func impact(pos: Vector3, color: Color = Color(0.85, 0.80, 0.65)) -> void:

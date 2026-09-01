@@ -261,6 +261,9 @@ func _strike_lightning() -> void:
 
 
 # 锯齿雷柱：五段折线从 60m 高空劈落 + 落点闪光，0.14 秒后消散。
+static var _bolt_mat: StandardMaterial3D  # // FIX: AUD-P1-4 闪电材质复用
+static var _bolt_sheath: StandardMaterial3D
+
 func _spawn_bolt(pos: Vector3) -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
@@ -268,19 +271,28 @@ func _spawn_bolt(pos: Vector3) -> void:
 	var bolt := Node3D.new()
 	scene.add_child(bolt)
 	bolt.global_position = pos
-	var mat := StandardMaterial3D.new()
+	if _bolt_mat == null:
+		_bolt_mat = StandardMaterial3D.new()
+		_bolt_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_bolt_mat.albedo_color = Color(0.85, 0.92, 1.0)
+		_bolt_mat.emission_enabled = true
+		_bolt_mat.emission = Color(0.75, 0.88, 1.0)
+		_bolt_mat.emission_energy_multiplier = 4.0
+	if _bolt_sheath == null:
+		_bolt_sheath = StandardMaterial3D.new()
+		_bolt_sheath.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_bolt_sheath.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_bolt_sheath.albedo_color = Color(0.45, 0.65, 1.0, 0.28)
+		_bolt_sheath.emission_enabled = true
+		_bolt_sheath.emission = Color(0.40, 0.60, 1.0)
+		_bolt_sheath.emission_energy_multiplier = 1.2
+	var mat := _bolt_mat
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(0.85, 0.92, 1.0)
 	mat.emission_enabled = true
 	mat.emission = Color(0.75, 0.88, 1.0)
 	mat.emission_energy_multiplier = 4.0
-	var sheath := StandardMaterial3D.new()
-	sheath.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	sheath.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	sheath.albedo_color = Color(0.45, 0.65, 1.0, 0.28)
-	sheath.emission_enabled = true
-	sheath.emission = Color(0.40, 0.60, 1.0)
-	sheath.emission_energy_multiplier = 1.2
+	var sheath := _bolt_sheath
 	var prev := Vector3(0, 60.0, 0)
 	for i in range(5):
 		var next := Vector3(_rng.randf_range(-1.5, 1.5) * (1.0 - float(i) / 5.0), 60.0 - float(i + 1) * 12.0, _rng.randf_range(-1.5, 1.5) * (1.0 - float(i) / 5.0))

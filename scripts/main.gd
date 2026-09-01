@@ -35,7 +35,7 @@ var _airdrops := 0 # // FIX: OPT-G4 空投计数
 # // FIX: R4-G7b 二周目存档最小闭环（C5-lite）：结算写入 user://save_v1.json（原子写），
 # 新局读取出击次数推 bot skill 下限（0.7→0.9→1.1 封顶），重载可读、损坏回退默认
 const SAVE_PATH := "user://save_v1.json"
-var save_data := {"version": 1, "runs": 0, "best_rank": 99, "total_kills": 0}
+var save_data := {"version": 1, "runs": 0, "best_rank": 99, "total_kills": 0, "talents": {"armor": 0, "stamina": 0, "hp": 0}}  # // FIX: AUD-P1-5 局外天赋
 
 func _load_save() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
@@ -57,6 +57,27 @@ func _write_save() -> void:
 	f.store_string(JSON.stringify(save_data))
 	f.close()
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(SAVE_PATH))
+
+func _talent_available() -> int:  # // FIX: AUD-P1-5 可用天赋点 = total_kills/10 - 已分配
+	var spent := 0
+	var t: Dictionary = save_data.get("talents", {})
+	for v in t.values():
+		spent += int(v)
+	return int(int(save_data.get("total_kills", 0)) / 10) - spent
+
+func _apply_talents_to_player(p: Player) -> void:  # // FIX: AUD-P1-5 天赋生效
+	var t: Dictionary = save_data.get("talents", {})
+	var armor_pts := int(t.get("armor", 0))
+	var stam_pts := int(t.get("stamina", 0))
+	var hp_pts := int(t.get("hp", 0))
+	if armor_pts > 0:
+		p.armor = minf(100.0, p.armor + armor_pts * 10.0)
+	if stam_pts > 0:
+		p.max_stamina += stam_pts * 10.0
+		p.stamina = p.max_stamina
+	if hp_pts > 0:
+		p.max_hp += hp_pts * 10.0
+		p.hp = p.max_hp
 
 func _ng_skill_floor() -> float:
 	# // FIX: G7b ng_floor 可观测探针（--sim/--wildtest 可 grep skill_floor）
@@ -146,6 +167,8 @@ func _ready() -> void:
 	buildings.name = "Buildings"
 	add_child(buildings)
 	if not args.has("--noworld") and _map_id == "battlefield":
+		if buildings.has_method("_apply_seed_jitter"):
+			buildings._apply_seed_jitter(_seed_value)  # // FIX: AUD-P1-6
 		buildings.generate(terrain)
 
 	zone = Zone.new()
@@ -190,7 +213,7 @@ func _ready() -> void:
 	add_child(daynight)
 	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
 	_load_save() # // FIX: R4-G7b
-	print("[save] runs=%d best=%d ng_floor=%.1f seed=%d" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor(), _seed_value])
+	print("[save] runs=%d best=%d ng_floor=%.1f seed=%d talent_avail=%d talents=%s" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor(), _seed_value, _talent_available(), str(save_data.get("talents", {}))])  # // FIX: AUD-P1-5
 	if _map_id == "battlefield" and int(save_data.get("runs", 0)) == 0:
 		# // FIX: R11-lite 首局三步教学（老玩家局自动跳过）
 		_tutorial_step = 0
@@ -229,7 +252,7 @@ func _ready() -> void:
 		wild_world = WildWorld.new()
 		wild_world.name = "WildWorld"
 		add_child(wild_world)
-		wild_world.generate(terrain, player)
+		wild_world.generate(terrain, player, _seed_value)  # // FIX: AUD-P1-6
 		print("[boot_t] wild_world.generate +%dms" % (Time.get_ticks_msec() - boot_t0))
 		_spawn_wild_bots(rng)
 	# // FIX: OPT-G7/REG4 毒圈漂移与天气纳入 --seed（-1 时行为不变）
@@ -574,6 +597,7 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 		player.fairies = 0
 	hud.set_weapon_name(player.weapon.label())
 	hud.set_ammo_text("--")
+	_apply_talents_to_player(player)  # // FIX: AUD-P1-5
 	hud.set_alive(total_combatants)
 	hud.set_kills(0)
 

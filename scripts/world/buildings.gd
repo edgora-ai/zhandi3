@@ -40,7 +40,7 @@ var _terrain: Terrain
 
 func generate(terrain: Terrain) -> void:
 	_terrain = terrain
-	_rng.seed = 20260719
+	_rng.seed = 20260719  # // FIX: AUD-P1-6 基准 seed，外部可通过 _apply_seed_jitter 注入
 	_m_wall = Toon.make_material(WALL_WHITE, true, 0.02)
 	_m_wood_wall = Toon.make_material(WALL_WOOD, true, 0.02)
 	_m_brick = Toon.make_material(WALL_BRICK, true, 0.02)

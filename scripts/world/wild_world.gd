@@ -38,7 +38,18 @@ var _flyer_points: Array = []
 var _dragon_points: Array = []
 
 
-func generate(p_terrain: Terrain, p_player: Player) -> void:
+var _ww_seed := -1  # // FIX: AUD-P1-6 种子抖动源
+
+func _jitter(pos: Vector3) -> Vector3:  # // FIX: AUD-P1-6 hash(seed) ±6m
+	if _ww_seed < 0:
+		return pos
+	var h := hash(str(_ww_seed, "_", pos.x, "_", pos.z))
+	var dx := (float(h % 120) / 119.0 - 0.5) * 12.0
+	var dz := (float((h / 120) % 120) / 119.0 - 0.5) * 12.0
+	return Vector3(pos.x + dx, pos.y, pos.z + dz)
+
+func generate(p_terrain: Terrain, p_player: Player, seed_value: int = -1) -> void:  # // FIX: AUD-P1-6
+	_ww_seed = seed_value
 	terrain = p_terrain
 	player = p_player
 	_build_materials()
@@ -999,6 +1010,7 @@ func _spawn_monsters() -> void:
 	var points := [Vector3(-42, 0, 48), Vector3(48, 0, 93), Vector3(118, 0, -74), Vector3(135, 0, -102), Vector3(-138, 0, -72), Vector3(-150, 0, -64), Vector3(45, 0, -70), Vector3(28, 0, -82)]
 	_monster_points = points
 	for p in points:
+		p = _jitter(p)  # // FIX: AUD-P1-6
 		var monster := WildMonster.new()
 		monster.setup(terrain, player)
 		monster.position = _ground(p, 0.05)
@@ -1020,7 +1032,7 @@ func respawn_monsters() -> int:
 		if not occupied:
 			var monster := WildMonster.new()
 			monster.setup(terrain, player)
-			monster.position = _ground(p, 0.05)
+			monster.position = _ground(_jitter(p), 0.05)  # // FIX: AUD-P1-6
 			add_child(monster)
 			monster.rotation.y = randf_range(0, TAU)
 			respawned += 1

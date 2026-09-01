@@ -802,6 +802,10 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.35
 	if blocking:
 		speed *= 0.5
+	# // FIX: AUD-P1-7 雨中移速 ×0.92（weather rain_strength>0.5 且非雪区）
+	var _weather: Variant = get_tree().current_scene.get("weather") if get_tree().current_scene and get_tree().current_scene.get("weather") else null  # // FIX: AUD-P1-7 Variant
+	if _weather and _weather.raining and _weather.rain_strength > 0.5:
+		speed *= 0.92
 
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
 	if wish.length_squared() < 0.001:
@@ -1960,7 +1964,11 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 			is_climbing = false
 			return false
 		# 攀爬耗精力：静止缓耗、移动快耗，耗尽后滑落。
-		_drain_stamina((5.0 + 7.0 * (absf(f) + absf(r))) * _delta * climb_stamina_mult)
+		var _rain_mult := 1.0
+		var _w2: Variant = get_tree().current_scene.get("weather") if get_tree().current_scene and get_tree().current_scene.get("weather") else null  # // FIX: AUD-P1-7 Variant
+		if _w2 and _w2.raining and _w2.rain_strength > 0.5:
+			_rain_mult = 1.25  # // FIX: AUD-P1-7 雨中攀爬精力 ×1.25
+		_drain_stamina((5.0 + 7.0 * (absf(f) + absf(r))) * _delta * climb_stamina_mult * _rain_mult)
 		if stamina <= 0.0:
 			velocity = n * 1.5 + Vector3(0, -3.0, 0)
 			is_climbing = false

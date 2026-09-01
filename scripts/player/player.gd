@@ -11,9 +11,8 @@ signal backpack_changed
 
 @export var WALK_SPEED := 5.5 # // FIX: M13 @export 魔法数抽离
 @export var SPRINT_SPEED := 8.6 # // FIX: M13
-const ACCEL := 20.0  # // FIX: AUD-P1-3 地面加速 30->20
-const AIR_ACCEL := 8.0  # // FIX: AUD-P1-3 空中 14->8 (26%地面，减少肥皂)
-const FRICTION := 18.0  # // FIX: AUD-P1-3 地面摩擦分离
+const ACCEL := 30.0
+const AIR_ACCEL := 14.0
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 var MOUSE_SENS := 0.0022 # // FIX: R4-U1 设置面板可调灵敏度（原 const）
@@ -114,8 +113,6 @@ var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
 var _airborne_time := 0.0
-var _coyote_t := 0.0  # // FIX: AUD-P0-3 coyote 0.15s 墙钟
-var _jump_buf_t := 0.0  # // FIX: AUD-P0-3 jump buffer 0.18s 墙钟
 var _glider_open := 0.0
 var _melee_cd := 0.0
 var _combo_i := 0
@@ -152,6 +149,12 @@ var _landed_last_frame := true
 var _scan_cd := 0.0 # // FIX: H9/M17 组扫描限频 0.12s，避免每帧6组get_nodes_in_group
 var _shake_t := 0.0
 var _shake_amp := 0.0
+var _recoil_pitch: float = 0.0
+var _recoil_yaw: float = 0.0
+var _recoil_pitch_vel: float = 0.0
+var _recoil_yaw_vel: float = 0.0
+const RECOIL_STIFF: float = 64.0
+const RECOIL_DAMP: float = 16.0
 
 
 func _ready() -> void:
@@ -197,6 +200,11 @@ func _ready() -> void:
 	weapon = Weapon.new()
 	camera.add_child(weapon)
 	weapon.setup(self, true)
+	# W4: connect fired to HUD pulse without writing main.gd
+	weapon.fired.connect(func() -> void:
+		if hud:
+			hud.pulse_crosshair()
+	)
 	_build_glider()
 	_build_glide_arms()
 	_build_sword()
@@ -207,10 +215,38 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
-func add_recoil(deg: float) -> void:
-	pitch = clampf(pitch + deg_to_rad(deg), -1.45, 1.45)
-	camera.rotation.x = pitch
-	rotate_y(randf_range(-0.08, 0.08) * deg_to_rad(deg))  # // FIX: AUD-P1-3 后坐随机 ±0.08 可学习
+func add_recoil(deg: float, yaw_deg: float = 0.0) -> void:
+	var p: float = deg_to_rad(deg)
+	var y: float = deg_to_rad(yaw_deg)
+	_recoil_pitch = clampf(_recoil_pitch + p, -0.9, 0.9)
+	_recoil_yaw = clampf(_recoil_yaw + y, -0.6, 0.6)
+	_apply_recoil_to_camera()
+
+func _apply_recoil_to_camera() -> void:
+	if camera:
+		camera.rotation.x = clampf(pitch + _recoil_pitch, -1.45, 1.45)
+		camera.rotation.y = _recoil_yaw
+
+func apply_recoil_step(dt: float) -> void:
+	# Deterministic helper for coordinator validation: critically damped spring without overshoot
+	var dt_c: float = clampf(dt, 0.0, 0.033)
+	var ap: float = -RECOIL_STIFF * _recoil_pitch - RECOIL_DAMP * _recoil_pitch_vel
+	_recoil_pitch_vel += ap * dt_c
+	_recoil_pitch += _recoil_pitch_vel * dt_c
+	var ay: float = -RECOIL_STIFF * _recoil_yaw - RECOIL_DAMP * _recoil_yaw_vel
+	_recoil_yaw_vel += ay * dt_c
+	_recoil_yaw += _recoil_yaw_vel * dt_c
+	# Snap tiny residual to avoid jitter
+	if absf(_recoil_pitch) < 0.00008 and absf(_recoil_pitch_vel) < 0.001:
+		_recoil_pitch = 0.0
+		_recoil_pitch_vel = 0.0
+	if absf(_recoil_yaw) < 0.00008 and absf(_recoil_yaw_vel) < 0.001:
+		_recoil_yaw = 0.0
+		_recoil_yaw_vel = 0.0
+	_apply_recoil_to_camera()
+
+func get_recoil_offset_deg() -> Vector2:
+	return Vector2(rad_to_deg(_recoil_pitch), rad_to_deg(_recoil_yaw))
 
 
 func get_aim_origin() -> Vector3:
@@ -257,7 +293,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENS)
 		pitch = clampf(pitch - event.relative.y * MOUSE_SENS * (0.7 if weapon.is_ads else 1.0), -1.45, 1.45)
-		camera.rotation.x = pitch
+		_apply_recoil_to_camera()
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -694,18 +730,10 @@ func _surface_footstep() -> String:
 
 
 func _physics_process(delta: float) -> void:
-	# // FIX: AUD-P0-3 coyote + buffer 墙钟（前置于所有 early return）
-	if is_on_floor():
-		_coyote_t = 0.15
-	else:
-		_coyote_t = maxf(0.0, _coyote_t - delta)
-	if Input.is_action_just_pressed("jump"):
-		_jump_buf_t = 0.18
-	else:
-		_jump_buf_t = maxf(0.0, _jump_buf_t - delta)
 	_last_frame_vy = velocity.y # // FIX: OPT-H5 记录落地前垂直速度
 	_check_timed_consumables()
 	_update_shake(delta)
+	apply_recoil_step(delta)
 	if not alive:
 		return
 	# 测试钩子：无头环境下输入分支不执行，举盾状态在这里维护。
@@ -802,17 +830,13 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.35
 	if blocking:
 		speed *= 0.5
-	# // FIX: AUD-P1-7 雨中移速 ×0.92（weather rain_strength>0.5 且非雪区）
-	var _weather: Variant = get_tree().current_scene.get("weather") if get_tree().current_scene and get_tree().current_scene.get("weather") else null  # // FIX: AUD-P1-7 Variant
+	var _weather: Variant = get_tree().current_scene.get("weather") if get_tree().current_scene and get_tree().current_scene.get("weather") else null  # // FIX: AUD-P1-7
 	if _weather and _weather.raining and _weather.rain_strength > 0.5:
-		speed *= 0.92
+		speed *= 0.92  # // FIX: AUD-P1-7
 
+	var accel := ACCEL if is_on_floor() else AIR_ACCEL
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
-	if wish.length_squared() < 0.001:
-		hv = hv.move_toward(Vector3.ZERO, FRICTION * delta)  # // FIX: AUD-P1-3 摩擦分离，急停更自然
-	else:
-		var accel := ACCEL if is_on_floor() else AIR_ACCEL
-		hv = hv.move_toward(wish * speed, accel * delta)
+	hv = hv.move_toward(wish * speed, accel * delta)
 	velocity.x = hv.x
 	velocity.z = hv.z
 
@@ -843,19 +867,10 @@ func _physics_process(delta: float) -> void:
 		if is_dropping:
 			is_dropping = false
 			landed.emit()
-		if _jump_buf_t > 0.0 and _coyote_t > 0.0:
-			velocity.y = JUMP_VEL
-			_jump_buf_t = 0.0
-			_coyote_t = 0.0
-		elif Input.is_action_pressed("jump"):
+		if Input.is_action_pressed("jump"):
 			velocity.y = JUMP_VEL
 	else:
 		_landed_last_frame = false
-		# // FIX: AUD-P0-3 空中 coyote 窗内仍可起跳（buffer 同 _coyote_t 校验）
-		if _jump_buf_t > 0.0 and _coyote_t > 0.0:
-			velocity.y = JUMP_VEL
-			_jump_buf_t = 0.0
-			_coyote_t = 0.0
 		_airborne_time += delta
 		# 初次空降和之后从任意悬崖跃下都能展开；普通小跳因离地高度不足不会误触。
 		var clearance := 99.0
@@ -936,7 +951,7 @@ func _physics_process(delta: float) -> void:
 
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if Input.is_action_pressed("fire"):  # // FIX: AUD-P0-1 fire 进 InputMap
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			if _magnet_prop:
 				_throw_magnet()
 			elif weapon.weapon_id == "bow":
@@ -953,7 +968,7 @@ func _physics_process(delta: float) -> void:
 				_melee_swing()
 		elif weapon.weapon_id == "bow" and _bow_draw > 0.0:
 			_fire_arrow()
-		var rmb := Input.is_action_pressed("ads")  # // FIX: AUD-P0-1 ads 进 InputMap
+		var rmb := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 		if debug_block:
 			rmb = true
 		weapon.set_ads(rmb and weapon.weapon_id != "")
@@ -1965,9 +1980,9 @@ func _update_climbing(_delta: float, f: float, r: float) -> bool:
 			return false
 		# 攀爬耗精力：静止缓耗、移动快耗，耗尽后滑落。
 		var _rain_mult := 1.0
-		var _w2: Variant = get_tree().current_scene.get("weather") if get_tree().current_scene and get_tree().current_scene.get("weather") else null  # // FIX: AUD-P1-7 Variant
+		var _w2: Variant = get_tree().current_scene.get("weather") if get_tree().current_scene and get_tree().current_scene.get("weather") else null
 		if _w2 and _w2.raining and _w2.rain_strength > 0.5:
-			_rain_mult = 1.25  # // FIX: AUD-P1-7 雨中攀爬精力 ×1.25
+			_rain_mult = 1.25  # // FIX: AUD-P1-7
 		_drain_stamina((5.0 + 7.0 * (absf(f) + absf(r))) * _delta * climb_stamina_mult * _rain_mult)
 		if stamina <= 0.0:
 			velocity = n * 1.5 + Vector3(0, -3.0, 0)

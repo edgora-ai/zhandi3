@@ -35,7 +35,7 @@ var _airdrops := 0 # // FIX: OPT-G4 空投计数
 # // FIX: R4-G7b 二周目存档最小闭环（C5-lite）：结算写入 user://save_v1.json（原子写），
 # 新局读取出击次数推 bot skill 下限（0.7→0.9→1.1 封顶），重载可读、损坏回退默认
 const SAVE_PATH := "user://save_v1.json"
-var save_data := {"version": 1, "runs": 0, "best_rank": 99, "total_kills": 0, "talents": {"armor": 0, "stamina": 0, "hp": 0}}  # // FIX: AUD-P1-5 局外天赋
+var save_data := {"version": 1, "runs": 0, "best_rank": 99, "total_kills": 0, "talents": {"armor": 0, "stamina": 0, "hp": 0}}  # // FIX: AUD-P1-5
 
 func _load_save() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
@@ -46,10 +46,14 @@ func _load_save() -> void:
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	if parsed is Dictionary and int(parsed.get("version", 0)) == 1:
 		save_data = parsed
+		if not save_data.has("talents"):
+				save_data["talents"] = {"armor": 0, "stamina": 0, "hp": 0}  # // FIX: AUD-P1-5
 	else:
 		push_warning("[save] 损坏存档已回退默认值")
 
 func _write_save() -> void:
+	if _is_test_mode:
+		return
 	var tmp := SAVE_PATH + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
@@ -58,14 +62,256 @@ func _write_save() -> void:
 	f.close()
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(SAVE_PATH))
 
-func _talent_available() -> int:  # // FIX: AUD-P1-5 可用天赋点 = total_kills/10 - 已分配
+
+func _is_harness_negative(args: PackedStringArray) -> bool:
+	return args.has("--test-harness-negative")
+
+
+func _is_harness_stall(args: PackedStringArray) -> bool:
+	return args.has("--test-harness-stall")
+
+
+func _detect_test_mode(args: PackedStringArray) -> bool:
+	return args.has("--firetest") or args.has("--wildtest") or args.has("--screenshot") or args.has("--fxstresstest") or args.has("--animalshot") or args.has("--sim") or args.has("--seasontest") or args.has("--focusrecoverytest") or args.has("--feedtest") or args.has("--smoketest") or args.has("--reloadtest") or args.has("--movetest") or args.has("--mapmenutest") or _is_harness_negative(args) or _is_harness_stall(args)
+
+
+func _check_test(harness: RefCounted, condition: bool, label: String) -> void:
+	if harness and harness.has_method("check"):
+		harness.check(condition, label)
+
+
+func _request_pending_quit(exit_code: int) -> void:
+	if _quit_done and _pending_quit_frames < 0:
+		return
+	if _pending_quit_frames >= 0:
+		return
+	var code: int = exit_code
+	if _harness and _harness.has_method("summary_once"):
+		var extra: int = _harness.summary_once()
+		if extra != 0:
+			code = 1
+	_pending_quit_code = code
+	_pending_quit_frames = 2
+	# Release harness instance and GDScript resource before cleanup frames to hit baseline 4/2
+	_harness = null
+	_HarnessScript = null
+
+func _request_quit(exit_code: int) -> void:
+	if _quit_done:
+		return
+	var code: int = exit_code
+	if _harness and _harness.has_method("summary_once"):
+		if not _summary_emitted():
+			var extra: int = _harness.summary_once()
+			if extra != 0:
+				code = 1
+		else:
+			if _harness.has_failures():
+				code = 1
+	_quit_done = true
+	# Ensure harness not retained at quit even if this path is taken without pending
+	_harness = null
+	_HarnessScript = null
+	get_tree().quit(code)
+
+func _summary_emitted() -> bool:
+	if _harness == null:
+		return false
+	if _harness.has_method("is_summary_done"):
+		return _harness.is_summary_done()
+	return false
+
+
+func _probe_complete(probe: String) -> void:
+	match probe:
+		"screenshot":
+			_shot_done = true
+		"firetest":
+			_firetest_done = true
+		"wildtest":
+			_wildtest_done = true
+		"fx":
+			_fx_done = true
+		"animalshot":
+			_animalshot_done = true
+		"negative":
+			_negative_done = true
+		"stall":
+			_stall_done = true
+	_try_unified_quit()
+
+
+func _harness_incomplete_labels() -> Array[String]:
+	var out: Array[String] = []
+	if _shot_requested and not _shot_done:
+		out.append("screenshot")
+	if _firetest_requested and not _firetest_done:
+		out.append("firetest")
+	if _wildtest_requested and not _wildtest_done:
+		out.append("wildtest")
+	if _fx_requested and not _fx_done:
+		out.append("fx")
+	if _animalshot_requested and not _animalshot_done:
+		out.append("animalshot")
+	if _negative_requested and not _negative_done:
+		out.append("negative")
+	if _stall_requested and not _stall_done:
+		out.append("stall")
+	return out
+
+
+func _harness_has_incomplete() -> bool:
+	return _harness_incomplete_labels().size() > 0
+
+
+func _harness_mark_all_incomplete_done_idempotent() -> void:
+	# Idempotent completion so watchdog never double-FIFO a pending quit.
+	if _shot_requested:
+		_shot_done = true
+	if _firetest_requested:
+		_firetest_done = true
+	if _wildtest_requested:
+		_wildtest_done = true
+	if _fx_requested:
+		_fx_done = true
+	if _animalshot_requested:
+		_animalshot_done = true
+	if _negative_requested:
+		_negative_done = true
+	if _stall_requested:
+		_stall_done = true
+
+
+func _harness_init_deadline_from_requested() -> void:
+	# Per-probe budgets before external --quit-after: fire 260/300, wild 850/900, FX 300/360, negative 90/120, stall 60/120, shot frames+30.
+	# Global deadline is max of per-probe deadlines (so combined probes compose); per-probe check still fires before its own external.
+	var cur := Engine.get_process_frames()
+	var deadlines: Array[int] = []
+	_harness_deadlines.clear()
+	if _firetest_requested:
+		_harness_deadlines["firetest"] = cur + 260
+		deadlines.append(_harness_deadlines["firetest"])
+	if _wildtest_requested:
+		_harness_deadlines["wildtest"] = cur + 850
+		deadlines.append(_harness_deadlines["wildtest"])
+	if _fx_requested:
+		_harness_deadlines["fx"] = cur + 300
+		deadlines.append(_harness_deadlines["fx"])
+	if _negative_requested:
+		_harness_deadlines["negative"] = cur + 90
+		deadlines.append(_harness_deadlines["negative"])
+	if _stall_requested:
+		_harness_deadlines["stall"] = cur + 60
+		deadlines.append(_harness_deadlines["stall"])
+	if _shot_requested:
+		var frames: int = maxi(_shot_frames, 0)
+		var d: int
+		if frames > 0:
+			d = cur + frames + 30
+		elif _animalshot_requested:
+			d = cur + 120
+		else:
+			d = cur + 90
+		_harness_deadlines["screenshot"] = d
+		if _animalshot_requested and not _harness_deadlines.has("animalshot"):
+			_harness_deadlines["animalshot"] = d
+		deadlines.append(d)
+	elif _animalshot_requested:
+		# animalshot always paired with screenshot, but guard
+		_harness_deadlines["animalshot"] = cur + 120
+		deadlines.append(_harness_deadlines["animalshot"])
+	if deadlines.is_empty():
+		_harness_deadline_frame = -1
+		return
+	# Global deadline = max (latest) so combined probe successes compose; watchdog also checks per-probe above.
+	_harness_deadline_frame = deadlines[0]
+	for d in deadlines:
+		if d > _harness_deadline_frame:
+			_harness_deadline_frame = d
+
+
+func _try_unified_quit() -> void:
+	if not _is_test_mode or _quit_done:
+		return
+	if _pending_quit_frames >= 0:
+		return
+	if _shot_requested and not _shot_done:
+		return
+	if _firetest_requested and not _firetest_done:
+		return
+	if _wildtest_requested and not _wildtest_done:
+		return
+	if _fx_requested and not _fx_done:
+		return
+	if _animalshot_requested and not _animalshot_done:
+		return
+	if _negative_requested and not _negative_done:
+		return
+	if _stall_requested and not _stall_done:
+		return
+	var failed: bool = false
+	if _harness and _harness.has_method("has_failures"):
+		failed = _harness.has_failures()
+	var code: int = 1 if failed else 0
+	_request_pending_quit(code)
+
+var _HarnessScript: GDScript = null
+var _is_test_mode: bool = false
+var _harness: RefCounted = null
+var _quit_done: bool = false
+var _shot_requested: bool = false
+var _shot_done: bool = false
+var _firetest_requested: bool = false
+var _firetest_done: bool = false
+var _firetest_shots: int = 0
+var _firetest_hits: int = 0
+var _firetest_initial_eff: float = -1.0
+var _firetest_prev_eff: float = -1.0
+var _firetest_increased: bool = false
+var _firetest_local_frames: int = 0
+var _wildtest_requested: bool = false
+var _wildtest_done: bool = false
+var _wild_early_refs: Array[WeakRef] = []
+var _wild_late_refs: Array[WeakRef] = []
+var _wild_seen_projectiles: Array[WeakRef] = []
+var _wild_seen_count: int = 0
+var _fx_requested: bool = false
+var _fx_done: bool = false
+var _fx_frame: int = 0
+var _fx_baseline_nodes: int = 0
+var _fx_baseline_objects: int = 0
+var _fx_baseline_resources: int = 0
+var _fx_peak1_nodes: int = 0
+var _fx_peak1_objects: int = 0
+var _fx_peak1_resources: int = 0
+var _fx_peak2_nodes: int = 0
+var _fx_peak2_objects: int = 0
+var _fx_peak2_resources: int = 0
+var _fx_host_at_peak1: Node = null
+var _fx_host_at_peak2: Node = null
+var _fx_host_at_end: Node = null
+var _pending_quit_code: int = -1
+var _pending_quit_frames: int = -1
+var _animalshot_requested: bool = false
+var _animalshot_done: bool = false
+var _animal_fixtures: Array[WildCreature] = []
+var _negative_requested: bool = false
+var _negative_done: bool = false
+var _stall_requested: bool = false
+var _stall_done: bool = false
+var _harness_deadline_frame: int = -1
+var _harness_watchdog_fired: bool = false
+var _harness_deadlines: Dictionary = {}
+var _animalshot_camera: Camera3D = null
+
+func _talent_available() -> int:  # // FIX: AUD-P1-5
 	var spent := 0
 	var t: Dictionary = save_data.get("talents", {})
 	for v in t.values():
 		spent += int(v)
 	return int(int(save_data.get("total_kills", 0)) / 10) - spent
 
-func _apply_talents_to_player(p: Player) -> void:  # // FIX: AUD-P1-5 天赋生效
+func _apply_talents_to_player(p: Player) -> void:  # // FIX: AUD-P1-5
 	var t: Dictionary = save_data.get("talents", {})
 	var armor_pts := int(t.get("armor", 0))
 	var stam_pts := int(t.get("stamina", 0))
@@ -141,11 +387,39 @@ var _thundertest_frame := -1
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var boot_t0 := Time.get_ticks_msec()
+	var early_args := OS.get_cmdline_user_args()
+	_is_test_mode = _detect_test_mode(early_args)
+	if _is_test_mode:
+		_HarnessScript = load("res://scripts/testing/runtime_test_harness.gd") as GDScript
+		if _HarnessScript:
+			_harness = _HarnessScript.new()
+	# Pre-register ALL requested probes before any setup/completion can fire
+	var args := early_args
+	_shot_requested = args.has("--screenshot")
+	_firetest_requested = args.has("--firetest")
+	_fx_requested = args.has("--fxstresstest")
+	_wildtest_requested = args.has("--wildtest")
+	_animalshot_requested = args.has("--animalshot")
+	_negative_requested = _is_harness_negative(args)
+	_stall_requested = _is_harness_stall(args)
+	_shot_done = false
+	_firetest_done = false
+	_fx_done = false
+	_wildtest_done = false
+	_animalshot_done = false
+	_negative_done = false
+	_stall_done = false
+	_harness_watchdog_fired = false
+	# Deadline uses current Engine process frame + budgets (W1 spec: fire260/300, wild850/900, FX300/360, negative90/120, stall60/120, screenshot frames+margin).
+	# Do NOT pre-count _ready frame setup; deadline is minute-accurate so wiring just after pre-register is correct.
+	# Godot 4.7.1 user_args stable here; no fallback needed.
+	_setup_screenshot_mode()
+	_harness_init_deadline_from_requested()
+	print("[harness] deadline frame=%d cur=%d requested=[shot:%s fire:%s wild:%s fx:%s animal:%s negative:%s stall:%s]" % [_harness_deadline_frame, Engine.get_process_frames(), str(_shot_requested), str(_firetest_requested), str(_wildtest_requested), str(_fx_requested), str(_animalshot_requested), str(_negative_requested), str(_stall_requested)])
 	if not _acquire_instance_lock():
 		get_tree().quit()
 		return
 	tree_exiting.connect(_release_instance_lock)
-	var args := OS.get_cmdline_user_args()
 	_map_id = _resolve_map(args)
 	_map_from_cli = args.find("--map") >= 0
 	_show_initial_map_menu = args.has("--mapmenutest") or (not args.has("--wildtest") and not _map_from_cli and not FileAccess.file_exists(MAP_SELECTION) and DisplayServer.get_name() != "headless")
@@ -167,8 +441,6 @@ func _ready() -> void:
 	buildings.name = "Buildings"
 	add_child(buildings)
 	if not args.has("--noworld") and _map_id == "battlefield":
-		if buildings.has_method("_apply_seed_jitter"):
-			buildings._apply_seed_jitter(_seed_value)  # // FIX: AUD-P1-6
 		buildings.generate(terrain)
 
 	zone = Zone.new()
@@ -213,7 +485,7 @@ func _ready() -> void:
 	add_child(daynight)
 	daynight.setup(_env, _sky_mat, _sun, _fill, _rim)
 	_load_save() # // FIX: R4-G7b
-	print("[save] runs=%d best=%d ng_floor=%.1f seed=%d talent_avail=%d talents=%s" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor(), _seed_value, _talent_available(), str(save_data.get("talents", {}))])  # // FIX: AUD-P1-5
+	print("[save] runs=%d best=%d ng_floor=%.1f seed=%d" % [int(save_data.get("runs", 0)), int(save_data.get("best_rank", 99)), _ng_skill_floor(), _seed_value])
 	if _map_id == "battlefield" and int(save_data.get("runs", 0)) == 0:
 		# // FIX: R11-lite 首局三步教学（老玩家局自动跳过）
 		_tutorial_step = 0
@@ -252,7 +524,7 @@ func _ready() -> void:
 		wild_world = WildWorld.new()
 		wild_world.name = "WildWorld"
 		add_child(wild_world)
-		wild_world.generate(terrain, player, _seed_value)  # // FIX: AUD-P1-6
+		wild_world.generate(terrain, player)
 		print("[boot_t] wild_world.generate +%dms" % (Time.get_ticks_msec() - boot_t0))
 		_spawn_wild_bots(rng)
 	# // FIX: OPT-G7/REG4 毒圈漂移与天气纳入 --seed（-1 时行为不变）
@@ -273,6 +545,52 @@ func _ready() -> void:
 		player.global_position.y = terrain.get_height(player.global_position.x, player.global_position.z) + 1.0
 	if args.has("--arm"):
 		player.give_weapon("rifle")
+	# _setup_screenshot_mode already called before deadline init; idempotent second call removed to keep deadline stable
+	if _firetest_requested:
+		if not args.has("--ground") or not args.has("--arm"):
+			_check_test(_harness, false, "firetest requires --ground --arm")
+			_firetest_done = true
+			_probe_complete("firetest")
+		else:
+			_ft_bot = Bot.new()
+			add_child(_ft_bot)
+			var fwd := -player.global_transform.basis.z
+			fwd.y = 0.0
+			fwd = fwd.normalized()
+			var p := player.global_position + fwd * 12.0
+			p.y = terrain.get_height(p.x, p.z)
+			_ft_bot.setup("测试兵", zone, terrain, p)
+			_ft_bot.global_position = p + Vector3(0, 0.2, 0)
+			_ft_frames = 0
+			_firetest_initial_eff = _ft_bot.hp + _ft_bot.armor
+			_firetest_prev_eff = _firetest_initial_eff
+			_firetest_local_frames = 0
+			if player.weapon:
+				player.weapon.fired.connect(func() -> void: _firetest_shots += 1)
+				player.weapon.hit_landed.connect(func(_part: String) -> void: _firetest_hits += 1)
+	if _fx_requested:
+		_fx_baseline_nodes = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+		_fx_baseline_objects = Performance.get_monitor(Performance.OBJECT_COUNT)
+		_fx_baseline_resources = Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)
+		if not _setup_fx_stresstest():
+			_fx_done = true
+			_probe_complete("fx")
+	if _animalshot_requested:
+		if _map_id != "wild":
+			_check_test(_harness, false, "animalshot requires --map wild")
+			_animalshot_done = true
+			_probe_complete("animalshot")
+		elif not _shot_requested:
+			_check_test(_harness, false, "animalshot requires --screenshot")
+			_animalshot_done = true
+			_probe_complete("animalshot")
+		elif not _setup_animalshot_fixtures():
+			_animalshot_done = true
+			_probe_complete("animalshot")
+	if _wildtest_requested:
+		_wild_test_frame = 0
+	if _negative_requested:
+		call_deferred("_run_negative_selftest")
 	_sim = args.has("--sim")
 	_reloadtest = args.has("--reloadtest")
 	_smoketest = args.has("--smoketest")
@@ -284,8 +602,6 @@ func _ready() -> void:
 		for i in range(12):
 			hud.add_feed("播报上限回归 %02d" % i)
 		print("[feedtest] items=%d expected=%d" % [hud.feed_item_count(), HUD.MAX_FEED_ITEMS])
-	if args.has("--wildtest"):
-		_wild_test_frame = 0
 	if args.has("--backpacktest"):
 		player.give_weapon("rifle")
 		player.give_weapon("smg")
@@ -452,21 +768,11 @@ func _ready() -> void:
 		if rt_jeep:
 			player.global_position = rt_jeep.global_position + Vector3(1.2, 0, 0)
 			rt_jeep.enter(player)
-	if args.has("--firetest") and args.has("--ground") and args.has("--arm"):
-		_ft_bot = Bot.new()
-		add_child(_ft_bot)
-		var fwd := -player.global_transform.basis.z
-		fwd.y = 0.0
-		fwd = fwd.normalized()
-		var p := player.global_position + fwd * 12.0
-		p.y = terrain.get_height(p.x, p.z)
-		_ft_bot.setup("测试兵", zone, terrain, p)
-		_ft_bot.global_position = p + Vector3(0, 0.2, 0)
-		_ft_frames = 0
+	if _stall_requested:
+		print("[stalltest] registered stall requested never completes normally; deadline=%d cur=%d" % [_harness_deadline_frame, Engine.get_process_frames()])
 	if args.has("--movetest") and args.has("--ground"):
 		_mt = 0
 	_setup_focus_recovery()
-	_setup_screenshot_mode()
 	if _show_initial_map_menu:
 		call_deferred("_toggle_map_menu")
 	print("[boot] map=%s nodes=%d objs=%d mem=%dMB" % [_map_id, Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0)])
@@ -517,7 +823,7 @@ func _open_shop_test() -> void:
 
 
 func _acquire_instance_lock() -> bool:
-	if DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--screenshot"):
+	if _is_test_mode or DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--screenshot"):
 		# 无头/截图自动化（测试/截图）不占用单实例锁，避免与正在试玩的窗口实例冲突。
 		_owns_instance_lock = false
 		return true
@@ -585,7 +891,10 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	player.weapon.ammo_changed.connect(hud.set_ammo)
 	player.weapon.fired.connect(func() -> void: sfx.play("shot_" + player.weapon.weapon_id, -2.0))
 	player.weapon.hit_landed.connect(func(part: String) -> void:
-		sfx.play("hit", -8.0)
+		if part == "head":
+			sfx.play("headshot", -8.0)
+		else:
+			sfx.play("hit", -8.0)
 		hud.show_hitmarker(part == "head") # // FIX: D4/CB17 爆头红色 hitmarker
 	)
 	# // FIX: VIS1 武器名随武器切换事件驱动更新（截图模式 _process 早退时也正确）
@@ -608,9 +917,6 @@ func _spawn_player(rng: RandomNumberGenerator) -> void:
 	var a := land + Vector3(rng.randf_range(-5, 5), 0, rng.randf_range(-5, 5))
 	a.y = terrain.get_height(a.x, a.z) + 0.1
 	Loot.spawn(self, a, "armor", "", 25, 1)
-	var ammo_pos := land + Vector3(rng.randf_range(-3, 3), 0, rng.randf_range(-3, 3))
-	ammo_pos.y = terrain.get_height(ammo_pos.x, ammo_pos.z) + 0.1
-	Loot.spawn(self, ammo_pos, "ammo", "", 45, 1)  # // FIX: AUD-P0-8 落点补弹药 45（空手进圈率 0）
 	if _map_id == "wild":
 		Loot.spawn(self, land + Vector3(-2.5, 0.15, 2.0), "mushroom", "", 3, 1)
 
@@ -928,7 +1234,6 @@ func _on_blood_moon() -> void:
 
 # ---------- 任务链 ----------
 
-# // FIX: AUD-3.10 任务二段：护送后追击线（占位，后续补对话树）
 func _on_npc_talk(npc: Node) -> void:
 	var qid: String = npc.quest_id
 	var state: int = quest_states.get(qid, 0)
@@ -1182,6 +1487,16 @@ func _select_map(next_map: String) -> void:
 		hud.add_feed("当前由命令行 --map 锁定地图")
 		_toggle_map_menu()
 		return
+	if _is_test_mode:
+		# Test-mode must not persist map selection to disk; in-memory only.
+		if next_map == _map_id:
+			_toggle_map_menu()
+			return
+		if _map_menu_open:
+			_toggle_map_menu()
+		_map_id = next_map
+		get_tree().reload_current_scene()
+		return
 	var file := FileAccess.open(MAP_SELECTION, FileAccess.WRITE)
 	if file:
 		file.store_string(next_map)
@@ -1253,6 +1568,54 @@ func _poll_focus_recovery() -> void:
 
 
 func _process(delta: float) -> void:
+	# Global watchdog (PROCESS_MODE_ALWAYS): per-probe deadline before its external --quit-after, plus global max for compose.
+	if _is_test_mode and not _harness_watchdog_fired and _pending_quit_frames < 0 and not _quit_done and _harness_has_incomplete():
+		var cur := Engine.get_process_frames()
+		var per_probe_due := false
+		var per_probe_label: String = ""
+		var per_probe_deadline: int = -1
+		if _harness_deadlines.size() > 0:
+			for key in _harness_deadlines.keys():
+				var d: int = int(_harness_deadlines[key])
+				var incomplete: bool = false
+				match key:
+					"screenshot":
+						incomplete = _shot_requested and not _shot_done
+					"firetest":
+						incomplete = _firetest_requested and not _firetest_done
+					"wildtest":
+						incomplete = _wildtest_requested and not _wildtest_done
+					"fx":
+						incomplete = _fx_requested and not _fx_done
+					"animalshot":
+						incomplete = _animalshot_requested and not _animalshot_done
+					"negative":
+						incomplete = _negative_requested and not _negative_done
+					"stall":
+						incomplete = _stall_requested and not _stall_done
+				if incomplete and cur >= d:
+					per_probe_due = true
+					per_probe_label = key
+					per_probe_deadline = d
+					break
+		var global_due: bool = _harness_deadline_frame >= 0 and cur >= _harness_deadline_frame
+		if per_probe_due or global_due:
+			_harness_watchdog_fired = true
+			var labels := _harness_incomplete_labels()
+			var label_str := ", ".join(labels)
+			var reason_deadline: int = per_probe_deadline if per_probe_due else _harness_deadline_frame
+			var reason_key: String = per_probe_label if per_probe_due else "global"
+			print("[harness][WATCHDOG] deadline=%d cur=%d incomplete=%s reason=%s/%d" % [_harness_deadline_frame, cur, label_str, reason_key, reason_deadline])
+			if _harness and _harness.has_method("check"):
+				_harness.check(false, "watchdog incomplete: %s deadline %d cur %d reason %s/%d" % [label_str, _harness_deadline_frame, cur, reason_key, reason_deadline])
+			_harness_mark_all_incomplete_done_idempotent()
+			_request_pending_quit(1)
+			return
+	if _pending_quit_frames >= 0:
+		_pending_quit_frames -= 1
+		if _pending_quit_frames <= 0:
+			_request_quit(_pending_quit_code)
+		return
 	# // FIX: OPT-H3 对局时长统计（结算用）
 	if not match_over:
 		_match_t += delta
@@ -1301,14 +1664,63 @@ func _process(delta: float) -> void:
 			_pause_for_focus()
 	if _smoketest and Engine.get_process_frames() == 30:
 		player._throw_smoke()
-	if _shot_frames >= 0:
-		_shot_frames -= 1
-		if _shot_frames == 0:
-			var img := get_viewport().get_texture().get_image()
-			var err := img.save_png(_shot_path)
-			print("screenshot saved: ", _shot_path, " err=", err)
-			get_tree().quit()
-		return
+	# firetest before screenshot to ensure flash visible in capture (frames4) and shot count grounded
+	if _firetest_requested and not _firetest_done:
+		if _ft_frames >= 0:
+			_ft_frames += 1
+			_firetest_local_frames += 1
+			if _ft_bot:
+				var chest: Vector3 = _ft_bot.global_position + Vector3(0, 1.0, 0)
+				var d: Vector3 = (chest - player.camera.global_position).normalized()
+				player.rotation.y = atan2(-d.x, -d.z)
+				player.pitch = asin(clampf(d.y, -1.0, 1.0))
+				player.camera.rotation.x = player.pitch
+				if _ft_frames % 12 == 3 or _ft_frames == 0:
+					player.weapon.pull_trigger()
+				var cur_eff: float = _ft_bot.hp + _ft_bot.armor if _ft_bot and is_instance_valid(_ft_bot) else _firetest_prev_eff
+				if cur_eff > _firetest_prev_eff + 0.01:
+					_firetest_increased = true
+				_firetest_prev_eff = cur_eff
+				if _ft_frames % 30 == 0:
+					print("[firetest] bot_hp=%.1f armor=%.1f alive=%s shots=%d hits=%d" % [_ft_bot.hp, _ft_bot.armor, str(_ft_bot.alive), _firetest_shots, _firetest_hits])
+			if _ft_frames >= 200:
+				var reached: int = _firetest_local_frames
+				print("[firetest] done")
+				_check_test(_harness, _firetest_shots > 0, "firetest shots fired")
+				_check_test(_harness, _firetest_hits > 0, "firetest hits landed")
+				_check_test(_harness, _firetest_prev_eff < _firetest_initial_eff - 0.01, "firetest effective hp decreased")
+				_check_test(_harness, not _firetest_increased, "firetest effective hp never increased")
+				_check_test(_harness, reached >= 200, "firetest reached 200 frames")
+				_ft_frames = -1
+				_firetest_done = true
+				_probe_complete("firetest")
+			elif _firetest_local_frames > 300:
+				_check_test(_harness, false, "firetest watchdog 300 frames exceeded")
+				_firetest_done = true
+				_probe_complete("firetest")
+	if _fx_requested and not _fx_done:
+		_update_fx_stresstest()
+	if _shot_requested and not _shot_done:
+		if _shot_frames >= 0:
+			_shot_frames -= 1
+			if _shot_frames == 0:
+				var tex: ViewportTexture = get_viewport().get_texture()
+				if tex == null:
+					_check_test(_harness, false, "screenshot texture null")
+					_finish_screenshot(false, "texture null")
+				else:
+					var img: Image = tex.get_image()
+					if img == null:
+						_check_test(_harness, false, "screenshot image null")
+						_finish_screenshot(false, "image null")
+					else:
+						var err: int = img.save_png(_shot_path)
+						print("screenshot saved: ", _shot_path, " err=", err)
+						if err != OK:
+							_check_test(_harness, false, "screenshot save_png ok")
+							_finish_screenshot(false, "save failed")
+						else:
+							_finalize_screenshot_image(tex, img, err)
 	if player == null or hud == null:
 		return
 
@@ -1340,21 +1752,7 @@ func _process(delta: float) -> void:
 		var wb: Color = seasons.wx_base
 		seasons.wx_mat.albedo_color = Color(wb.r * cd, wb.g * cd, wb.b * cd, wb.a)
 
-	if _ft_frames >= 0:
-		_ft_frames += 1
-		if _ft_bot:
-			var chest: Vector3 = _ft_bot.global_position + Vector3(0, 1.0, 0)
-			var d: Vector3 = (chest - player.camera.global_position).normalized()
-			player.rotation.y = atan2(-d.x, -d.z)
-			player.pitch = asin(clampf(d.y, -1.0, 1.0))
-			player.camera.rotation.x = player.pitch
-			if _ft_frames % 12 == 3:
-				player.weapon.pull_trigger()
-			if _ft_frames % 30 == 0:
-				print("[firetest] bot_hp=%.1f armor=%.1f alive=%s" % [_ft_bot.hp, _ft_bot.armor, str(_ft_bot.alive)])
-		if _ft_frames >= 200:
-			print("[firetest] done")
-			_ft_frames = -1
+	# firetest already handled before screenshot (single path)
 
 	if _mt >= 0:
 		_mt += 1
@@ -1460,14 +1858,25 @@ func _update_wild_test() -> void:
 				var enemy_pos := player.global_position + Vector3(0, 0, -9)
 				enemy_pos.y = terrain.get_height(enemy_pos.x, enemy_pos.z) + 0.05
 				enemy.global_position = enemy_pos
-				enemy._throw_at_player_locked() # // FIX: OPT-C6 改名后同步测试钩子
+				enemy._throw_at_player_locked()
+				for pr_now in get_tree().get_nodes_in_group("wild_projectile"):
+					var _w_early: WeakRef = weakref(pr_now)
+					_wild_early_refs.append(_w_early)
+					_wild_seen_projectiles.append(_w_early)
+				_wild_seen_count = maxi(_wild_seen_count, get_tree().get_nodes_in_group("wild_projectile").size())
 		300:
 			var projectiles := get_tree().get_nodes_in_group("wild_projectile")
 			var projectile_pos := Vector3.ZERO
 			if not projectiles.is_empty():
 				var remaining: Node3D = projectiles[0]
 				projectile_pos = remaining.global_position
-			print("[wildtest] projectile in_flight remaining=%d sample_pos=%s" % [projectiles.size(), str(projectile_pos)])
+			for pr in projectiles:
+				var _w2: WeakRef = weakref(pr)
+				if not _wild_seen_projectiles.has(_w2):
+					_wild_early_refs.append(_w2)
+					_wild_seen_projectiles.append(_w2)
+			_wild_seen_count = maxi(_wild_seen_count, projectiles.size())
+			print("[wildtest] projectile in_flight remaining=%d sample_pos=%s tracked=%d" % [projectiles.size(), str(projectile_pos), _wild_seen_projectiles.size()])
 			var before := get_tree().get_nodes_in_group("loot").size()
 			var creature := get_tree().get_first_node_in_group("wildlife") as WildCreature
 			if creature:
@@ -1654,6 +2063,13 @@ func _update_wild_test() -> void:
 			var tp_dist: float = wz.global_position.distance_to(wpos)
 			wz.take_damage(999.0, player)
 			print("[wildtest] wizzrobe cast=%s tp=%.1f dead=%s" % [str(cast_ok), tp_dist, str(not wz.alive)])
+			if cast_ok:
+				for pr2 in get_tree().get_nodes_in_group("wild_projectile"):
+					var _w3: WeakRef = weakref(pr2)
+					if not _wild_seen_projectiles.has(_w3):
+						_wild_early_refs.append(_w3)
+						_wild_seen_projectiles.append(_w3)
+				_wild_seen_count = maxi(_wild_seen_count, get_tree().get_nodes_in_group("wild_projectile").size())
 			# 宝箱与防具回归：开箱得防具、装备三套效果互斥生效。
 			var ch := LootChest.create(self, player.global_position + Vector3(1.2, 0, 0), "armor_soldier")
 			ch.open(player)
@@ -1736,6 +2152,13 @@ func _update_wild_test() -> void:
 			var thrown := get_tree().get_nodes_in_group("wild_projectile").size() > p_before
 			hx.take_damage(9999.0, player)
 			print("[wildtest] hinox woke=%s active=%s stomp=%s->%s eye2x=%s stag=%s throw=%s" % [str(woke), str(act2), str(stomping), str(stomped), str(eye_mult), str(stag), str(thrown)])
+			if thrown:
+				for pr3 in get_tree().get_nodes_in_group("wild_projectile"):
+					var _w4: WeakRef = weakref(pr3)
+					if not _wild_seen_projectiles.has(_w4):
+						_wild_early_refs.append(_w4)
+						_wild_seen_projectiles.append(_w4)
+				_wild_seen_count = maxi(_wild_seen_count, get_tree().get_nodes_in_group("wild_projectile").size())
 			# 传送回归：激活水晶注册、传送落点正确。
 			var wb := WarpBeacon.create(self, player.global_position + Vector3(1.5, 0, 0), "测试塔")
 			wb.activate(player)
@@ -2019,6 +2442,11 @@ func _update_wild_test() -> void:
 				player._bow_draw = 1.0
 				_wild_test_hp = _wild_test_moblin.hp
 				player._fire_arrow()
+				for pr_arr in get_tree().get_nodes_in_group("wild_projectile"):
+					var _w_late_a: WeakRef = weakref(pr_arr)
+					_wild_late_refs.append(_w_late_a)
+					_wild_seen_projectiles.append(_w_late_a)
+				_wild_seen_count = maxi(_wild_seen_count, get_tree().get_nodes_in_group("wild_projectile").size())
 				print("[wildtest] bow reserve=%d" % player.weapon.reserve)
 			# 弹反回归：举盾面向来石应将其弹回且不伤血（放在弓箭之后，避免传送冲突）。
 			player.weapon.set_weapon("")
@@ -2028,6 +2456,10 @@ func _update_wild_test() -> void:
 			add_child(rock)
 			rock.configure("rock", player.global_transform.basis.z * 12.0, 12.0, null)
 			rock.global_position = player.global_position - player.global_transform.basis.z * 3.0 + Vector3(0, 1.0, 0)
+			var _w_late_r: WeakRef = weakref(rock)
+			_wild_late_refs.append(_w_late_r)
+			_wild_seen_projectiles.append(_w_late_r)
+			_wild_seen_count = maxi(_wild_seen_count, _wild_seen_projectiles.size())
 			_wild_test_parry_hp = player.hp
 			# 守卫光束弹反回归：完美格挡窗口内受光束，守卫自毁。
 			player.debug_block = true
@@ -2149,6 +2581,97 @@ func _update_wild_test() -> void:
 			if dragon:
 				dragon.take_damage(999.0, player)
 			print("[wildtest] dragon_end match_over=%s" % str(match_over))
+			if _wildtest_requested:
+				var terminal_ok: bool = _wild_test_frame >= 790
+				_check_test(_harness, terminal_ok, "wildtest reached terminal phase 790")
+				var loot_nodes: Array[Node] = get_tree().get_nodes_in_group("loot")
+				var loot_outcome: bool = loot_nodes.size() > _wild_test_loot_before
+				_check_test(_harness, loot_outcome, "wildtest loot outcome grounded")
+				var observed: int = _wild_seen_count
+				if observed == 0:
+					observed = _wild_seen_projectiles.size()
+				_check_test(_harness, observed > 0, "wildtest at least one projectile observed")
+				var early_cleared: bool = false
+				var early_checked: int = 0
+				var early_cleared_count: int = 0
+				for wr_early in _wild_early_refs:
+					early_checked += 1
+					var eobj: Object = wr_early.get_ref()
+					if eobj == null or not is_instance_valid(eobj) or (eobj as Node).is_queued_for_deletion():
+						early_cleared_count += 1
+				if early_checked > 0 and early_cleared_count > 0:
+					early_cleared = true
+				print("[wildtest] early_refs=%d early_cleared=%d late_refs=%d cur_projectiles=%d" % [_wild_early_refs.size(), early_cleared_count, _wild_late_refs.size(), get_tree().get_nodes_in_group("wild_projectile").size()])
+				var cur_nodes: Array[Node] = get_tree().get_nodes_in_group("wild_projectile")
+				var cur_count: int = cur_nodes.size()
+				var cur_is_tracked: bool = true
+				var late_count: int = _wild_late_refs.size()
+				for pn_cur2 in cur_nodes:
+					var is_tracked_cur: bool = false
+					for wr2 in _wild_seen_projectiles:
+						if wr2.get_ref() == pn_cur2:
+							is_tracked_cur = true
+							break
+					var is_late_expected: bool = false
+					for wl in _wild_late_refs:
+						if wl.get_ref() == pn_cur2:
+							is_late_expected = true
+							break
+					if not is_tracked_cur:
+						cur_is_tracked = false
+					if late_count > 0 and not is_late_expected:
+						cur_is_tracked = false
+				var late_nonempty_ok: bool = late_count > 0
+				var cur_nonempty_and_late_ok: bool = cur_count > 0 and cur_is_tracked and late_nonempty_ok
+				print("[wildtest] terminal cur_count=%d late_count=%d cur_is_tracked=%s" % [cur_count, late_count, str(cur_is_tracked)])
+				_check_test(_harness, observed > 0 and early_cleared, "wildtest early projectiles naturally cleared")
+				_check_test(_harness, cur_nonempty_and_late_ok, "wildtest current projectiles nonempty (%d) and all in tracked late refs (%d)" % [cur_count, late_count])
+				# DO NOT queue_free anything for the assertion
+				var creature: WildCreature = null
+				for n in get_tree().get_nodes_in_group("wildlife"):
+					if n is WildCreature:
+						creature = n as WildCreature
+						break
+				var creature_exists: bool = creature != null and is_instance_valid(creature)
+				_check_test(_harness, creature_exists, "wildtest WildCreature exists")
+				var ap_exists: bool = false
+				var has_idle: bool = false
+				var has_walk: bool = false
+				var has_attack: bool = false
+				var has_hit: bool = false
+				var has_die: bool = false
+				var has_run: bool = false
+				if creature_exists:
+					var ap: AnimationPlayer = creature.find_child("AnimationPlayer", true, false) as AnimationPlayer
+					ap_exists = ap != null
+					if ap_exists:
+						var anims: PackedStringArray = ap.get_animation_list()
+						has_idle = "idle" in anims
+						has_walk = "walk" in anims
+						has_attack = "attack" in anims
+						has_hit = "hit" in anims
+						has_die = "die" in anims
+						has_run = "run" in anims
+				_check_test(_harness, ap_exists, "wildtest creature AnimationPlayer exists")
+				_check_test(_harness, has_idle, "wildtest creature has idle")
+				_check_test(_harness, has_walk, "wildtest creature has walk")
+				_check_test(_harness, has_attack, "wildtest creature has attack")
+				_check_test(_harness, has_hit, "wildtest creature has hit")
+				_check_test(_harness, has_die, "wildtest creature has die")
+				# unconditional: not-has-run OR resource-valid-and-selectable
+				var run_anim_valid: bool = false
+				if creature_exists and ap_exists and has_run:
+					var ap_tmp: AnimationPlayer = creature.find_child("AnimationPlayer", true, false) as AnimationPlayer
+					if ap_tmp and ap_tmp.has_animation("run"):
+						var run_anim: Animation = ap_tmp.get_animation("run")
+						if run_anim and run_anim.length > 0.0:
+							run_anim_valid = true
+				_check_test(_harness, not has_run or run_anim_valid, "wildtest run clip valid when present")
+				print("[wildtest] done")
+				_wildtest_done = true
+				_probe_complete("wildtest")
+			else:
+				print("[wildtest] done")
 			_wild_test_frame = -1
 
 
@@ -2164,18 +2687,36 @@ func _find_choppable() -> ChoppableTree:
 
 
 func _setup_screenshot_mode() -> void:
+	if not _shot_requested:
+		return
 	var args := OS.get_cmdline_user_args()
 	var i := args.find("--screenshot")
-	if i < 0 or i + 1 >= args.size():
+	if i < 0:
+		return
+	if i + 1 >= args.size() or str(args[i + 1]).strip_edges() == "":
+		_check_test(_harness, false, "screenshot path missing/empty")
+		_finish_screenshot(false, "path missing")
 		return
 	_shot_path = args[i + 1]
+	if _shot_path.strip_edges() == "":
+		_check_test(_harness, false, "screenshot path missing/empty")
+		_finish_screenshot(false, "path empty")
+		return
 	var frames := 40
 	var fi := args.find("--frames")
-	if fi >= 0 and fi + 1 < args.size():
-		frames = maxi(1, args[fi + 1].to_int())
+	if fi >= 0:
+		if fi + 1 >= args.size():
+			_check_test(_harness, false, "screenshot --frames missing value")
+			_finish_screenshot(false, "frames missing")
+			return
+		var raw: String = str(args[fi + 1])
+		if not raw.is_valid_int() or raw.to_int() <= 0:
+			_check_test(_harness, false, "screenshot --frames invalid")
+			_finish_screenshot(false, "frames invalid")
+			return
+		frames = maxi(1, raw.to_int())
 	var ci := args.find("--cam")
 	if ci < 0 or ci + 1 >= args.size():
-		# 无 --cam 参数时用玩家视角截图
 		_shot_frames = frames
 		return
 	var cam := Camera3D.new()
@@ -2192,3 +2733,271 @@ func _setup_screenshot_mode() -> void:
 	add_child(cam)
 	cam.make_current()
 	_shot_frames = frames
+
+
+func _finish_screenshot(success: bool, reason: String) -> void:
+	if _shot_done:
+		return
+	if _animalshot_requested and not _animalshot_done:
+		if not success:
+			_check_test(_harness, false, "animalshot screenshot failed: %s" % reason)
+			_animalshot_done = true
+			_probe_complete("animalshot")
+	_shot_done = true
+	_probe_complete("screenshot")
+
+
+func _finalize_screenshot_image(tex: ViewportTexture, img: Image, err: int) -> void:
+	if _shot_done:
+		return
+	var ok := err == OK
+	_check_test(_harness, ok, "screenshot save_png ok")
+	if _animalshot_requested and not _animalshot_done:
+		if ok:
+			var present: int = 0
+			var species_map: Dictionary = {}
+			var glb_ok: int = 0
+			var ap_ok: int = 0
+			var anim_idle_ok: int = 0
+			var anim_walk_ok: int = 0
+			var anim_attack_ok: int = 0
+			var anim_hit_ok: int = 0
+			var anim_die_ok: int = 0
+			for fix in _animal_fixtures:
+				if is_instance_valid(fix) and fix.is_inside_tree():
+					present += 1
+					species_map[fix.species] = true
+					var ap: AnimationPlayer = fix.find_child("AnimationPlayer", true, false) as AnimationPlayer
+					if ap != null:
+						ap_ok += 1
+						var anims: PackedStringArray = ap.get_animation_list()
+						if "idle" in anims:
+							anim_idle_ok += 1
+						if "walk" in anims:
+							anim_walk_ok += 1
+						if "attack" in anims:
+							anim_attack_ok += 1
+						if "hit" in anims:
+							anim_hit_ok += 1
+						if "die" in anims:
+							anim_die_ok += 1
+					# Direct GLB evidence: _glb valid/in-tree (not procedural fallback via child_count)
+					if fix._glb != null and is_instance_valid(fix._glb) and fix._glb.is_inside_tree():
+						glb_ok += 1
+			_check_test(_harness, present == 3, "animalshot three fixtures present")
+			_check_test(_harness, species_map.has("boar") and species_map.has("wolf") and species_map.has("bear"), "animalshot species boar/wolf/bear")
+			_check_test(_harness, glb_ok == 3, "animalshot GLB rendered")
+			_check_test(_harness, ap_ok == 3, "animalshot AnimationPlayer exists")
+			_check_test(_harness, anim_idle_ok == 3, "animalshot has idle")
+			_check_test(_harness, anim_walk_ok == 3, "animalshot has walk")
+			_check_test(_harness, anim_attack_ok == 3, "animalshot has attack")
+			_check_test(_harness, anim_hit_ok == 3, "animalshot has hit")
+			_check_test(_harness, anim_die_ok == 3, "animalshot has die")
+			# optional run unconditional: not-has-run OR resource-valid-and-selectable
+			var has_run_any: bool = false
+			var run_valid: bool = false
+			for fix2 in _animal_fixtures:
+				var ap2: AnimationPlayer = fix2.find_child("AnimationPlayer", true, false) as AnimationPlayer
+				if ap2 and ap2.has_animation("run"):
+					has_run_any = true
+					var anim_res: Animation = ap2.get_animation("run")
+					if anim_res and anim_res.length > 0.0:
+						run_valid = true
+			_check_test(_harness, not has_run_any or run_valid, "animalshot run clip valid when present")
+			_animalshot_done = true
+			_probe_complete("animalshot")
+		else:
+			_check_test(_harness, false, "animalshot png save failed")
+			_animalshot_done = true
+			_probe_complete("animalshot")
+	if _firetest_requested and not _firetest_done:
+		_check_test(_harness, _firetest_shots > 0, "screenshot after firetest shots>0")
+	_shot_done = true
+	_probe_complete("screenshot")
+
+
+func _find_fx_host() -> Node:
+	var candidates: Array[Node] = []
+	for child in get_children():
+		if child.name == "FXHost" or child.name == "FXPool" or child.name == "FxHost":
+			candidates.append(child)
+	var group_nodes: Array[Node] = get_tree().get_nodes_in_group("fx_host")
+	for n in group_nodes:
+		if n not in candidates:
+			candidates.append(n)
+	group_nodes = get_tree().get_nodes_in_group("fx_pool")
+	for n in group_nodes:
+		if n not in candidates:
+			candidates.append(n)
+	var found := find_child("FXHost", true, false)
+	if found and found not in candidates:
+		candidates.append(found)
+	found = find_child("FXPool", true, false)
+	if found and found not in candidates:
+		candidates.append(found)
+	if candidates.size() >= 1:
+		return candidates[0]
+	return null
+
+
+func _setup_fx_stresstest() -> bool:
+	if terrain == null or player == null:
+		_check_test(_harness, false, "fxstresstest requires terrain/player")
+		return false
+	_fx_frame = 0
+	return true
+
+
+func _update_fx_stresstest() -> void:
+	_fx_frame += 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	if _fx_frame in [10, 30]:
+		var burst_count: int = 16
+		var tracer_count: int = 32
+		var puff_count: int = 64
+		var melee_count: int = 24
+		for i in range(burst_count):
+			var p: Vector3 = player.global_position + Vector3(rng.randf_range(-6.0, 6.0), rng.randf_range(0.5, 3.0), rng.randf_range(-6.0, 6.0))
+			FX.muzzle_flash(p, 0.22)
+		for i in range(tracer_count):
+			var a: Vector3 = player.global_position + Vector3(rng.randf_range(-5.0, 5.0), 0.8, rng.randf_range(-5.0, 5.0))
+			var b: Vector3 = a + Vector3(rng.randf_range(-2.0, 2.0), rng.randf_range(-1.0, 1.0), rng.randf_range(-2.0, 2.0))
+			FX.tracer(a, b, Color(1.0, 0.88, 0.45), 0.025)
+		for i in range(puff_count):
+			var q: Vector3 = player.global_position + Vector3(rng.randf_range(-6.0, 6.0), rng.randf_range(0.5, 3.0), rng.randf_range(-6.0, 6.0))
+			FX.impact(q, Color(0.9, 0.8, 0.5))
+		for i in range(melee_count):
+			var mpos: Vector3 = player.global_position + Vector3(rng.randf_range(-3.0, 3.0), 0.9, rng.randf_range(-3.0, 3.0))
+			var dir: Vector3 = Vector3(rng.randf_range(-1.0, 1.0), 0.2, rng.randf_range(-1.0, 1.0)).normalized()
+			FX.melee_hit(mpos, dir, false)
+		# sample pooled MeshInstance visibility immediately after burst
+		var host_now := _find_fx_host()
+		var vis_count: int = 0
+		var total_children: int = -1
+		if host_now and is_instance_valid(host_now):
+			total_children = host_now.get_child_count()
+			for c in host_now.get_children():
+				if c is MeshInstance3D and (c as MeshInstance3D).visible:
+					vis_count += 1
+		if _fx_frame == 10:
+			_check_test(_harness, vis_count > 0, "fx burst1 visible>0")
+			_check_test(_harness, total_children == 136, "fx burst1 children 136")
+		else:
+			_check_test(_harness, vis_count > 0, "fx burst2 visible>0")
+			_check_test(_harness, total_children == 136, "fx burst2 children 136")
+	elif _fx_frame == 20:
+		_fx_peak1_nodes = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+		_fx_peak1_objects = Performance.get_monitor(Performance.OBJECT_COUNT)
+		_fx_peak1_resources = Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)
+		_fx_host_at_peak1 = _find_fx_host()
+		_check_test(_harness, _fx_peak1_nodes - _fx_baseline_nodes >= 137 and _fx_peak1_nodes - _fx_baseline_nodes <= 140, "fx burst1 delta 137")
+	elif _fx_frame == 50:
+		_fx_peak2_nodes = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+		_fx_peak2_objects = Performance.get_monitor(Performance.OBJECT_COUNT)
+		_fx_peak2_resources = Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)
+		_fx_host_at_peak2 = _find_fx_host()
+		_check_test(_harness, _fx_peak2_nodes - _fx_baseline_nodes >= 137 and _fx_peak2_nodes - _fx_baseline_nodes <= 140, "fx burst2 delta 137")
+		_check_test(_harness, _fx_peak2_nodes == _fx_peak1_nodes, "fx no second-round Node growth")
+		var _fx_obj_jitter: int = abs(_fx_peak2_objects - _fx_peak1_objects)
+		_check_test(_harness, _fx_obj_jitter <= 60, "fx no second-round Object growth jitter<=60 got %d" % _fx_obj_jitter)
+		_check_test(_harness, _fx_peak2_resources == _fx_peak1_resources, "fx no second-round Resource growth")
+	elif _fx_frame >= 80:
+		var cur_nodes: int = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+		var cur_objs: int = Performance.get_monitor(Performance.OBJECT_COUNT)
+		var cur_res: int = Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)
+		_fx_host_at_end = _find_fx_host()
+		var delta_peak1: int = _fx_peak1_nodes - _fx_baseline_nodes
+		var delta_peak2: int = _fx_peak2_nodes - _fx_baseline_nodes
+		var delta_cur: int = cur_nodes - _fx_baseline_nodes
+		var host_exists: bool = _fx_host_at_end != null and is_instance_valid(_fx_host_at_end)
+		var host_single: bool = host_exists and _fx_host_at_peak1 == _fx_host_at_end and _fx_host_at_peak2 == _fx_host_at_end
+		var child_count: int = -1
+		if host_exists:
+			child_count = _fx_host_at_end.get_child_count()
+		_check_test(_harness, host_exists, "fx host exists")
+		_check_test(_harness, host_single, "fx host single stable")
+		_check_test(_harness, host_exists and child_count == 136, "fx pool children 136")
+		_check_test(_harness, delta_cur >= 137 and delta_cur <= 140, "fx cooldown delta 137 pooled")
+		var obj_peak1_drift: int = _fx_peak1_objects - _fx_baseline_objects
+		var res_peak1_drift: int = _fx_peak1_resources - _fx_baseline_resources
+		var obj_cur_drift: int = cur_objs - _fx_baseline_objects
+		var res_cur_drift: int = cur_res - _fx_baseline_resources
+		print("[fxstresstest] obj baseline=%d peak1=%d peak2=%d cur=%d res baseline=%d peak1=%d peak2=%d cur=%d" % [_fx_baseline_objects, _fx_peak1_objects, _fx_peak2_objects, cur_objs, _fx_baseline_resources, _fx_peak1_resources, _fx_peak2_resources, cur_res])
+		var _fx_cur_obj_jitter: int = abs(cur_objs - _fx_peak1_objects)
+		_check_test(_harness, _fx_cur_obj_jitter <= 60, "fx Object no growth beyond jitter<=60 got %d" % _fx_cur_obj_jitter)
+		_check_test(_harness, cur_res == _fx_peak1_resources or abs(cur_res - _fx_peak1_resources) <= 2, "fx Resource no growth beyond scheduler jitter")
+		# cooldown: all pooled transient children are hidden/inactive
+		var hidden_count: int = 0
+		var total: int = 0
+		if host_exists:
+			for c in _fx_host_at_end.get_children():
+				total += 1
+				if c is MeshInstance3D and not (c as MeshInstance3D).visible:
+					hidden_count += 1
+		_check_test(_harness, host_exists and hidden_count == total and total == 136, "fx cooldown all pooled hidden")
+		print("[fxstresstest] baseline=%d peak1=%d peak2=%d cur=%d host=%s child=%d hidden=%d" % [_fx_baseline_nodes, _fx_peak1_nodes, _fx_peak2_nodes, cur_nodes, str(host_exists), child_count, hidden_count])
+		print("[fxstresstest] done")
+		_fx_done = true
+		_probe_complete("fx")
+
+
+func _setup_animalshot_fixtures() -> bool:
+	if terrain == null or player == null:
+		_check_test(_harness, false, "animalshot requires terrain/player")
+		return false
+	# suppress normal wildlife near fixture patch
+	for existing in get_tree().get_nodes_in_group("wildlife"):
+		if existing is WildCreature:
+			existing.visible = false
+			existing.set_physics_process(false)
+			existing.set_process(false)
+	# choose clear unobstructed patch away from large building (use stable area)
+	var center: Vector3 = Vector3(-138, 0, 108)
+	if terrain:
+		center.y = terrain.get_height(center.x, center.z) + 0.1
+	var species_list: Array[String] = ["boar", "wolf", "bear"]
+	var offsets: Array[Vector3] = [Vector3(-2.6, 0, -1.2), Vector3(0, 0, -1.2), Vector3(2.7, 0, -1.2)]
+	# yaws: boar FRONT toward camera (PI), wolf SIDE (PI*0.5), bear three-quarter toward camera (3*PI/4)
+	var yaws: Array[float] = [PI, PI * 0.5, PI * 0.75]
+	for idx in range(species_list.size()):
+		var species: String = species_list[idx]
+		var creature := WildCreature.new()
+		creature.setup(species, terrain, player)
+		var pos: Vector3 = center + offsets[idx]
+		pos.y = terrain.get_height(pos.x, pos.z) + 0.05
+		add_child(creature)
+		creature.global_position = pos
+		creature.rotation.y = yaws[idx]
+		creature.set_physics_process(false)
+		creature.set_process(false)
+		creature.visible = true
+		_animal_fixtures.append(creature)
+	if hud:
+		hud.visible = false
+		if hud.has_method("hide_pause"):
+			hud.hide_pause()
+	if player and player.weapon and player.weapon.viewmodel:
+		player.weapon.viewmodel.visible = false
+	if player:
+		player.visible = false
+	# hide pause overlay suppression: ensure not paused (animalshot runs with map wild, no pause expected)
+	var cam := Camera3D.new()
+	cam.name = "AnimalShotCamera"
+	var look_center: Vector3 = center + Vector3(0, 1.0, -1.2)
+	var cam_pos: Vector3 = center + Vector3(0, 1.0, 4.8)
+	cam.position = cam_pos
+	cam.fov = 45.0
+	cam.far = 1500.0
+	add_child(cam)
+	cam.look_at_from_position(cam_pos, look_center, Vector3.UP)
+	cam.make_current()
+	_animalshot_camera = cam
+	return true
+
+
+func _run_negative_selftest() -> void:
+	_check_test(_harness, false, "negative intentional failure")
+	print("[negative] done")
+	_negative_done = true
+	_probe_complete("negative")

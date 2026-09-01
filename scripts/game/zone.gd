@@ -125,8 +125,8 @@ func _begin_shrink() -> void:
 
 
 func _update_wall() -> void:
-	_wall.position = Vector3(center.x, 30.0, center.y)
-	_wall.scale = Vector3(radius, 160.0, radius)
+	_wall.position = Vector3(center.x, 25.0, center.y)
+	_wall.scale = Vector3(radius, 70.0, radius)
 
 
 func _damage_tick(delta: float) -> void:

@@ -192,7 +192,7 @@ tools/
 ### 调试参数（`--` 之后传入）
 
 ```bash
-# 截图（窗口模式，N 帧后存图退出）
+# 截图（窗口模式，N 帧后存图退出，注意：无头 headless 下截图为空白，不可用于校验）
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/shot.png [--frames 2700] [--cam x,y,z,tx,ty,tz]
 # 无头模拟整场比赛并打印进度
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 30000 -- --sim
@@ -204,13 +204,25 @@ tools/Godot.app/Contents/MacOS/Godot --path . -- --seed 7
 tools/Godot.app/Contents/MacOS/Godot --path . -- --season winter
 # 直接进入指定地图（battlefield / wild）
 tools/Godot.app/Contents/MacOS/Godot --path . -- --map wild
-# 阔野完整玩法回归：背包、游泳、悬崖滑翔、骑马、投射物、掉落、摩托、吉普转向与制动
-tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 520 -- --wildtest --ground --arm --seed 7
+# 射击链路自检（headless，300 帧内完成，生成测试 bot 并开火校验命中与伤害递减）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm --seed 7
+# 阔野完整玩法回归（headless，900 帧到 terminal 790）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 900 -- --wildtest --ground --arm --seed 7
+# 特效固定池回归（headless --quit-after 360，需配合已合入的 W3 池化补丁；洁净基线下 catcher 预期 exit 1，合入 W3 后 exit 0）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 360 -- --fxstresstest --ground --arm --seed 7
+# 动物定格照（窗口 GUI，不可 headless；三只动物正/侧/three-quarter 分明，近景 180-300px，无遮挡无重叠）
+tools/Godot.app/Contents/MacOS/Godot --path . -- --map wild --animalshot --seed 7 --screenshot /tmp/animals.png --frames 90
+# 枪口焰定格照（窗口 GUI 4 帧，需 W3 已合入可见径向焰；落地应达 200 帧）
+tools/Godot.app/Contents/MacOS/Godot --path . -- --firetest --ground --arm --seed 7 --screenshot /tmp/muzzle.png --frames 4
+# 负向探针（headless，预期 exit 1，仅一次 FAIL + SUMMARY FAIL）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --test-harness-negative
+# 看门狗自检：内部约 60 帧后产生一次 watchdog FAIL+SUMMARY 并自然 exit 1，早于外部 --quit-after 120（验证 --quit-after 无法拦截的兜底）
+tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --test-harness-stall
+# 视觉调试：--pilottest（Blender 小人）、--moblintest/--liztest（敌人前摇）、--ridertest/--biketest/--jeeptest（骑乘）、--koroktest（探索精灵）
 # 地图选择与背包界面截图预览
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/map.png --mapmenutest
 tools/Godot.app/Contents/MacOS/Godot --path . -- --screenshot /tmp/backpack.png --backpacktest --map wild
-# 射击链路自检（生成测试bot并开火，打印血量）
-# 视觉调试：--pilottest（Blender 小人）、--moblintest/--liztest（敌人前摇）、--ridertest/--biketest/--jeeptest（骑乘）、--koroktest（探索精灵）
+# 射击链路自检（生成测试bot并开火，校验命中与伤害递减，安全值 300 帧）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 300 -- --firetest --ground --arm
 # 失焦恢复自检（模拟漏收恢复通知，确认暂停外定时器能自动解锁）
 tools/Godot.app/Contents/MacOS/Godot --headless --path . --quit-after 120 -- --noworld --ground --focusrecoverytest
@@ -236,8 +248,18 @@ python3 tools/gen_sfx.py   # 仅依赖 Python 标准库
 
 - `--headless --import` + `--quit-after N`：编译与运行时错误检查，每次改动必跑
 - `--screenshot`：窗口模式定时自动截图，视觉改动以图像确认（上方效果图即该命令产物）
-- `--firetest` / `--movetest`：射击链路与移动的脚本化自检
+- `--firetest`（headless --quit-after 300）：射击链路与伤害递减自检，本地 300 帧内完成
+- `--wildtest`（headless --quit-after 900）：阔野全量回归，terminal 790
+- `--fxstresstest`（headless --quit-after 360，需 W3）：固定池 137 节点/136 子/无二轮增长/可见→冷却隐藏（洁净基线 catcher exit 1，W3 后 exit 0）
+- `--animalshot`（GUI --map wild --animalshot --seed 7 --screenshot ... --frames 90）：动物定格照，需目检无重叠
+- `--screenshot --frames 4`（GUI）：枪口焰 4 帧定格，需 W3 可见径向焰
+- `--test-harness-negative`（headless --quit-after 120，预期 exit 1 且恰好一次 FAIL）：负向探针，`--test-harness-stall` 为看门狗自检（内部 60 帧，外部 120，恰好一次 watchdog FAIL+SUMMARY 并自然 exit 1）
 - `--sim`：无头模拟整场比赛（24 人 + 完整毒圈流程），可挂内存/对象数探针做压测
+
+### CI 门禁语义（防 engine --quit-after 0 掩盖）
+
+- 任何 `--firetest` / `--wildtest` / `--fxstresstest` / `--animalshot` / `--test-harness-stall` 的正向/负向判定必须同时满足**退出码**与**唯一 SUMMARY 标记**：`exit 0` 仅当恰好一次 `[test] SUMMARY PASS`，`exit 1` 仅当恰好一次 `[test] SUMMARY FAIL` 且含对应的 `FAIL` 行；仅靠 `exit 0` 会被 `--quit-after` 兜底误判。
+- 内部看门狗在 `PROCESS_MODE_ALWAYS` 的 `_process` 顶部以 `Engine.get_process_frames()` 对全局 deadline 校验（fire 约 260/300、wild 约 850/900、FX 约 300/360、negative 约 90/120、stall 约 60/120、screenshot 为 frames+余量），到期对仍未 `done` 的 requested probe 追加一次 harness `FAIL` 并经幂等的 `_harness_mark_all_incomplete_done_idempotent()` 自然 `pending-quit exit 1`，早于外部 `--quit-after`；脚本级 parse/crash 无法被拦截，README/CI 显式要求双条件。
 
 ### 真人试玩驱动修复的真实案例
 

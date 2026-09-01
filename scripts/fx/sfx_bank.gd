@@ -11,6 +11,8 @@ const SOUNDS := {
 	"shot_lmg_far": "res://assets/sfx/shot_lmg_far.wav",
 	"shot_smg": "res://assets/sfx/shot_smg.wav",
 	"hit": "res://assets/sfx/hit.wav",
+	"headshot": "res://assets/sfx/headshot.wav",
+	"animal_bird": "res://assets/sfx/animal_bird.wav",
 	"sword_whoosh": "res://assets/sfx/sword_whoosh.wav",
 	"heavy_impact": "res://assets/sfx/heavy_impact.wav",
 	"enemy_charge": "res://assets/sfx/enemy_charge.wav",

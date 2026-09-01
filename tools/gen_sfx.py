@@ -100,8 +100,8 @@ shot("shot_rifle_far.wav", 0.22, 0.060, 70.0, 0.06)
 shot("shot_dmr_far.wav", 0.40, 0.10, 55.0, 0.045)
 shot("shot_smg_far.wav", 0.16, 0.045, 85.0, 0.08)
 
-# 命中确认：短促咔哒
-write_wav("hit.wav", tone(0.05, 2400.0, 0.012, 0.35, "square"))
+# 命中确认：短促咔哒（W5：2-4kHz 瞬态，原始峰值直达 0.89 归一化上限，运行时 -8dB vs 步枪 -2dB 约 6dB 差）
+write_wav("hit.wav", tone(0.06, 3200.0, 0.013, 0.90, "square"))
 
 # 毒圈警报：两声低鸣
 alarm = mix(tone(0.28, 330.0, 0.4, 0.5), [0.0] * int(SR * 0.36) + tone(0.28, 262.0, 0.4, 0.5))
@@ -490,5 +490,18 @@ write_wav("shot_lmg.wav", lg)
 # 远距变体
 shot("shot_shotgun_far.wav", 0.38, 0.10, 48.0, 0.04)
 shot("shot_lmg_far.wav", 0.18, 0.05, 65.0, 0.06)
+
+# ---------- W5 命中/爆头/鸟鸣（追加在末尾，不消耗全局 random，保证既有输出字节一致） ----------
+# 爆头确认：比 hit 更亮、更高、双层短瞬态，短促非铃声（0.08s，3.8kHz+5.2kHz 双层方波）
+_head1 = tone(0.055, 3800.0, 0.011, 0.90, "square")
+_head2 = tone(0.040, 5600.0, 0.008, 0.55, "square")
+headshot = mix(_head1, [0.0] * int(SR * 0.018) + _head2)
+write_wav("headshot.wav", headshot)
+
+# 独立高频鸟鸣：确定性双滑音 chirp，不复用狼嚎，不消耗全局 random（固定频率）
+_b1 = sweep(0.09, 2800.0, 4200.0, 0.028, 0.42)
+_b2 = sweep(0.07, 3600.0, 5200.0, 0.022, 0.36)
+animal_bird = mix(_b1, [0.0] * int(SR * 0.095) + _b2)
+write_wav("animal_bird.wav", animal_bird)
 
 print("done")

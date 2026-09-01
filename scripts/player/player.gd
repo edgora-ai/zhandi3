@@ -149,6 +149,12 @@ var _landed_last_frame := true
 var _scan_cd := 0.0 # // FIX: H9/M17 组扫描限频 0.12s，避免每帧6组get_nodes_in_group
 var _shake_t := 0.0
 var _shake_amp := 0.0
+var _recoil_pitch: float = 0.0
+var _recoil_yaw: float = 0.0
+var _recoil_pitch_vel: float = 0.0
+var _recoil_yaw_vel: float = 0.0
+const RECOIL_STIFF: float = 64.0
+const RECOIL_DAMP: float = 16.0
 
 
 func _ready() -> void:
@@ -194,6 +200,11 @@ func _ready() -> void:
 	weapon = Weapon.new()
 	camera.add_child(weapon)
 	weapon.setup(self, true)
+	# W4: connect fired to HUD pulse without writing main.gd
+	weapon.fired.connect(func() -> void:
+		if hud:
+			hud.pulse_crosshair()
+	)
 	_build_glider()
 	_build_glide_arms()
 	_build_sword()
@@ -204,10 +215,38 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
-func add_recoil(deg: float) -> void:
-	pitch = clampf(pitch + deg_to_rad(deg), -1.45, 1.45)
-	camera.rotation.x = pitch
-	rotate_y(randf_range(-0.3, 0.3) * deg_to_rad(deg))
+func add_recoil(deg: float, yaw_deg: float = 0.0) -> void:
+	var p: float = deg_to_rad(deg)
+	var y: float = deg_to_rad(yaw_deg)
+	_recoil_pitch = clampf(_recoil_pitch + p, -0.9, 0.9)
+	_recoil_yaw = clampf(_recoil_yaw + y, -0.6, 0.6)
+	_apply_recoil_to_camera()
+
+func _apply_recoil_to_camera() -> void:
+	if camera:
+		camera.rotation.x = clampf(pitch + _recoil_pitch, -1.45, 1.45)
+		camera.rotation.y = _recoil_yaw
+
+func apply_recoil_step(dt: float) -> void:
+	# Deterministic helper for coordinator validation: critically damped spring without overshoot
+	var dt_c: float = clampf(dt, 0.0, 0.033)
+	var ap: float = -RECOIL_STIFF * _recoil_pitch - RECOIL_DAMP * _recoil_pitch_vel
+	_recoil_pitch_vel += ap * dt_c
+	_recoil_pitch += _recoil_pitch_vel * dt_c
+	var ay: float = -RECOIL_STIFF * _recoil_yaw - RECOIL_DAMP * _recoil_yaw_vel
+	_recoil_yaw_vel += ay * dt_c
+	_recoil_yaw += _recoil_yaw_vel * dt_c
+	# Snap tiny residual to avoid jitter
+	if absf(_recoil_pitch) < 0.00008 and absf(_recoil_pitch_vel) < 0.001:
+		_recoil_pitch = 0.0
+		_recoil_pitch_vel = 0.0
+	if absf(_recoil_yaw) < 0.00008 and absf(_recoil_yaw_vel) < 0.001:
+		_recoil_yaw = 0.0
+		_recoil_yaw_vel = 0.0
+	_apply_recoil_to_camera()
+
+func get_recoil_offset_deg() -> Vector2:
+	return Vector2(rad_to_deg(_recoil_pitch), rad_to_deg(_recoil_yaw))
 
 
 func get_aim_origin() -> Vector3:
@@ -254,7 +293,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENS)
 		pitch = clampf(pitch - event.relative.y * MOUSE_SENS * (0.7 if weapon.is_ads else 1.0), -1.45, 1.45)
-		camera.rotation.x = pitch
+		_apply_recoil_to_camera()
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -694,6 +733,7 @@ func _physics_process(delta: float) -> void:
 	_last_frame_vy = velocity.y # // FIX: OPT-H5 记录落地前垂直速度
 	_check_timed_consumables()
 	_update_shake(delta)
+	apply_recoil_step(delta)
 	if not alive:
 		return
 	# 测试钩子：无头环境下输入分支不执行，举盾状态在这里维护。

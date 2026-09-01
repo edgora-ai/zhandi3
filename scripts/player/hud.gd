@@ -166,7 +166,7 @@ func _build_minimap() -> void:
 		_minimap_wrap.add_child(dot)
 	_minimap_zone = ColorRect.new()
 	_minimap_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_minimap_zone.color = Color(0.25, 0.75, 1.0, 0.18)
+	_minimap_zone.color = Color(1.0, 0.55, 0.34, 0.18)
 	_minimap_wrap.add_child(_minimap_zone)
 	# // FIX: OPT-H1/FX10 下一目标圈白色虚线预览（StyleBoxFlat 圆形描边，与 zone 同源坐标）
 	_minimap_zone_next = Panel.new()
@@ -625,10 +625,18 @@ var _hit_t := 0.0 # // FIX: D4/CB17 hitmarker
 var _hit_head := false
 var _kill_t := 0.0 # // FIX: D4 击杀扩散圈
 
+var _pulse_t: float = 0.0
+
+func pulse_crosshair() -> void:
+	_pulse_t = 0.12
+	_ensure_feedback_arc()
+	_dmg_arc.queue_redraw()
+
 func show_hitmarker(headshot: bool) -> void:
 	_ensure_feedback_arc()
 	_hit_head = headshot
 	_hit_t = 0.18
+	_dmg_arc.queue_redraw()
 
 # // FIX: D4 击杀确认：准星扩散圈
 func show_kill_confirm() -> void:
@@ -657,32 +665,51 @@ func _draw_dmg_arc() -> void:
 		var r := minf(_dmg_arc.size.x, _dmg_arc.size.y) * 0.30
 		var alpha := clampf(_dmg_dir_t / 0.8, 0.0, 1.0) * 0.9
 		_dmg_arc.draw_arc(c, r, _dmg_dir_angle - 0.9, _dmg_dir_angle + 0.9, 24, Color(1.0, 0.28, 0.22, alpha), 10.0)
-	# // FIX: D4/CB17 hitmarker 四角斜刻（爆头红色）
+	# // FIX: D4/CB17 hitmarker - distinguish head/body by color plus width/size
 	if _hit_t > 0.0:
 		var a := clampf(_hit_t / 0.18, 0.0, 1.0)
-		var col := Color(1.0, 0.25, 0.20, a) if _hit_head else Color(1.0, 1.0, 1.0, a * 0.9)
-		var g := 7.0
-		var d := 11.0
+		var is_head: bool = _hit_head
+		var col: Color = Color(1.0, 0.22, 0.18, a) if is_head else Color(1.0, 1.0, 1.0, a * 0.9)
+		var w: float = 3.5 if is_head else 2.5
+		var g: float = 6.0 if is_head else 7.0
+		var d: float = 14.0 if is_head else 11.0
 		for sx in [-1.0, 1.0]:
 			for sy in [-1.0, 1.0]:
-				_dmg_arc.draw_line(c + Vector2(sx * g, sy * g), c + Vector2(sx * d, sy * d), col, 2.5)
+				_dmg_arc.draw_line(c + Vector2(sx * g, sy * g), c + Vector2(sx * d, sy * d), col, w)
 	# // FIX: D4 击杀扩散圈
 	if _kill_t > 0.0:
 		var k := 1.0 - _kill_t / 0.35
 		var kcol := Color(1.0, 0.85, 0.35, (1.0 - k) * 0.9)
 		_dmg_arc.draw_arc(c, 14.0 + k * 22.0, 0, TAU, 32, kcol, 3.0)
+	if _pulse_t > 0.0:
+		var pa: float = clampf(_pulse_t / 0.12, 0.0, 1.0)
+		_dmg_arc.draw_arc(c, 10.0, 0, TAU, 20, Color(1.0, 1.0, 1.0, pa * 0.55), 1.5)
 
 
 func _process(delta: float) -> void:
 	# // FIX: OPT-D3 方向弧倒计时与濒死红晕脉动
+	var prev_hit_active: bool = _hit_t > 0.0
+	var prev_kill_active: bool = _kill_t > 0.0
+	var prev_pulse_active: bool = _pulse_t > 0.0
 	if _dmg_dir_t > 0.0:
 		_dmg_dir_t -= delta
 	if _hit_t > 0.0:
 		_hit_t -= delta
+		if _hit_t <= 0.0:
+			_hit_t = 0.0
 	if _kill_t > 0.0:
 		_kill_t -= delta
-	if _dmg_arc and (_dmg_dir_t > 0.0 or _hit_t > 0.0 or _kill_t > 0.0):
-		_dmg_arc.queue_redraw()
+		if _kill_t <= 0.0:
+			_kill_t = 0.0
+	if _pulse_t > 0.0:
+		_pulse_t -= delta
+		if _pulse_t <= 0.0:
+			_pulse_t = 0.0
+	if _dmg_arc:
+		var any_active: bool = _dmg_dir_t > 0.0 or _hit_t > 0.0 or _kill_t > 0.0 or _pulse_t > 0.0
+		var just_expired: bool = (prev_hit_active and _hit_t == 0.0) or (prev_kill_active and _kill_t == 0.0) or (prev_pulse_active and _pulse_t == 0.0)
+		if any_active or just_expired:
+			_dmg_arc.queue_redraw()
 	if _low_hp_on and _vignette and not _danger_on:
 		_vignette.modulate.a = 0.25 + sin(Time.get_ticks_msec() * 0.006) * 0.10
 

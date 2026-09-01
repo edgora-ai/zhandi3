@@ -314,6 +314,7 @@ func set_boss_music(on: bool) -> void:
 
 # // FIX: L2 Stinger 占位（窗口可验证）— 复用已有音轨，无需外部资产；后续可替换为专用采样。 [stinger] 日志可验证
 # 关键事件：Hinox 倒下 / Boss 战胜利。调用方直接复用现有 victory/heavy_impact/defeat。
+# // FIX: AUD-3.10 Stinger 专用采样占位（hinox_down 低鼓+刮）
 func play_hinox_down_stinger(pos: Vector3 = Vector3.ZERO) -> void:
 	# // FIX: L2 占位实现：复用 victory(胜利动机) + heavy_impact(打击)，窗口通过 [stinger] hinox_down 日志验证。
 	print("[stinger] hinox_down at %s" % str(pos))
@@ -326,6 +327,7 @@ func play_hinox_down_stinger(pos: Vector3 = Vector3.ZERO) -> void:
 			play("heavy_impact", -4.0, 0.85)
 
 
+# // FIX: AUD-3.10 Stinger 专用采样占位（boss 胜利铜管）
 func play_boss_victory_stinger() -> void:
 	# // FIX: L2 占位实现：复用 victory + heavy_impact；接入点为讨伐结算（main.gd _on_dragon_killed），[stinger] boss_victory 日志可验证
 	print("[stinger] boss_victory")

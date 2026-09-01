@@ -928,6 +928,7 @@ func _on_blood_moon() -> void:
 
 # ---------- 任务链 ----------
 
+# // FIX: AUD-3.10 任务二段：护送后追击线（占位，后续补对话树）
 func _on_npc_talk(npc: Node) -> void:
 	var qid: String = npc.quest_id
 	var state: int = quest_states.get(qid, 0)

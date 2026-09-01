@@ -17,6 +17,9 @@ uniform float rain_amount : hint_range(0.0, 1.0) = 0.0;
 uniform float ice_amount : hint_range(0.0, 1.0) = 0.0;
 
 varying vec3 v_world;
+varying float v_depth;
+varying float v_n1;
+varying float v_n2;
 
 float vhash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -36,17 +39,22 @@ float terrain_h(vec2 xz) {
 }
 
 void vertex() {
+	// // FIX: AUD-P0-8 水面 varying 化（depth/n1/n2 顶点侧算，片元瘦身）
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float t = TIME * wave_speed;
 	// 两组低频行波叠加的涌浪
 	float open_water = 1.0 - ice_amount * 0.92;
 	VERTEX.y += (sin(wp.x * 0.30 + t * 1.4) * 0.11 + sin(wp.z * 0.24 - t * 1.0 + wp.x * 0.12) * 0.09) * open_water;
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float t2 = TIME * wave_speed;
+	v_depth = clamp((u_water_level - terrain_h(v_world.xz)) / 3.5, 0.0, 1.0);
+	v_n1 = vnoise(v_world.xz * 0.35 + vec2(t2 * 0.30, t2 * 0.18));
+	v_n2 = vnoise(v_world.xz * 0.18 - vec2(t2 * 0.12, t2 * 0.25));
 }
 
 void fragment() {
-	float depth = u_water_level - terrain_h(v_world.xz);
-	float d = clamp(depth / 3.5, 0.0, 1.0);
+	float depth = v_depth * 3.5;
+	float d = v_depth;
 
 	// 基础水色：浅滩绿松石 → 深水蓝
 	vec3 col = mix(color_shallow.rgb, color_deep.rgb, sqrt(d));
@@ -55,8 +63,8 @@ void fragment() {
 
 	float t = TIME * wave_speed;
 	// 表面流动波带：波峰亮、波谷暗，肉眼可见的涌动
-	float n1 = vnoise(v_world.xz * 0.35 + vec2(t * 0.30, t * 0.18));
-	float n2 = vnoise(v_world.xz * 0.18 - vec2(t * 0.12, t * 0.25));
+	float n1 = v_n1;
+	float n2 = v_n2;
 	float band = sin(v_world.x * 0.9 + v_world.z * 0.6 + (n1 + n2) * 4.0 + t * 1.8);
 	col *= 0.90 + (n1 * 0.6 + n2 * 0.4) * 0.14 + band * 0.05;
 

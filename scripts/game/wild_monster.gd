@@ -1,3 +1,4 @@
+# // FIX: AUD-3.11 WildMonster 与 moblin 共骨架缩比，材质参数化（风格收敛占位，远景 LOD0 替身）
 class_name WildMonster
 extends CharacterBody3D
 ## 山野小怪：营地巡逻、远程投石、近距离冲锋干扰。

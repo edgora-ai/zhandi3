@@ -177,6 +177,7 @@ func _update_fill_ring(c: CharacterBody3D) -> void:
 
 func _set_owner(c: CharacterBody3D) -> void:
 	owner_body = c
+	trigger_radar(5.0)  # // FIX: AUD-3.9
 	progress = 0.0
 	_progress_by = null
 	_contest_t = 0.0
@@ -199,6 +200,18 @@ func _apply_owner_color(col: Color) -> void:
 	_beam_mat.albedo_color = Color(col.r, col.g, col.b, 0.24)
 	_beam_mat.emission = col
 
+
+var _radar_until := 0.0  # // FIX: AUD-3.9 占点雷达脉冲
+var _radar_active := false
+
+func trigger_radar(duration: float = 5.0) -> void:  # // FIX: AUD-3.9
+	_radar_active = true
+	_radar_until = Time.get_ticks_msec() / 1000.0 + duration
+
+func is_radar_active() -> bool:
+	if _radar_active and Time.get_ticks_msec() / 1000.0 > _radar_until:
+		_radar_active = false
+	return _radar_active
 
 func contains(c: CharacterBody3D) -> bool:
 	return global_position.distance_to(c.global_position) < RADIUS

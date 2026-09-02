@@ -57,6 +57,7 @@ const SOUNDS := {
 	"shot_dmr_far": "res://assets/sfx/shot_dmr_far.wav",
 	"shot_smg_far": "res://assets/sfx/shot_smg_far.wav", # // FIX: R2-3 血月 stinger 此前未注册（死调用）
 	"zone_tick": "res://assets/sfx/zone_tick.wav", # // FIX: R2-8 圈外掉血专用低鸣（原复用 hit.wav）
+	"kill_confirm": "res://assets/sfx/headshot.wav", # // FIX: KC 击杀确认复用爆头双层音（无新资产）
 }
 
 var _streams := {}

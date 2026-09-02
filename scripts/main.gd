@@ -1122,6 +1122,9 @@ func _spawn_airdrop() -> void:
 
 
 func _on_combatant_died(victim: Variant, killer: Variant) -> void:
+	# // FIX: KC 击杀确认双击音（玩家击杀任何目标时）
+	if killer == player and victim != player and sfx:
+		sfx.play("kill_confirm", -4.0, 1.0)
 	var killer_name := "毒圈"
 	if killer != null:
 		killer_name = "你" if killer == player else killer.display_name

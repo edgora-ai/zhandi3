@@ -12,8 +12,8 @@ signal backpack_changed
 @export var WALK_SPEED := 5.5 # // FIX: M13 @export 魔法数抽离
 @export var SPRINT_SPEED := 8.6 # // FIX: M13
 const ACCEL := 30.0
-const AIR_ACCEL := 14.0
-const FRICTION := 18.0  # // FIX: FEEL 地面无输入摩擦
+const AIR_ACCEL := 8.0
+const FRICTION := 28.0  # // FIX: FEEL 地面无输入摩擦
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 var MOUSE_SENS := 0.0022 # // FIX: R4-U1 设置面板可调灵敏度（原 const）

@@ -233,6 +233,7 @@ func _hip_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Mate
 	snow.visible = false
 	parent.add_child(snow)
 	_snow_caps.append(snow)
+	_add_roof_collision(parent, w, h, d, y, true)
 
 
 # 人字屋顶：三棱柱网格（前向面顺时针绕序）
@@ -277,6 +278,20 @@ func _gable_roof(parent: Node3D, w: float, h: float, d: float, y: float, mat: Ma
 	snow.visible = false
 	parent.add_child(snow)
 	_snow_caps.append(snow)
+	_add_roof_collision(parent, w, h, d, y, false)
+
+
+# // FIX: ROOF 屋顶碰撞：斜屋面近似盒，防玩家/马从上方穿顶入屋
+func _add_roof_collision(parent: Node3D, w: float, h: float, d: float, y: float, _hip: bool) -> void:
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(w, maxf(h * 0.55, 0.3), d)
+	cs.shape = bs
+	cs.position = Vector3(0, y + h * 0.28, 0)
+	body.add_child(cs)
+	parent.add_child(body)
 
 
 # 带门洞的前墙：两段侧墙 + 门楣 + 木门框

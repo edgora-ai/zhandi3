@@ -78,7 +78,7 @@ func _build_collision() -> void:
 			body_col.position = Vector3(0, 1.18, 0.20)
 			body_col.rotation_degrees = Vector3(90, 0, 0)
 			var head := SphereShape3D.new()
-			head.radius = 0.68
+			head.radius = 0.62  # // FIX: HIT 头盒贴合视觉（原 0.68 大 22%，爆头虚大）
 			head_col.shape = head
 			head_col.position = Vector3(0, 1.67, -1.05)
 		"wolf":
@@ -89,7 +89,7 @@ func _build_collision() -> void:
 			body_col.position = Vector3(0, 0.84, 0.0)
 			body_col.rotation_degrees = Vector3(90, 0, 0)
 			var head := SphereShape3D.new()
-			head.radius = 0.38
+			head.radius = 0.34  # // FIX: HIT 头盒贴合视觉
 			head_col.shape = head
 			head_col.position = Vector3(0, 1.26, -1.12)
 		"bird":

@@ -493,6 +493,9 @@ func _find_visible_enemy() -> CharacterBody3D:
 		idx += 1
 		if c == self or not c.alive:
 			continue
+		# // FIX: TEAM 同队不互射（8队×3，队友是友军非敌人）
+		if squad_id >= 0 and c.get("squad_id") != null and int(c.get("squad_id")) == squad_id:
+			continue
 		var d := global_position.distance_to(c.global_position)
 		if d > best_d:
 			continue
@@ -734,7 +737,10 @@ func _fight_move() -> Vector3:
 	var fwd := to_t.normalized()
 	var side := fwd.cross(Vector3.UP) * _strafe_dir
 	var move := side
-	if dist > FIGHT_DIST + 10.0:
+	# // FIX: TACT 残血(≤40%)时后拉求生，不再原地横移送死
+	if hp < MAX_HP * 0.4 and dist < 30.0:
+		move = (side * 0.5 - fwd * 0.9).normalized()
+	elif dist > FIGHT_DIST + 10.0:
 		move = (side * 0.6 + fwd * 0.8).normalized()
 	elif dist < FIGHT_DIST - 8.0:
 		move = (side * 0.6 - fwd * 0.8).normalized()
@@ -752,6 +758,11 @@ func _fight_fire(delta: float) -> void:
 	# // FIX: OPT-A3 烟雾遮断视线即停火：目标被烟遮挡时不开火（压制弹只打最后已知位置）
 	var dist := global_position.distance_to(aim_target.global_position)
 	if dist > weapon.data.range * 0.85:
+		return
+	# // FIX: TACT 距离窗：霰弹只近战开火，DMR 只中远开火（避免 bot 近身拿霰弹/DMR 站桩）
+	if weapon.weapon_id == "shotgun" and dist > 22.0:
+		return
+	if weapon.weapon_id == "dmr" and dist < 12.0:
 		return
 	# // FIX: R4-11 烟雾压制：丢视后朝最后已知位置盲射最多 3 发（原入烟=完全无敌窗），超出即真停火
 	if _lose_sight > 0.3:
@@ -827,6 +838,11 @@ func take_damage(amount: float, from: Variant = null, part: String = "body") -> 
 	# // FIX: OPT-A3/CB5 受击不再瞬锁：非交战态进入 0.5s 警觉期（转身面向来源、不锁定不开火）；
 	# 无视线不会隔墙锁定 aim_target；交战态保持当前目标不被打扰
 	if from is Node3D and from.is_inside_tree():
+		# // FIX: TEAM 同队误伤不锁敌还击（队友流弹不算敌人）
+		var _fsq: Variant = from.get("squad_id") if from.get("squad_id") != null else -1
+		if squad_id >= 0 and int(_fsq) == squad_id:
+			_alert_t = 0.0
+			return
 		if state != State.FIGHT:
 			var sid: int = from.get_instance_id()
 			# // FIX: R2-B3 警觉压制漏洞：原每次受击都重置 0.5s 且禁射，持续开火可让 bot 永不还击

@@ -442,17 +442,28 @@ static func muzzle_flash(pos: Vector3, size: float = 0.12) -> void:
 	_ensure_flash_res()
 	if _flash_pool.is_empty():
 		return
-	var idx := -1
+	var idx: int = -1
 	for i in range(_flash_pool.size()):
 		if _flash_ttl[i] <= 0.0:
 			idx = i
 			break
 	if idx == -1:
-		idx = _flash_next
-		_flash_next = (_flash_next + 1) % FLASH_MAX
-	var mi := _flash_pool[idx]
+		# // FIX: FXP1 满池 TTL 最小偷取（原 round-robin 直接复用活体致闪烁）
+		var best: int = 0
+		var best_ttl: float = _flash_ttl[0]
+		for i in range(1, _flash_pool.size()):
+			var cur: float = _flash_ttl[i]
+			if cur < best_ttl:
+				best_ttl = cur
+				best = i
+		idx = best
+	var mi: MeshInstance3D = _flash_pool[idx]
 	if not is_instance_valid(mi):
 		return
+	# // FIX: FXP1 复用前重置 visible/scale/transparency 防闪烁
+	mi.visible = true
+	mi.scale = Vector3.ONE
+	mi.transparency = 0.0
 	mi.mesh = _flash_mesh
 	var is_player_flash := size < 0.1
 	mi.material_override = _flash_mat_player if is_player_flash else _flash_mat
@@ -475,24 +486,37 @@ static func muzzle_flash(pos: Vector3, size: float = 0.12) -> void:
 
 
 static func tracer(from: Vector3, to: Vector3, color: Color = Color(1.0, 0.88, 0.45), width: float = 0.025) -> void:
-	var dist := from.distance_to(to)
+	var dist: float = from.distance_to(to)
 	if dist < 1.0:
+		# // FIX: FXP2 近距曳光降级为小 impact puff（原直接 return 丢反馈）
+		_puff(to, color, 0.05, 1.5, 0.12)
 		return
 	_ensure_host()
 	_ensure_tracer_res()
 	if _tracer_pool.is_empty():
 		return
-	var idx := -1
+	var idx: int = -1
 	for i in range(_tracer_pool.size()):
 		if _tracer_ttl[i] <= 0.0:
 			idx = i
 			break
 	if idx == -1:
-		idx = _tracer_next
-		_tracer_next = (_tracer_next + 1) % TRACER_MAX
-	var mi := _tracer_pool[idx]
+		# // FIX: FXP1 满池 TTL 最小偷取（原 round-robin 直接复用活体致闪烁）
+		var best: int = 0
+		var best_ttl: float = _tracer_ttl[0]
+		for i in range(1, _tracer_pool.size()):
+			var cur: float = _tracer_ttl[i]
+			if cur < best_ttl:
+				best_ttl = cur
+				best = i
+		idx = best
+	var mi: MeshInstance3D = _tracer_pool[idx]
 	if not is_instance_valid(mi):
 		return
+	# // FIX: FXP1 复用前重置 visible/scale/transparency 防闪烁
+	mi.visible = true
+	mi.scale = Vector3.ONE
+	mi.transparency = 0.0
 	mi.mesh = _tracer_mesh
 	var mat := _get_tracer_mat(color)
 	mi.material_override = mat
@@ -606,28 +630,39 @@ static func melee_hit(pos: Vector3, attack_dir: Vector3, heavy: bool = false) ->
 	var streak_len := 0.34 if heavy else 0.24
 	var outward_dist := 0.75 if heavy else 0.52
 	for i in range(count):
-		var angle := TAU * float(i) / float(count)
-		var outward := (right * cos(angle) + Vector3.UP * sin(angle)).normalized()
-		var start := pos + outward * 0.10
-		var end := pos + outward * outward_dist
-		var idx := -1
+		var angle: float = TAU * float(i) / float(count)
+		var outward: Vector3 = (right * cos(angle) + Vector3.UP * sin(angle)).normalized()
+		var start: Vector3 = pos + outward * 0.10
+		var end: Vector3 = pos + outward * outward_dist
+		var idx: int = -1
 		for k in range(_melee_pool.size()):
 			if _melee_ttl[k] <= 0.0:
 				idx = k
 				break
 		if idx == -1:
-			idx = _melee_next
-			_melee_next = (_melee_next + 1) % MELEE_POOL_MAX
-		var mi := _melee_pool[idx]
+			# // FIX: FXP1 满池 TTL 最小偷取（原 round-robin 直接复用活体致闪烁）
+			var best: int = 0
+			var best_ttl: float = _melee_ttl[0]
+			for k in range(1, _melee_pool.size()):
+				var cur: float = _melee_ttl[k]
+				if cur < best_ttl:
+					best_ttl = cur
+					best = k
+			idx = best
+		var mi: MeshInstance3D = _melee_pool[idx]
 		if not is_instance_valid(mi):
 			continue
+		# // FIX: FXP1 复用前重置 visible/scale/transparency 防闪烁
+		mi.visible = true
+		mi.scale = Vector3.ONE
+		mi.transparency = 0.0
 		mi.mesh = base_mesh
 		mi.material_override = base_mat
 		mi.scale = Vector3(1, 1, streak_len)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.global_position = start
-		var look_target := pos + outward
-		var up2 := Vector3.UP if absf(outward.dot(Vector3.UP)) < 0.95 else Vector3.FORWARD
+		var look_target: Vector3 = pos + outward
+		var up2: Vector3 = Vector3.UP if absf(outward.dot(Vector3.UP)) < 0.95 else Vector3.FORWARD
 		mi.look_at(look_target, up2)
 		mi.transparency = 0.0
 		mi.visible = true
@@ -695,17 +730,28 @@ static func _puff(pos: Vector3, color: Color, radius: float, grow: float, life: 
 		mat = m
 	if _puff_pool.is_empty():
 		return
-	var idx := -1
+	var idx: int = -1
 	for i in range(_puff_pool.size()):
 		if _puff_ttl[i] <= 0.0:
 			idx = i
 			break
 	if idx == -1:
-		idx = _puff_next
-		_puff_next = (_puff_next + 1) % PUFF_MAX
-	var mi := _puff_pool[idx]
+		# // FIX: FXP1 满池 TTL 最小偷取（原 round-robin 直接复用活体致闪烁）
+		var best: int = 0
+		var best_ttl: float = _puff_ttl[0]
+		for i in range(1, _puff_pool.size()):
+			var cur: float = _puff_ttl[i]
+			if cur < best_ttl:
+				best_ttl = cur
+				best = i
+		idx = best
+	var mi: MeshInstance3D = _puff_pool[idx]
 	if not is_instance_valid(mi):
 		return
+	# // FIX: FXP1 复用前重置 visible/scale/transparency 防闪烁
+	mi.visible = true
+	mi.scale = Vector3.ONE
+	mi.transparency = 0.0
 	mi.mesh = s
 	mi.material_override = mat as Material
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

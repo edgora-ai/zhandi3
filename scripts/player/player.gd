@@ -982,7 +982,7 @@ func _physics_process(delta: float) -> void:
 
 	# 武器输入（持续按住）
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		if Input.is_action_pressed("fire"):  # // FIX: INP fire InputMap
 			if _magnet_prop:
 				_throw_magnet()
 			elif weapon.weapon_id == "bow":
@@ -999,7 +999,7 @@ func _physics_process(delta: float) -> void:
 				_melee_swing()
 		elif weapon.weapon_id == "bow" and _bow_draw > 0.0:
 			_fire_arrow()
-		var rmb := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+		var rmb := Input.is_action_pressed("ads")  # // FIX: INP ads 走 InputMap（手柄可用）
 		if debug_block:
 			rmb = true
 		weapon.set_ads(rmb and weapon.weapon_id != "")

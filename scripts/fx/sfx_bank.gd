@@ -66,6 +66,7 @@ var _pool_3d: Array[AudioStreamPlayer3D] = []
 var _idx_2d := 0
 var _idx_3d := 0
 var _print_budget := 40 # // FIX: FX18/E2 日志限量：默认只打前 40 条，--verbose-sfx 恢复全量
+var _hit_player: AudioStreamPlayer  # // FIX: HITP 命中专属通道（防枪声抢占）
 var _music_player: AudioStreamPlayer
 var _ambience_player: AudioStreamPlayer
 var _boss_player: AudioStreamPlayer
@@ -93,6 +94,10 @@ func _ready() -> void:
 		p.bus = "SFX"
 		add_child(p)
 		_pool_2d.append(p)
+	# // FIX: HITP 命中/爆头专属通道（连发枪声占满池时不丢命中反馈）
+	_hit_player = AudioStreamPlayer.new()
+	_hit_player.bus = "SFX"
+	add_child(_hit_player)
 	for i in range(16):
 		var p := AudioStreamPlayer3D.new()
 		p.bus = "SFX"
@@ -142,6 +147,14 @@ func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 		return
 	if _streams[name] == null:
 		print("[sfx] WARN null stream: ", name)
+		return
+	# // FIX: HITP hit/headshot 走专属通道，永远盖过枪声
+	if name in ["hit", "headshot", "kill_confirm"] and _hit_player:
+		_hit_player.stream = _streams[name]
+		_hit_player.volume_db = volume_db
+		_hit_player.pitch_scale = pitch * randf_range(0.97, 1.03)
+		_hit_player.play()
+		_log("[sfx] hit play %s" % name)
 		return
 	var p := _pick_2d()
 	p.bus = _bus_for(name)
@@ -348,6 +361,9 @@ func _exit_tree() -> void:
 	for p in _pool_3d:
 		p.stop()
 		p.stream = null
+	if _hit_player:
+		_hit_player.stop()
+		_hit_player.stream = null
 	if _music_player:
 		_music_player.stop()
 		_music_player.stream = null

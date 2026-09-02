@@ -632,7 +632,7 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 				_gallop_cd = 0.32
 				var _sfx_hg := get_tree().get_first_node_in_group("sfx_bank")
 				if _sfx_hg:
-					_sfx_hg.play_at("heavy_impact", global_position, -14.0, randf_range(0.92, 1.08))
+					_sfx_hg.play_at("footstep_sand", global_position, -13.0, randf_range(0.7, 0.8))  # // FIX: HOOF 蹄声独立
 		elif speed_ratio > 0.4:
 			_play(&"trot")
 			_gallop_cd -= delta * 0.5
@@ -640,7 +640,7 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 				_gallop_cd = 0.45
 				var _sfx_ht := get_tree().get_first_node_in_group("sfx_bank")
 				if _sfx_ht:
-					_sfx_ht.play_at("heavy_impact", global_position, -16.0, randf_range(0.88, 1.02))
+					_sfx_ht.play_at("footstep_sand", global_position, -15.0, randf_range(0.65, 0.75))  # // FIX: HOOF
 		elif actual_speed > 0.15:
 			_play(&"walk")
 		else:

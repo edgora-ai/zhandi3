@@ -158,6 +158,13 @@ func _apply() -> void:
 	if blood_moon:
 		_sun.light_color = Color(1.0, 0.22, 0.15)
 		_sun.light_energy = 0.35
+		# // FIX: BM 血月 rim/fill 转红压暗（原角色剪影仍冷白）
+		if _fill:
+			_fill.light_color = Color(0.5, 0.12, 0.10)
+			_fill.light_energy = lerpf(0.06, 0.42, day) * 0.35
+		if _rim:
+			_rim.light_color = Color(1.0, 0.18, 0.10)
+			_rim.light_energy = lerpf(0.10, 0.35, day) * 0.30
 		return
 	_sun.light_energy = lerpf(0.14, 1.15, day)
 	_fill.light_energy = lerpf(0.06, 0.42, day)

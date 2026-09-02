@@ -709,15 +709,17 @@ func _trigger_shake(amp: float, dur: float) -> void: # // FIX: M11 命中/爆炸
 	_shake_t = maxf(_shake_t, dur)
 
 func _update_shake(delta: float) -> void: # // FIX: M11 镜头抖动更新（h/v_offset 随强度衰减）
+	# // FIX: SHAKE 阻尼正弦（原每帧白噪=雪花）：相位递增的正弦包络，方向感统一
+	_shake_t -= delta
 	if _shake_t > 0.0 and camera:
-		_shake_t -= delta
 		var k := _shake_t / 0.28
-		camera.h_offset = randf_range(-1.0, 1.0) * _shake_amp * k
-		camera.v_offset = randf_range(-1.0, 1.0) * _shake_amp * k
-		if _shake_t <= 0.0:
-			camera.h_offset = 0.0
-			camera.v_offset = 0.0
-			_shake_amp = 0.0
+		var ph := _shake_t * 42.0
+		camera.h_offset = sin(ph) * _shake_amp * k
+		camera.v_offset = cos(ph * 0.83) * _shake_amp * 0.7 * k
+	else:
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
+		_shake_amp = 0.0
 
 
 # // FIX: OPT-E1/REG2 地面材质判定：近水→沙/水花，高处/雪线→沙石，其余草地（按高度/水线启发式）

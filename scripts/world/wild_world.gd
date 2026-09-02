@@ -200,10 +200,16 @@ func _ground(p: Vector3, offset: float = 0.0) -> Vector3:
 	return p
 
 
+var _shared_box: Dictionary = {}  # // FIX: SHARED BoxMesh 按尺寸缓存（wild_world 数百 new -> 去重）
+
 func _part(size: Vector3, mat: Material, pos: Vector3, parent: Node3D, rot: Vector3 = Vector3.ZERO) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
+	var key := Vector3i(size * 1000.0)
+	var mesh: BoxMesh = _shared_box.get(key)
+	if mesh == null:
+		mesh = BoxMesh.new()
+		mesh.size = size
+		_shared_box[key] = mesh
 	mi.mesh = mesh
 	mi.material_override = mat
 	mi.position = pos

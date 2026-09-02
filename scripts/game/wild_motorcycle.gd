@@ -24,6 +24,7 @@ var _camera: Camera3D
 var _wheels: Array[MeshInstance3D] = []
 var _front_fork: Node3D
 var _core: MeshInstance3D
+var _engine: AudioStreamPlayer3D  # // FIX: MOTOE 引擎音
 var _steer := 0.0
 var _camera_yaw := 0.0
 var _camera_pitch := -0.22
@@ -295,6 +296,20 @@ func enter(p: Player) -> void:
 	_rider.visible = true
 	driver.set_deferred("collision_layer", 0)
 	driver.set_deferred("collision_mask", 0)
+	# // FIX: MOTOE 引擎循环（摩托 pitch 高）
+	if _engine == null:
+		var es := load("res://assets/sfx/engine_loop.wav") as AudioStreamWAV
+		if es:
+			es.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			es.loop_end = int(es.get_length() * es.mix_rate)
+		_engine = AudioStreamPlayer3D.new()
+		_engine.stream = es
+		_engine.bus = "SFX"
+		_engine.volume_db = -14.0
+		_engine.max_distance = 60.0
+		add_child(_engine)
+	if _engine:
+		_engine.play()
 	_camera_yaw = 0.0
 	_camera_pitch = -0.22
 	_camera_idle = 0.0
@@ -306,6 +321,8 @@ func exit() -> void:
 		return
 	var p := driver
 	driver = null
+	if _engine:
+		_engine.stop()  # // FIX: MOTOE
 	speed = 0.0
 	velocity = Vector3.ZERO
 	p.global_position = _find_safe_exit(global_position + global_transform.basis.x * 1.55 + Vector3(0, 0.35, 0)) # // FIX: H17 固定偏移→安全落点
@@ -362,7 +379,7 @@ func _physics_process(delta: float) -> void:
 	if wish.length_squared() > 0.01 and speed > 0.25:
 		var target_yaw := atan2(-wish.x, -wish.z)
 		var yaw_diff := wrapf(target_yaw - rotation.y, -PI, PI)
-		var max_turn := lerpf(2.2, 0.85, speed_ratio) * delta
+		var max_turn := lerpf(TURN_SPEED * 1.4, TURN_SPEED * 0.55, pow(speed_ratio, 1.5)) * delta  # // FIX: TURN 指数衰减统一马方案
 		rotation.y += clampf(yaw_diff, -max_turn, max_turn)
 		_steer = clampf(yaw_diff * 1.5, -1.0, 1.0)
 	elif absf(side_input) > 0.05 and absf(throttle) <= 0.05:
@@ -409,6 +426,10 @@ func _physics_process(delta: float) -> void:
 	if driver:
 		driver.global_position = global_position + global_transform.basis * Vector3(0, 1.38, 0.24)
 		driver.rotation.y = rotation.y
+		if _engine:  # // FIX: MOTOE 怠速 0.85x 全速 1.65x
+			var _spd := clampf(absf(speed) / TOP_SPEED, 0.0, 1.0)
+			_engine.pitch_scale = lerpf(0.85, 1.65, _spd)
+			_engine.volume_db = lerpf(-16.0, -9.0, _spd)
 	_update_camera(delta, speed_ratio)
 
 

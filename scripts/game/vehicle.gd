@@ -393,7 +393,7 @@ func _physics_process(delta: float) -> void:
 	_steer = move_toward(_steer, turn_input, delta * 4.2)
 	var speed_ratio := clampf(absf(speed) / TOP_SPEED, 0.0, 1.0)
 	if absf(speed) > 0.35:
-		var steering_rate := lerpf(TURN_RATE, 0.72, speed_ratio)
+		var steering_rate := lerpf(TURN_RATE * 1.4, TURN_RATE * 0.55, pow(speed_ratio, 1.5))  # // FIX: TURN 指数衰减统一马方案
 		rotation.y -= _steer * steering_rate * delta * signf(speed)
 
 	var forward := -global_transform.basis.z

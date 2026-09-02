@@ -217,7 +217,8 @@ func _physics_process(delta: float) -> void:
 			f = debug_forward
 		var target := f * SPEED
 		var cur := Vector2(velocity.x, velocity.z).length() * signf(velocity.dot(-global_transform.basis.z))
-		cur = move_toward(cur, target, 4.0 * delta)
+		# // FIX: RAFT 惯性：加速快(5.5)/减速慢(2.8)，松手滑行
+		cur = move_toward(cur, target, (5.5 if absf(target) > absf(cur) else 2.8) * delta)
 		rotation.y -= r * TURN * delta * (1.0 if cur >= 0.0 else -1.0)
 		var forward := -global_transform.basis.z
 		forward.y = 0.0
@@ -227,7 +228,9 @@ func _physics_process(delta: float) -> void:
 		if terrain:
 			var next := global_position + velocity * delta * 1.5
 			if terrain.get_height(next.x, next.z) > Terrain.WATER_LEVEL + 0.1:
-				velocity = Vector3.ZERO
+				# // FIX: RAFT 岸线缓停（原瞬停）
+				cur = move_toward(cur, 0.0, 3.0 * delta)
+				velocity = forward.normalized() * cur
 		move_and_slide()
 		global_position.y = Terrain.WATER_LEVEL + 0.05
 		driver.global_position = global_position + Vector3(0, 0.7, 0)

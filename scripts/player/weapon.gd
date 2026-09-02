@@ -12,35 +12,35 @@ const WEAPONS: Dictionary = {
 	"rifle": {
 		"label": "突击步枪", "damage": 12.0, "head_mult": 2.0, "rpm": 540.0,
 		"mag": 30, "start_reserve": 90, "spread": 1.3, "ads_spread": 0.45,
-		"reload": 1.8, "auto": true, "zoom": 1.3, "range": 220.0, "recoil": 0.62,  # // FIX: RC recoil 增强可压枪
+		"reload": 1.8, "auto": true, "zoom": 1.3, "range": 220.0, "recoil": 0.95,  # // FIX: RC2
 		"falloff_start": 120.0, "falloff_end": 220.0, "falloff_min": 0.75,
 		"bloom_add": 0.12, "bloom_cap": 0.90, "bloom_recovery": 0.7, "ads_bloom_scale": 0.50,
 	},
 	"dmr": {
 		"label": "射手步枪", "damage": 35.0, "head_mult": 2.2, "rpm": 150.0,
 		"mag": 12, "start_reserve": 36, "spread": 0.8, "ads_spread": 0.12,
-		"reload": 2.1, "auto": false, "zoom": 2.4, "range": 350.0, "recoil": 1.55,  # // FIX: RC
+		"reload": 2.1, "auto": false, "zoom": 2.4, "range": 350.0, "recoil": 1.85,  # // FIX: RC2
 		"falloff_start": 250.0, "falloff_end": 350.0, "falloff_min": 0.85,
 		"bloom_add": 0.22, "bloom_cap": 0.65, "bloom_recovery": 0.45, "ads_bloom_scale": 0.35,
 	},
 	"smg": {
 		"label": "冲锋枪", "damage": 8.0, "head_mult": 1.8, "rpm": 800.0,
 		"mag": 36, "start_reserve": 108, "spread": 2.0, "ads_spread": 1.0,
-		"reload": 1.5, "auto": true, "zoom": 1.15, "range": 130.0, "recoil": 0.38,  # // FIX: RC
+		"reload": 1.5, "auto": true, "zoom": 1.15, "range": 130.0, "recoil": 0.55,  # // FIX: RC2
 		"falloff_start": 60.0, "falloff_end": 130.0, "falloff_min": 0.40,
 		"bloom_add": 0.18, "bloom_cap": 1.25, "bloom_recovery": 1.6, "ads_bloom_scale": 0.55,
 	},
 	"shotgun": {
 		"label": "霰弹枪", "damage": 8.0, "head_mult": 1.5, "rpm": 75.0,
 		"mag": 6, "start_reserve": 24, "spread": 4.5, "ads_spread": 3.0,
-		"reload": 2.4, "auto": false, "zoom": 1.1, "range": 40.0, "recoil": 1.9,  # // FIX: RC
+		"reload": 2.4, "auto": false, "zoom": 1.1, "range": 40.0, "recoil": 2.2,  # // FIX: RC2
 		"pellets": 7, "falloff_start": 10.0, "falloff_end": 25.0, "falloff_min": 0.25,
 		"bloom_add": 0.28, "bloom_cap": 0.80, "bloom_recovery": 0.3, "ads_bloom_scale": 0.70,
 	},
 	"lmg": {
 		"label": "轻机枪", "damage": 11.0, "head_mult": 1.6, "rpm": 480.0,
 		"mag": 60, "start_reserve": 120, "spread": 2.2, "ads_spread": 0.9,
-		"reload": 3.6, "auto": true, "zoom": 1.2, "range": 200.0, "recoil": 0.7,  # // FIX: RC
+		"reload": 3.6, "auto": true, "zoom": 1.2, "range": 200.0, "recoil": 0.95,  # // FIX: RC2
 		"falloff_start": 110.0, "falloff_end": 200.0, "falloff_min": 0.7,
 		"bloom_add": 0.14, "bloom_cap": 1.35, "bloom_recovery": 0.9, "ads_bloom_scale": 0.55,
 	},
@@ -500,7 +500,7 @@ func _try_fire() -> void:
 		# Small bounded noise only
 		pitch_deg += randf_range(-0.025, 0.025)
 		var yaw_deg: float = yaw_bias + randf_range(-0.032, 0.032)
-		var ads_scale: float = 0.6 if is_ads else 1.0
+		var ads_scale: float = 0.75 if is_ads else 1.0  # // FIX: ADS 缩放 0.75
 		pitch_deg *= ads_scale
 		yaw_deg *= ads_scale
 		owner_body.add_recoil(pitch_deg, yaw_deg)

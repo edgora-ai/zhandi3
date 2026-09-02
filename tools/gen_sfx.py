@@ -510,4 +510,10 @@ _b2 = sweep(0.07, 3600.0, 5200.0, 0.022, 0.36)
 animal_bird = mix(_b1, [0.0] * int(SR * 0.095) + _b2)
 write_wav("animal_bird.wav", animal_bird)
 
+# // FIX: HOOF 独立蹄声（短促木质叩击 120Hz + 1.4kHz click，区别于 footstep_sand 噪声床）
+_hoof1 = tone(0.05, 120.0, 0.025, 0.9)
+_hoof2 = tone(0.02, 1400.0, 0.008, 0.35, "square")
+hoof = mix(_hoof1, [0.0] * int(SR * 0.006) + _hoof2)
+write_wav("footstep_hoof.wav", hoof)
+
 print("done")

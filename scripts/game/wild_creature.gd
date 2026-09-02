@@ -372,8 +372,9 @@ func _die(from: Variant) -> void:
 		_play(&"die")
 	else:
 		# // FIX: DIE 无死亡剪辑时侧躺倒地（原停在站姿=“卡住”），0.9s 后回收
-		rotation.x = lerpf(rotation.x, -PI * 0.5, 0.5)
-		scale.y = 0.35
+		var tw_d := create_tween()
+		tw_d.tween_property(self, "rotation:x", -PI * 0.5, 0.35).set_trans(Tween.TRANS_SINE)
+		tw_d.parallel().tween_property(self, "position:y", global_position.y - 0.25, 0.35)
 	await get_tree().create_timer(0.9).timeout
 	if is_inside_tree() and not is_queued_for_deletion():
 		queue_free()

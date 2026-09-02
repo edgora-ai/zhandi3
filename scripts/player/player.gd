@@ -908,6 +908,12 @@ func _physics_process(delta: float) -> void:
 			_drain_stamina(5.0 * delta)
 			if stamina <= 0.0:
 				_set_gliding(false)
+				# // FIX: GLID 滑翔耗尽提示（仅边沿一次）
+				if hud:
+					hud.add_feed("精力耗尽，滑翔中断！")
+				var _sfx_g := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_g:
+					_sfx_g.play("dodge_whoosh", -6.0, 0.7)
 			# 旷野式滑翔：始终向前飘；W 俯冲提速但下降更快，S 减速缓降，A/D 转向。
 			var glide_forward := -global_transform.basis.z
 			glide_forward.y = 0.0

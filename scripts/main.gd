@@ -1631,7 +1631,7 @@ func _process(delta: float) -> void:
 		if _tutorial_t <= 0.0:
 			match _tutorial_step:
 				0:
-					hud.add_feed("教学 1/3：移动 WASD，鼠标视角；空格跳跃")
+					hud.add_feed("教学 1/3：移动 WASD，鼠标视角；空格 跳跃/展开滑翔")
 					_tutorial_step = 1
 					_tutorial_t = 10.0
 				1:

@@ -19,6 +19,7 @@ var _legs: Array[Node3D] = []
 var _wings: Array[Node3D] = []
 var _home := Vector3.ZERO
 var _alert_left := -1.0
+var _flee_lock := 0.0  # // FIX: FLEE 逃跑锚点锁定（防每 1.2-2.8s 乱转向）
 var _alerted := false
 var _glb: Node3D
 var _ap: AnimationPlayer
@@ -365,11 +366,15 @@ func _die(from: Variant) -> void:
 		from.give_rupees(5 if species == "bear" else 2 if species == "wolf" else 1)
 	var meat_count := 1 if species == "bird" else 4 if species == "bear" else 2
 	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.25, 0), "meat", "", meat_count, 1)
-	if _ap:
+	collision_layer = 0
+	collision_mask = 0
+	if _ap and _ap.has_animation(&"die"):
 		_play(&"die")
-		collision_layer = 0
-		collision_mask = 0
-		await get_tree().create_timer(0.9).timeout
+	else:
+		# // FIX: DIE 无死亡剪辑时侧躺倒地（原停在站姿=“卡住”），0.9s 后回收
+		rotation.x = lerpf(rotation.x, -PI * 0.5, 0.5)
+		scale.y = 0.35
+	await get_tree().create_timer(0.9).timeout
 	if is_inside_tree() and not is_queued_for_deletion():
 		queue_free()
 
@@ -451,6 +456,7 @@ func _physics_process(delta: float) -> void:
 		return
 	rotation.x = lerpf(rotation.x, 0.0, delta * 6.0)
 	_think_time -= delta
+	_flee_lock = maxf(0.0, _flee_lock - delta)  # // FIX: FLEE
 	if _think_time < 0.0:
 		_think_time = 0.0
 	if do_ai and _think_time <= 0.0:
@@ -458,7 +464,19 @@ func _physics_process(delta: float) -> void:
 		if aggressive:
 			_move_target = player.global_position
 		elif distance < 15.0:
-			_move_target = global_position + (global_position - player.global_position).normalized() * 18.0
+			# // FIX: FLEE 逃跑方向一次确定并锁 4s（玩家移动不再导致每周期乱转向）；目标钳在 home 60m 内避免越逃越远
+			if _flee_lock <= 0.0 or _move_target.distance_to(global_position) < 2.0:
+				var flee_dir := (global_position - player.global_position)
+				flee_dir.y = 0.0
+				if flee_dir.length_squared() < 0.01:
+					flee_dir = Vector3(randf_range(-1,1), 0, randf_range(-1,1))
+				flee_dir = flee_dir.normalized()
+				var cand := global_position + flee_dir * randf_range(20.0, 30.0)
+				var to_home := cand - _home
+				if to_home.length() > 60.0:
+					cand = _home + to_home.normalized() * 55.0
+				_move_target = cand
+				_flee_lock = 4.0
 		else:
 			_move_target = _home + Vector3(randf_range(-18, 18), 0, randf_range(-18, 18))
 	var direction := _move_target - global_position

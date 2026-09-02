@@ -722,13 +722,11 @@ func _update_shake(delta: float) -> void: # // FIX: M11 镜头抖动更新（h/v
 
 # // FIX: OPT-E1/REG2 地面材质判定：近水→沙/水花，高处/雪线→沙石，其余草地（按高度/水线启发式）
 func _surface_footstep() -> String:
-	var y := global_position.y
-	if is_on_floor() and y < Terrain.WATER_LEVEL + 0.35:
+	# // FIX: STEP 用 terrain.surface_at 真实材质（替换海拔启发式；雪/沙/岩/草地同源）
+	if is_on_floor() and global_position.y < Terrain.WATER_LEVEL + 0.35:
 		return "footstep_water"
-	if y < Terrain.WATER_LEVEL + 1.4:
-		return "footstep_sand"
-	if terrain and y > Terrain.WATER_LEVEL + 26.0:
-		return "footstep_sand"
+	if terrain and terrain.has_method("surface_at"):
+		return terrain.surface_at(global_position.x, global_position.z)
 	return "footstep_grass"
 
 

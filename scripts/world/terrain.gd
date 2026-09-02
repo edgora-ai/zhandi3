@@ -356,6 +356,22 @@ func _build_road_mask() -> void:
 
 
 # // FIX: OPT-F6/TA7 公开道路临近查询（供植被过滤，路面 4.2m 内不种草）
+# // FIX: STEP 真实地表材质查询（玩家/bot 脚步共用，替换海拔启发式）
+func surface_at(x: float, z: float) -> String:
+	if profile == "wild":
+		var d_snow := Vector2(x, z).distance_to(Vector2(-166, -142))
+		if (1.0 - smoothstep(55.0, 125.0, d_snow)) * smoothstep(15.0, 30.0, y_at(x, z)) > 0.5:
+			return "footstep_sand"  # snow≈沙（软地）
+		var d_vol := Vector2(x, z).distance_to(Vector2(164, -145))
+		if (1.0 - smoothstep(45.0, 115.0, d_vol)) * smoothstep(10.0, 25.0, y_at(x, z)) > 0.5:
+			return "footstep_grass"  # rock≈草（硬底）
+		return "footstep_sand" if y_at(x,z) < Terrain.WATER_LEVEL + 1.2 else "footstep_grass"
+	# battlefield：近岸沙、其余草
+	return "footstep_sand" if y_at(x, z) < Terrain.WATER_LEVEL + 1.2 else "footstep_grass"
+
+func y_at(x: float, z: float) -> float:
+	return get_height_baked(x, z) if not _height_grid.is_empty() else get_height(x, z)
+
 func is_near_road(x: float, z: float) -> bool:
 	if _road_mask.is_empty():
 		return false # 战场图无路网：不按"处处近路"处理（原 _road_near 空掩码返回 true 会滤光全部草）

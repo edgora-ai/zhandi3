@@ -46,7 +46,8 @@ var _buck_t := 0.0
 var _graze_t := 0.0
 var _call_target: Player = null
 var _call_t := 0.0
-var _gallop_cd := 0.0
+var _gallop_cd: float = 0.0
+var _walk_cd: float = 0.0  # // FIX: AUD2 walk轻蹄计时 0.55s
 
 
 func whistle_call(p: Player) -> void:
@@ -646,6 +647,12 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 		elif actual_speed > 0.15:
 			_play(&"walk")
 			_ap.speed_scale = clampf(actual_speed / 4.5, 0.7, 1.2)  # // FIX: GAIT 步速同步
+			_walk_cd -= delta  # // FIX: AUD2 walk轻蹄计时
+			if _walk_cd <= 0.0:
+				_walk_cd = 0.55  # // FIX: AUD2 0.55s间隔
+				var _sfx_walk: Node = get_tree().get_first_node_in_group("sfx_bank")  # // FIX: AUD2 显式类型
+				if _sfx_walk and _sfx_walk.has_method("play_at"):
+					_sfx_walk.call("play_at", "footstep_hoof", global_position, -17.0, 0.9)  # // FIX: AUD2 轻蹄 -17dB pitch0.9
 		else:
 			_play(&"idle")
 	# 头部随步态点头；无人骑乘且静置时周期性低头吃草。

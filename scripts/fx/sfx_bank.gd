@@ -37,6 +37,7 @@ const SOUNDS := {
 	"footstep_sand": "res://assets/sfx/footstep_sand.wav",
 	"footstep_wood": "res://assets/sfx/footstep_wood.wav",
 	"footstep_water": "res://assets/sfx/footstep_water.wav",
+	"footstep_hoof": "res://assets/sfx/footstep_hoof.wav",  # // FIX: AUD2 walk蹄声独立采样
 	"rain_loop": "res://assets/sfx/rain_loop.wav",
 	# // FIX: OPT-E3/FX14 交互缺口补齐
 	"ui_click": "res://assets/sfx/ui_click.wav",
@@ -66,7 +67,8 @@ var _pool_3d: Array[AudioStreamPlayer3D] = []
 var _idx_2d := 0
 var _idx_3d := 0
 var _print_budget := 40 # // FIX: FX18/E2 日志限量：默认只打前 40 条，--verbose-sfx 恢复全量
-var _hit_player: AudioStreamPlayer  # // FIX: HITP 命中专属通道（防枪声抢占）
+var _hit_players: Array[AudioStreamPlayer] = []  # // FIX: AUD3 命中专属3路池（连发不吞确认音）
+var _hit_idx: int = 0  # // FIX: AUD3 轮转索引
 var _music_player: AudioStreamPlayer
 var _ambience_player: AudioStreamPlayer
 var _boss_player: AudioStreamPlayer
@@ -94,10 +96,12 @@ func _ready() -> void:
 		p.bus = "SFX"
 		add_child(p)
 		_pool_2d.append(p)
-	# // FIX: HITP 命中/爆头专属通道（连发枪声占满池时不丢命中反馈）
-	_hit_player = AudioStreamPlayer.new()
-	_hit_player.bus = "SFX"
-	add_child(_hit_player)
+	# // FIX: AUD3 命中/爆头专属3路池（连发枪声占满池时不丢命中反馈，hit/headshot/kill_confirm轮转）
+	for _i: int in range(3):
+		var _hp: AudioStreamPlayer = AudioStreamPlayer.new()  # // FIX: AUD3 显式类型
+		_hp.bus = "SFX"
+		add_child(_hp)
+		_hit_players.append(_hp)
 	for i in range(16):
 		var p := AudioStreamPlayer3D.new()
 		p.bus = "SFX"
@@ -148,12 +152,22 @@ func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if _streams[name] == null:
 		print("[sfx] WARN null stream: ", name)
 		return
-	# // FIX: HITP hit/headshot 走专属通道，永远盖过枪声
-	if name in ["hit", "headshot", "kill_confirm"] and _hit_player:
-		_hit_player.stream = _streams[name]
-		_hit_player.volume_db = volume_db
-		_hit_player.pitch_scale = pitch * randf_range(0.97, 1.03)
-		_hit_player.play()
+	# // FIX: AUD3 hit/headshot/kill_confirm 走3路命中专属池，轮转防吞音
+	if name in ["hit", "headshot", "kill_confirm"] and _hit_players.size() > 0:
+		var _hp_pick: AudioStreamPlayer = _hit_players[0]  # // FIX: AUD3 显式类型
+		var _found: bool = false  # // FIX: AUD3 显式类型
+		for _hp_iter: AudioStreamPlayer in _hit_players:  # // FIX: AUD3 显式类型
+			if not _hp_iter.playing:
+				_hp_pick = _hp_iter
+				_found = true
+				break
+		if not _found:
+			_hp_pick = _hit_players[_hit_idx]
+			_hit_idx = (_hit_idx + 1) % _hit_players.size()
+		_hp_pick.stream = _streams[name]
+		_hp_pick.volume_db = volume_db
+		_hp_pick.pitch_scale = pitch * randf_range(0.97, 1.03)
+		_hp_pick.play()
 		_log("[sfx] hit play %s" % name)
 		return
 	var p := _pick_2d()
@@ -361,9 +375,9 @@ func _exit_tree() -> void:
 	for p in _pool_3d:
 		p.stop()
 		p.stream = null
-	if _hit_player:
-		_hit_player.stop()
-		_hit_player.stream = null
+	for _hp_exit: AudioStreamPlayer in _hit_players:  # // FIX: AUD3 显式类型
+		_hp_exit.stop()
+		_hp_exit.stream = null
 	if _music_player:
 		_music_player.stop()
 		_music_player.stream = null

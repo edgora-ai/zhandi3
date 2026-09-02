@@ -435,6 +435,7 @@ for k in range(4):
     for j, x in enumerate(noise_burst(0.03, 0.012, 0.16, 0.30)):
         if off + j < len(eng):
             eng[off + j] += x
+eng = loopify(eng, 0.10)  # // FIX: AUD1 engine_loop 100ms 首尾交叠无咔哒（参考 music/ambience loopify）
 write_wav("engine_loop.wav", eng)
 # 探索精灵奖励：三连上行铃 + 咻
 kk = mix(sweep(0.12, 900.0, 1800.0, 0.08, 0.22), [0.0] * int(SR * 0.10) + tone(0.14, 1046.5, 0.10, 0.30))

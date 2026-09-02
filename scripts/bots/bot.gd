@@ -442,7 +442,8 @@ func _think_tick() -> void:
 			state = State.LOOT
 			target_loot = med
 			return
-	if armor <= 0.0:
+	# // FIX: RES 护甲 <35 即补（原仅 0 才搜，残甲 Bot 等效裸身送 TTK）
+	if armor < 35.0:
 		var arm := _find_nearest_loot("armor", 45.0)
 		if arm:
 			if target_loot != arm or state != State.LOOT:
@@ -450,7 +451,10 @@ func _think_tick() -> void:
 			state = State.LOOT
 			target_loot = arm
 			return
-	if weapon.reserve == 0 and weapon.mag_left == 0:
+	# // FIX: RES 弹药不足一半即搜（原仅全空才搜，Bot 带 5 发进战白送）
+	var _tot_ammo: int = weapon.reserve + weapon.mag_left
+	var _mag_cap: int = int(weapon.data.get("mag", 30)) if weapon.weapon_id != "" else 30
+	if weapon.weapon_id != "" and _tot_ammo < _mag_cap:
 		var ammo_loot := _find_nearest_loot("ammo")
 		if ammo_loot:
 			if target_loot != ammo_loot or state != State.LOOT:
@@ -685,12 +689,20 @@ func _physics_process(delta: float) -> void:
 		# glb 路径由骨骼动画驱动：交战端枪 / 奔跑 / 走步 / 站立。
 		if state == State.FIGHT and aim_target:
 			_play(&"fight")
+			if _ap:
+				_ap.speed_scale = 1.0
 		elif h_speed > (WALK + RUN) * 0.5:
 			_play(&"run")
+			if _ap:
+				_ap.speed_scale = clampf(h_speed / RUN, 0.8, 1.5)  # // FIX: SS glb 步速同步防滑步
 		elif h_speed > 0.5:
 			_play(&"walk")
+			if _ap:
+				_ap.speed_scale = clampf(h_speed / WALK, 0.7, 1.3)  # // FIX: SS
 		else:
 			_play(&"idle")
+			if _ap:
+				_ap.speed_scale = 1.0
 		return
 	_leg_l.rotation.x = swing
 	_leg_r.rotation.x = -swing

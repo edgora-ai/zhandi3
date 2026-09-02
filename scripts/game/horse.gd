@@ -627,14 +627,16 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 			_play(&"graze")
 		elif speed_ratio > 0.75:
 			_play(&"gallop")
+			_ap.speed_scale = clampf(actual_speed / 11.0, 0.9, 1.6)  # // FIX: GAIT 步速同步
 			_gallop_cd -= delta
 			if _gallop_cd <= 0.0:
 				_gallop_cd = 0.32
 				var _sfx_hg := get_tree().get_first_node_in_group("sfx_bank")
 				if _sfx_hg:
 					_sfx_hg.play_at("footstep_sand", global_position, -13.0, randf_range(0.7, 0.8))  # // FIX: HOOF 蹄声独立
-		elif speed_ratio > 0.4:
+		elif speed_ratio > 0.55:
 			_play(&"trot")
+			_ap.speed_scale = clampf(actual_speed / 7.0, 0.8, 1.4)  # // FIX: GAIT 步速同步  # // FIX: GAIT trot 阈值 0.4→0.55（WALK 9/19=0.47 应在 walk）
 			_gallop_cd -= delta * 0.5
 			if _gallop_cd <= 0.0:
 				_gallop_cd = 0.45
@@ -643,6 +645,7 @@ func _animate_gait(delta: float, speed_ratio: float) -> void:
 					_sfx_ht.play_at("footstep_sand", global_position, -15.0, randf_range(0.65, 0.75))  # // FIX: HOOF
 		elif actual_speed > 0.15:
 			_play(&"walk")
+			_ap.speed_scale = clampf(actual_speed / 4.5, 0.7, 1.2)  # // FIX: GAIT 步速同步
 		else:
 			_play(&"idle")
 	# 头部随步态点头；无人骑乘且静置时周期性低头吃草。

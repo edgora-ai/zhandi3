@@ -498,6 +498,12 @@ _head2 = tone(0.040, 5600.0, 0.008, 0.55, "square")
 headshot = mix(_head1, [0.0] * int(SR * 0.018) + _head2)
 write_wav("headshot.wav", headshot)
 
+# // FIX: KC kill_confirm 独立采样（下扫 900→300Hz + 58Hz thump，与爆头高频 3.8k 区分听觉）
+_kc1 = sweep(0.14, 900.0, 300.0, 0.09, 0.5)
+_kc2 = tone(0.10, 58.0, 0.06, 0.65)
+kill_confirm = mix(_kc1, [0.0] * int(SR * 0.012) + _kc2)
+write_wav("kill_confirm.wav", kill_confirm)
+
 # 独立高频鸟鸣：确定性双滑音 chirp，不复用狼嚎，不消耗全局 random（固定频率）
 _b1 = sweep(0.09, 2800.0, 4200.0, 0.028, 0.42)
 _b2 = sweep(0.07, 3600.0, 5200.0, 0.022, 0.36)

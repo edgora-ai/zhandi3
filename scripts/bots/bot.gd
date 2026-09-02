@@ -737,8 +737,11 @@ func _fight_move() -> Vector3:
 	var fwd := to_t.normalized()
 	var side := fwd.cross(Vector3.UP) * _strafe_dir
 	var move := side
+	# // FIX: RANGE DMR 近距(<15m)主动后拉保距，防玩家贴脸白嫖木桩
+	if weapon.weapon_id == "dmr" and dist < 15.0:
+		move = (side * 0.4 - fwd * 0.95).normalized()
 	# // FIX: TACT 残血(≤40%)时后拉求生，不再原地横移送死
-	if hp < MAX_HP * 0.4 and dist < 30.0:
+	elif hp < MAX_HP * 0.4 and dist < 30.0:
 		move = (side * 0.5 - fwd * 0.9).normalized()
 	elif dist > FIGHT_DIST + 10.0:
 		move = (side * 0.6 + fwd * 0.8).normalized()

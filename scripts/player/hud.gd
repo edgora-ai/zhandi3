@@ -187,6 +187,7 @@ func _build_minimap() -> void:
 var _minimap_zone: ColorRect
 var _minimap_zone_next: Panel # // FIX: OPT-H1 下一目标圈预览
 var _minimap_capture_dots: Array[ColorRect] = []
+var _minimap_dot_t := 0.0  # // FIX: MAP 占点标记节流
 
 func update_minimap(player: Player, zone: Zone = null) -> void:
 	if _minimap_wrap == null:
@@ -215,6 +216,35 @@ func update_minimap(player: Player, zone: Zone = null) -> void:
 				if sb:
 					sb.set_corner_radius_all(int(nr))
 
+
+
+
+	# // FIX: MAP 占点 A/B/C 标记（原声明未接线）；0.25s 节流
+	_minimap_dot_t -= get_process_delta_time()
+	if _minimap_dot_t <= 0.0:
+		_minimap_dot_t = 0.25
+		var cps := get_tree().get_nodes_in_group("capture_point")
+		while _minimap_capture_dots.size() > cps.size():
+			var _gone: ColorRect = _minimap_capture_dots.pop_back()
+			if is_instance_valid(_gone):
+				_gone.queue_free()
+		for i in range(cps.size()):
+			if i >= _minimap_capture_dots.size():
+				var _d := ColorRect.new()
+				_d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				_d.size = Vector2(6, 6)
+				_minimap_wrap.add_child(_d)
+				_minimap_capture_dots.append(_d)
+			var cp: Variant = cps[i]
+			var _dot: ColorRect = _minimap_capture_dots[i]
+			var _own: Variant = cp.get("owner_body")
+			if _own != null and _own == player:
+				_dot.color = Color(0.25, 0.85, 0.35)
+			elif _own != null:
+				_dot.color = Color(0.90, 0.30, 0.22)
+			else:
+				_dot.color = Color(0.85, 0.85, 0.35)
+			_dot.position = _world_to_map(cp.global_position) - Vector2(3, 3)
 
 
 # ---------- 准星 ----------

@@ -368,13 +368,10 @@ func _die(from: Variant) -> void:
 	Loot.spawn(get_tree().current_scene, global_position + Vector3(0, 0.25, 0), "meat", "", meat_count, 1)
 	collision_layer = 0
 	collision_mask = 0
-	if _ap and _ap.has_animation(&"die"):
-		_play(&"die")
-	else:
-		# // FIX: DIE 无死亡剪辑时侧躺倒地（原停在站姿=“卡住”），0.9s 后回收
-		var tw_d := create_tween()
-		tw_d.tween_property(self, "rotation:x", -PI * 0.5, 0.35).set_trans(Tween.TRANS_SINE)
-		tw_d.parallel().tween_property(self, "position:y", global_position.y - 0.25, 0.35)
+	# // FIX: DIE 死亡统一 tween 侧倒，不再播 die 剪辑（glb die 历史为绕Y打转不可信；程序化与 glb 同路径）
+	var tw_d := create_tween()
+	tw_d.tween_property(self, "rotation:x", -PI * 0.5, 0.35).set_trans(Tween.TRANS_SINE)
+	tw_d.parallel().tween_property(self, "position:y", global_position.y - 0.25, 0.35)
 	await get_tree().create_timer(0.9).timeout
 	if is_inside_tree() and not is_queued_for_deletion():
 		queue_free()

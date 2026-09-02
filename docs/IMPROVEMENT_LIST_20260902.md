@@ -30,7 +30,7 @@
 |---|----|------|----------|------|
 | M1 | 头盒贴合视觉 | 熊 .68→.62 狼 .38→.34 猪 .42→.38 | 爆头判定 ≈ 视觉头 1.10× | ✅ 42e1100 |
 | M2 | 屋顶碰撞 | hip/gable 屋顶补 Box col | 无法跳穿屋顶入屋（--ground 出生地旁房顶站立） | ✅ 42e1100 |
-| M3 | 野兽死亡轴向 | creatures.py die (0,78,0)→绕X侧倒（需 blender 重导） | 无法在本仓直接验证，标注待 blender 环境 | ⬜ 需blender |
+| M3 | 野兽死亡轴向 | creatures.py die 绕Y→绕Z；运行时统一 tween 侧倒（保留用户认可 glb） | 动物死亡侧躺倒地非打转（目检/日志） | ✅ c5e47f2+ |
 | M4 | wild_world 共享 Mesh | _part 复用 _shared_box_mats 模式 | boot 节点数/内存下降（[boot] mem 对比） | ✅ 43d7730 |
 | M5 | 血月 rim 同步 | day_night 血月分支 rim/fill 压暗 | 血月角色剪影不再冷白（截图对比） | ✅ 43d7730 |
 

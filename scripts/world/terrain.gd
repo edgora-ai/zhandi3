@@ -261,7 +261,6 @@ func _build() -> void:
 	_ground_material = ShaderMaterial.new()
 	_ground_material.shader = load("res://assets/shaders/ground.gdshader")
 	mesh_instance.material_override = _ground_material
-	mesh_instance.visibility_range_end = 800.0  # // FIX: AUD-P1-1 地形视距兜底（远景剔除占位）
 	add_child(mesh_instance)
 
 	var body := StaticBody3D.new()
@@ -375,8 +374,8 @@ func _road_near(x: float, z: float) -> bool:
 func _build_water() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(SIZE, SIZE) if profile == "wild" else Vector2(SIZE * 1.1, SIZE * 1.1)
-	plane.subdivide_width = 32  # // FIX: AUD-P0-8 水面 64->32 减半
-	plane.subdivide_depth = 32
+	plane.subdivide_width = 64
+	plane.subdivide_depth = 64
 	var water := MeshInstance3D.new()
 	water.name = "Water"
 	water.mesh = plane

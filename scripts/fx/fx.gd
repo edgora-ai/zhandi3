@@ -531,9 +531,15 @@ static func impact(pos: Vector3, color: Color = Color(0.85, 0.80, 0.65)) -> void
 static func decal(pos: Vector3, normal: Vector3) -> void:
 	_ensure_decal_res()
 	_reset_pools_if_scene_invalid()
-	if _decals.size() > 0 and not is_instance_valid(_decals[0]):
-		_decals.clear()
-		_decal_idx = 0
+	# // FIX: FEEL 弹孔池全量巡检（原仅查[0]，1..63 freed 漏检）
+	if _decals.size() > 0:
+		var _alive: Array[MeshInstance3D] = []
+		for _d in _decals:
+			if is_instance_valid(_d):
+				_alive.append(_d)
+		if _alive.size() != _decals.size():
+			_decals = _alive
+			_decal_idx = _decals.size() % DECAL_MAX if _decals.size() > 0 else 0
 	var mi: MeshInstance3D
 	if _decals.size() < DECAL_MAX:
 		mi = MeshInstance3D.new()

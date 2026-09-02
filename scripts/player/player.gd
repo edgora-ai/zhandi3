@@ -13,6 +13,7 @@ signal backpack_changed
 @export var SPRINT_SPEED := 8.6 # // FIX: M13
 const ACCEL := 30.0
 const AIR_ACCEL := 14.0
+const FRICTION := 18.0  # // FIX: FEEL 地面无输入摩擦
 const GRAVITY := 22.0
 const JUMP_VEL := 7.6
 var MOUSE_SENS := 0.0022 # // FIX: R4-U1 设置面板可调灵敏度（原 const）
@@ -113,6 +114,8 @@ var _ladder: Area3D = null
 var _col: CollisionShape3D
 var _glider: Node3D
 var _airborne_time := 0.0
+var _coyote_t := 0.0  # // FIX: FEEL coyote 0.15s 宽限（离地后仍可跳）
+var _jump_buf_t := 0.0  # // FIX: FEEL jump buffer 0.18s（落地前预输入不吞）
 var _glider_open := 0.0
 var _melee_cd := 0.0
 var _combo_i := 0
@@ -730,6 +733,15 @@ func _surface_footstep() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	# // FIX: FEEL coyote+buffer 墙钟（前置于所有 early return）
+	if is_on_floor():
+		_coyote_t = 0.15
+	else:
+		_coyote_t = maxf(0.0, _coyote_t - delta)
+	if Input.is_action_just_pressed("jump"):
+		_jump_buf_t = 0.18
+	else:
+		_jump_buf_t = maxf(0.0, _jump_buf_t - delta)
 	_last_frame_vy = velocity.y # // FIX: OPT-H5 记录落地前垂直速度
 	_check_timed_consumables()
 	_update_shake(delta)
@@ -834,9 +846,13 @@ func _physics_process(delta: float) -> void:
 	if _weather and _weather.raining and _weather.rain_strength > 0.5:
 		speed *= 0.92  # // FIX: AUD-P1-7
 
-	var accel := ACCEL if is_on_floor() else AIR_ACCEL
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
-	hv = hv.move_toward(wish * speed, accel * delta)
+	if wish.length_squared() < 0.001:
+		# // FIX: FEEL 摩擦分离：无输入按地面摩擦减速（原 move_toward 急停过粘）
+		hv = hv.move_toward(Vector3.ZERO, (FRICTION if is_on_floor() else AIR_ACCEL * 0.7) * delta)
+	else:
+		var accel := ACCEL if is_on_floor() else AIR_ACCEL
+		hv = hv.move_toward(wish * speed, accel * delta)
 	velocity.x = hv.x
 	velocity.z = hv.z
 
@@ -867,10 +883,19 @@ func _physics_process(delta: float) -> void:
 		if is_dropping:
 			is_dropping = false
 			landed.emit()
-		if Input.is_action_pressed("jump"):
+		if _jump_buf_t > 0.0:
+			velocity.y = JUMP_VEL
+			_jump_buf_t = 0.0
+			_coyote_t = 0.0
+		elif Input.is_action_pressed("jump"):
 			velocity.y = JUMP_VEL
 	else:
 		_landed_last_frame = false
+		# // FIX: FEEL 空中 coyote 窗内仍可起跳
+		if _jump_buf_t > 0.0 and _coyote_t > 0.0:
+			velocity.y = JUMP_VEL
+			_jump_buf_t = 0.0
+			_coyote_t = 0.0
 		_airborne_time += delta
 		# 初次空降和之后从任意悬崖跃下都能展开；普通小跳因离地高度不足不会误触。
 		var clearance := 99.0

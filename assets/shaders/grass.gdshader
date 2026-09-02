@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_disabled, unshaded, depth_draw_alpha_prepass  // FIX: AUD-P0-6 透排修正;
+render_mode cull_disabled, unshaded, depth_draw_opaque  // FIX: AUD-P0-6 透排修正;
 
 // FIX: OPT-F2/TA3 全局日光系数：unshaded 材质随昼夜明暗（夜晚草地 ≤ 白天 30%），修夜景"荧光地毯"
 global uniform float day_light;

@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode cull_disabled, unshaded, depth_draw_alpha_prepass  // FIX: AUD-P0-6 透排修正;
+render_mode cull_disabled, unshaded, depth_draw_opaque  // FIX: AUD-P0-6 透排修正;
 
 // FIX: OPT-F2/TA3 全局日光系数：树冠随昼夜明暗
 global uniform float day_light;

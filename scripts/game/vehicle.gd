@@ -433,6 +433,11 @@ func _physics_process(delta: float) -> void:
 	if driver:
 		driver.global_position = global_position + global_transform.basis * Vector3(0, 1.25, 0.25)
 		driver.rotation.y = rotation.y
+	# // FIX: FEEL 引擎音随速：怠速 0.9x/全速 1.4x，音量随速上升（质感项纯音频）
+	if _engine and driver:
+		var spd_r := clampf(absf(speed) / TOP_SPEED, 0.0, 1.0)
+		_engine.pitch_scale = lerpf(0.9, 1.4, spd_r)
+		_engine.volume_db = lerpf(-14.0, -8.0, spd_r)
 	_update_camera(delta, speed_ratio)
 
 

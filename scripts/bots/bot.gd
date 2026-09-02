@@ -67,6 +67,9 @@ var _head: Node3D
 var _look_phase := 0.0
 var _glance_yaw := 0.0
 var _step_cd := 0.0 # // FIX: OPT-E1/REG2 bot 脚步 3D 播放（听声辨位链路补全）
+var _tact_hits: int = 0 # // FIX: TACT2 换掩体：单次战斗受击计数
+var _tact_cover_t: float = 0.0 # // FIX: TACT2 换掩体：转移冷却标记，0可触发
+var _tact_strafe_t: float = 0.0 # // FIX: TACT1 拉枪线：横移翻转间隔计时
 
 
 var _glb: Node3D
@@ -385,6 +388,9 @@ func _think_tick() -> void:
 	if enemy:
 		if state != State.FIGHT:
 			_strafe_dir = 1.0 if randf() < 0.5 else -1.0
+			_tact_hits = 0 # // FIX: TACT2 换掩体：新战斗清计数
+			_tact_cover_t = 0.0 # // FIX: TACT2 换掩体：新战斗清冷却
+			_tact_strafe_t = randf_range(1.5, 3.5) # // FIX: TACT1 拉枪线：入战重置翻转计时
 		state = State.FIGHT
 		aim_target = enemy
 		_lose_sight = 0.0
@@ -392,6 +398,20 @@ func _think_tick() -> void:
 		_suppress_left = 3 # // FIX: R4-11
 		return
 	if state == State.FIGHT:
+		# // FIX: TACT2 换掩体：单次战斗受击≥3次侧向转移8-12m一次
+		if _tact_hits >= 3 and _tact_cover_t == 0.0 and aim_target and is_instance_valid(aim_target):
+			var _tact_fwd: Vector3 = (aim_target.global_position - global_position)
+			_tact_fwd.y = 0
+			if _tact_fwd.length() > 0.5:
+				_tact_fwd = _tact_fwd.normalized()
+				var _tact_side: Vector3 = _tact_fwd.cross(Vector3.UP).normalized()
+				var _tact_sign: float = 1.0 if randf() < 0.5 else -1.0
+				var _tact_dist: float = randf_range(8.0, 12.0)
+				var _tact_off: Vector3 = _tact_side * (_tact_sign * _tact_dist)
+				_tact_off.y = 0
+				move_target = global_position + _tact_off
+				_tact_cover_t = 1.0
+				_tact_hits = 0
 		# // FIX: R2-B3b 交战态查圈：圈外且残血强制撤离（原 outside 算完即被 early-return 吞掉，bot 站圈里对枪到毒死）
 		if outside and hp < MAX_HP * 0.6:
 			state = State.ROTATE
@@ -595,6 +615,7 @@ func _physics_process(delta: float) -> void:
 		_update_corpse(delta)
 		return
 	_vision_cd = maxf(0.0, _vision_cd - delta) # // FIX: H7 射线节流计时
+	_tact_strafe_t = maxf(0.0, _tact_strafe_t - delta) # // FIX: TACT1 拉枪线：翻转间隔倒计时
 	_think -= delta
 	if _think <= 0.0:
 		# 远距 AI（>80m 无可见目标）降频至 0.5Hz，近距保持 3Hz
@@ -745,10 +766,10 @@ func _fight_move() -> Vector3:
 		return Vector3.ZERO
 	var to_t := aim_target.global_position - global_position
 	to_t.y = 0
-	var dist := to_t.length()
-	var fwd := to_t.normalized()
-	var side := fwd.cross(Vector3.UP) * _strafe_dir
-	var move := side
+	var dist: float = to_t.length()
+	var fwd: Vector3 = to_t.normalized()
+	var side: Vector3 = fwd.cross(Vector3.UP) * _strafe_dir
+	var move: Vector3 = side
 	# // FIX: RANGE DMR 近距(<15m)主动后拉保距，防玩家贴脸白嫖木桩
 	if weapon.weapon_id == "dmr" and dist < 15.0:
 		move = (side * 0.4 - fwd * 0.95).normalized()
@@ -759,8 +780,10 @@ func _fight_move() -> Vector3:
 		move = (side * 0.6 + fwd * 0.8).normalized()
 	elif dist < FIGHT_DIST - 8.0:
 		move = (side * 0.6 - fwd * 0.8).normalized()
-	if randf() < 0.01:
+	# // FIX: TACT1 拉枪线：横移翻转间隔随机化1.5-3.5s才可能翻转（原固定randf()<0.01每帧概率）
+	if _tact_strafe_t <= 0.0:
 		_strafe_dir *= -1.0
+		_tact_strafe_t = randf_range(1.5, 3.5)
 	return move
 
 
@@ -770,6 +793,14 @@ func _fight_fire(delta: float) -> void:
 	if weapon.mag_left <= 0:
 		weapon.start_reload()
 		return
+	# // FIX: TACT3 预换弹：FIGHT中弹匣<25%且距目标>15m且未警觉时主动换弹
+	if _alert_t <= 0.0 and not weapon.reloading and weapon.weapon_id != "":
+		var _tact_mag_cap: int = int(weapon.data.get("mag", 30)) if not weapon.data.is_empty() else 30
+		if _tact_mag_cap > 0 and weapon.mag_left < _tact_mag_cap * 0.25:
+			var _tact_d2: float = global_position.distance_to(aim_target.global_position)
+			if _tact_d2 > 15.0 and weapon.reserve > 0:
+				weapon.start_reload()
+				return
 	# // FIX: OPT-A3 烟雾遮断视线即停火：目标被烟遮挡时不开火（压制弹只打最后已知位置）
 	var dist := global_position.distance_to(aim_target.global_position)
 	if dist > weapon.data.range * 0.85:
@@ -846,8 +877,13 @@ func take_damage(amount: float, from: Variant = null, part: String = "body") -> 
 		armor -= absorbed
 		dmg -= absorbed
 	hp -= dmg
+	# // FIX: TACT2 换掩体：FIGHT单次战斗受击计数
+	if state == State.FIGHT and from is Node3D:
+		var _tact_fs: Variant = from.get("squad_id") if from.get("squad_id") != null else -1
+		if not (squad_id >= 0 and int(_tact_fs) == squad_id):
+			_tact_hits += 1
 	# // FIX: OPT-A5 命中反馈：飘字（爆头变红）+ 受击压扁闪动，与野怪同款标准
-	var col := Color(1.0, 0.35, 0.30) if part == "head" else Color(1.0, 0.85, 0.25)
+	var col: Color = Color(1.0, 0.35, 0.30) if part == "head" else Color(1.0, 0.85, 0.25)
 	DamageNumber.spawn_at(get_parent(), global_position + Vector3(0, 2.05, 0), "%d%s" % [int(round(dmg)), "爆头" if part == "head" else ""], col)
 	_flash_hit()
 	# // FIX: OPT-A3/CB5 受击不再瞬锁：非交战态进入 0.5s 警觉期（转身面向来源、不锁定不开火）；

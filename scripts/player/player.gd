@@ -1348,6 +1348,10 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 		if to_attacker.length_squared() > 0.01 and to_attacker.normalized().dot(-global_transform.basis.z) > 0.25:
 			if Time.get_ticks_msec() / 1000.0 - _block_start < 0.18:
 				FX.parry_flash(camera.global_position + get_aim_dir() * 1.2)
+				# // FIX: BLK 弹反清脆音（pitch 1.35 金属鸣）
+				var _sfx_p := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_p:
+					_sfx_p.play("headshot", -6.0, 1.35)
 				Engine.time_scale = 0.05
 				_hitstop_end_ms = Time.get_ticks_msec() + 60
 				# 完美格挡守卫光束：直接弹回，守卫自毁。
@@ -1367,6 +1371,10 @@ func take_damage(amount: float, from: Variant = null, _part: String = "body") ->
 			if stamina > 0.0:
 				dmg *= 0.25
 				_drain_stamina(10.0)
+				# // FIX: BLK 盾挡闷响（pitch 0.8 沉）
+				var _sfx_b2 := get_tree().get_first_node_in_group("sfx_bank")
+				if _sfx_b2:
+					_sfx_b2.play("heavy_impact", -10.0, 0.8)
 				if hud and dmg >= 8.0:
 					hud.add_feed("格挡住了攻击")
 	if armor > 0.0:

@@ -200,6 +200,15 @@ func pull_trigger_dir(dir: Vector3) -> void:
 	fired.emit()
 
 
+# // FIX: RELC 换弹取消：冲刺/机瞄按下/跳跃时中断（保留当前弹匣+进冷却 0.2s），防止换弹成站桩锁
+func cancel_reload() -> void:
+	if not reloading:
+		return
+	reloading = false
+	_reload_left = 0.0
+	_cool = maxf(_cool, 0.2)
+
+
 func start_reload() -> void:
 	if reloading or weapon_id == "":
 		return
@@ -620,8 +629,19 @@ func _process(delta: float) -> void:
 	else:
 		_bloom = maxf(0.0, _bloom - delta * 4.0)
 	if reloading:
-		_reload_left -= delta
-		if _reload_left <= 0.0:
+		# // FIX: RELC 换弹取消触发（sprint/jump/ADS/高速移动）
+		if is_player and owner_body:
+			var _rc := owner_body as Node
+			if _rc.get("vehicle") != null and _rc.vehicle != null:
+				cancel_reload()
+			elif Input.is_action_pressed("sprint") and _rc.get("stamina") != null and float(_rc.stamina) > 1.0:
+				cancel_reload()
+			elif Input.is_action_just_pressed("jump"):
+				cancel_reload()
+			elif is_ads:
+				cancel_reload()
+	_reload_left -= delta
+	if _reload_left <= 0.0:
 			reloading = false
 			var mag_v: Variant = data.get("mag", 0)
 			var mag_i: int = int(mag_v) if mag_v is int else int(float(mag_v)) if mag_v is float else 0

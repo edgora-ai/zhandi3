@@ -49,6 +49,7 @@ func _build_visual() -> void:
 	bm.cull_mode = BaseMaterial3D.CULL_DISABLED
 	beam.material_override = bm
 	beam.position.y = 4.5
+	beam.scale = Vector3.ONE * (0.7 + 0.3 * rarity)  # // FIX: RAR 稀有度光柱尺寸 1白/1.3蓝/1.6紫
 	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(beam)
 
@@ -312,8 +313,8 @@ func _process(delta: float) -> void:
 	if consumed:
 		return
 	_t += delta
-	_item.rotation.y = _t * 1.6
-	_item.position.y = 0.55 + sin(_t * 2.2) * 0.1
+	_item.rotation.y = _t * (1.2 + 0.5 * rarity)  # // FIX: RAR 稀有更快
+	_item.position.y = 0.55 + sin(_t * 2.2) * (0.08 + 0.04 * rarity)
 
 
 func describe() -> String:
